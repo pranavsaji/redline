@@ -1,0 +1,80 @@
+app:
+  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000
+  runtime:
+    name: nodejs22.x
+  package:
+    bundler: manual@2026
+    path: dist
+modules:
+  sql:
+    - key: main
+      engine: mysql
+  trigger:
+    - key: on-install
+      function: onInstall
+      events: [avi:forge:installed:app]
+  jira:issuePanel:
+    - key: redline-panel
+      resource: config
+      resolver:
+        function: spikeResolver
+      title: Redline security review
+  action:
+    - key: ping
+      name: Ping Redline
+      function: ping
+      actionVerb: GET
+      description: Health check that returns the issue key it was given.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: true
+          description: The Jira work item key
+    - key: ingest-threat-model
+      name: "Redline: ingest threat model"
+      function: ingestThreatModelSpike
+      actionVerb: CREATE
+      description: Saves the Redline agent's threat model for a work item.
+      config:
+        resource: config
+        render: default
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: true
+          description: The Jira work item key
+        agentResponse:
+          title: Agent response
+          type: string
+          required: true
+          description: The Redline agent's response
+  automation:actionProvider:
+    - key: redline-automation
+      actions: [ingest-threat-model]
+  rovo:agent:
+    - key: redline-reviewer
+      name: Redline
+      description: Security reviewer for Jira work items.
+      prompt: You are Redline Security Reviewer. Call ping with the issue key you are given and reply with the result.
+      conversationStarters:
+        - Ping PROJ-1
+      actions: [ping]
+  function:
+    - key: onInstall
+      handler: index.onInstall
+    - key: spikeResolver
+      handler: index.spikeResolver
+    - key: ping
+      handler: index.ping
+    - key: ingestThreatModelSpike
+      handler: index.ingestThreatModelSpike
+resources:
+  - key: config
+    path: static/config
+permissions:
+  scopes:
+    - read:jira-work
+    - write:jira-work
+    - storage:app

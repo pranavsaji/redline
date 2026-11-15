@@ -1,0 +1,25 @@
+{
+  "name": "@redline/core-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "lint:forge": "forge lint"
+  },
+  "dependencies": {
+    "@forge/api": "^8.5.0",
+    "@forge/sql": "^4.0.10",
+    "@forge/kvs": "^2.1.2",
+    "@forge/events": "^3.0.10",
+    "@forge/resolver": "^2.0.2",
+    "@redline/shared": "workspace:*",
+    "@redline/crypto": "workspace:*",
+    "@redline/core": "workspace:*",
+    "@redline/db": "workspace:*",
+    "@redline/prompts": "workspace:*",
+    "@redline/frameworks": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

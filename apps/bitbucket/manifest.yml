@@ -1,0 +1,22 @@
+app:
+  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000001
+  runtime:
+    name: nodejs22.x
+  package:
+    bundler: manual@2026
+    path: dist
+modules:
+  bitbucket:mergeCheck:
+    - key: redline-merge-check
+      function: mergeCheck
+      name: Redline security attestation
+      description: Requires a valid Redline attestation for security-sensitive changes
+      triggers: [on-code-pushed, on-merge]
+  function:
+    - key: mergeCheck
+      handler: index.mergeCheck
+permissions:
+  scopes:
+    - read:pullrequest:bitbucket
+    - read:repository:bitbucket
+    - storage:app

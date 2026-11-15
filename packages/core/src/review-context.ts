@@ -29,7 +29,7 @@ const nonceFor = (bundle: ContextBundle): string => {
  * metadata in the clear, deterministic signals, and the output contract. Kept under 200 KB by dropping tail facts.
  */
 export function buildReviewContext(bundle: ContextBundle, opts: { revision: number; nonce?: string }): ReviewContextDto {
-  const nonce = opts.nonce && !bundle.facts.some((f) => f.excerpt.includes(opts.nonce!)) ? opts.nonce : nonceFor(bundle);
+  const nonce = opts.nonce && !bundle.facts.some((f) => f.excerpt.includes(opts.nonce!) || f.title.includes(opts.nonce!)) ? opts.nonce : nonceFor(bundle);
   const { evidence: _e, ...signals } = extractSignals(bundle.facts);
   const dto: ReviewContextDto = {
     issueKey: bundle.issueKey,
@@ -43,8 +43,11 @@ export function buildReviewContext(bundle: ContextBundle, opts: { revision: numb
   };
   let size = JSON.stringify(dto).length;
   for (const f of bundle.facts) {
-    const text = f.trustLevel === 'untrusted' ? `<<DATA-${nonce} id="${f.id}">>\n${f.excerpt}\n<</DATA-${nonce}>>` : f.excerpt;
-    const item = { id: f.id, sourceType: f.sourceType, title: f.title, url: f.url, trust: f.trustLevel, injectionSuspected: f.injectionSuspected, text };
+    // Untrusted titles are human-written too: they go inside the DATA block, and the label shown outside is defanged.
+    const untrusted = f.trustLevel === 'untrusted';
+    const text = untrusted ? `<<DATA-${nonce} id="${f.id}">>\nTitle: ${f.title}\n${f.excerpt}\n<</DATA-${nonce}>>` : f.excerpt;
+    const title = untrusted ? `Untrusted ${f.sourceType.replace('_', ' ')} ${f.id}` : f.title;
+    const item = { id: f.id, sourceType: f.sourceType, title, url: f.url, trust: f.trustLevel, injectionSuspected: f.injectionSuspected, text };
     const add = JSON.stringify(item).length + 1;
     if (size + add > MAX_CONTEXT_BYTES - 1024) {
       dto.truncated = true;
