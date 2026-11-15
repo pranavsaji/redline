@@ -1,4 +1,4 @@
 {
   "files": [],
-  "references": [{ "path": "packages/shared" }, { "path": "packages/crypto" }, { "path": "packages/frameworks" }]
+  "references": [{ "path": "packages/shared" }, { "path": "packages/crypto" }, { "path": "packages/frameworks" }, { "path": "packages/core" }]
 }

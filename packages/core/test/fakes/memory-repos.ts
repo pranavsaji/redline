@@ -1,0 +1,229 @@
+import { appError, err, ok, type ContextFact, type Requirement, type Review, type Threat } from '@redline/shared';
+import type {
+  AttestationRepo,
+  AttestationRow,
+  DiscardedThreat,
+  FeedbackRepo,
+  FeedbackRow,
+  IssueRepo,
+  IssueRow,
+  LedgerRepo,
+  LedgerRow,
+  RequirementRepo,
+  ReviewRepo,
+  Sample,
+  UsageRepo,
+  VerdictSink,
+} from '../../src/ports.js';
+
+const clone = <T>(v: T): T => structuredClone(v);
+
+export function memoryReviewRepo(): ReviewRepo & { _reviews: Map<string, Review> } {
+  const reviews = new Map<string, Review>();
+  const facts = new Map<string, ContextFact[]>();
+  const threats = new Map<string, Threat[]>();
+  const discarded = new Map<string, DiscardedThreat[]>();
+  const samples = new Map<string, Map<number, Sample>>();
+  const stages = new Map<string, { status: string; checkpoint?: unknown; error?: string }>();
+  return {
+    _reviews: reviews,
+    async latest(issueId) {
+      const list = [...reviews.values()].filter((r) => r.issueId === issueId).sort((a, b) => b.revision - a.revision);
+      return ok(list[0] ? clone(list[0]) : null);
+    },
+    async get(id) {
+      const r = reviews.get(id);
+      return ok(r ? clone(r) : null);
+    },
+    async history(issueId) {
+      return ok([...reviews.values()].filter((r) => r.issueId === issueId).sort((a, b) => a.revision - b.revision).map(clone));
+    },
+    async byStatus(status, olderThan) {
+      return ok([...reviews.values()].filter((r) => r.status === status && (!olderThan || r.updatedAt < olderThan)).map(clone));
+    },
+    async create(r) {
+      if (reviews.has(r.id)) return err(appError('conflict', `review ${r.id} exists`));
+      reviews.set(r.id, clone(r));
+      return ok(clone(r));
+    },
+    async update(id, patch) {
+      const r = reviews.get(id);
+      if (!r) return err(appError('not_found', `review ${id}`));
+      reviews.set(id, { ...r, ...clone(patch) });
+      return ok(undefined);
+    },
+    async saveFacts(reviewId, f) {
+      facts.set(reviewId, clone(f));
+      return ok(undefined);
+    },
+    async facts(reviewId) {
+      return ok(clone(facts.get(reviewId) ?? []));
+    },
+    async saveThreats(reviewId, t, d) {
+      threats.set(reviewId, clone(t));
+      discarded.set(reviewId, clone(d));
+      return ok(undefined);
+    },
+    async threats(reviewId) {
+      return ok(clone(threats.get(reviewId) ?? []));
+    },
+    async discarded(reviewId) {
+      return ok(clone(discarded.get(reviewId) ?? []));
+    },
+    async updateThreat(id, patch) {
+      for (const [rid, list] of threats) {
+        const i = list.findIndex((t) => t.id === id);
+        if (i >= 0) {
+          list[i] = { ...list[i]!, ...clone(patch) };
+          threats.set(rid, list);
+          return ok(undefined);
+        }
+      }
+      return err(appError('not_found', `threat ${id}`));
+    },
+    async saveSample(reviewId, n, sample) {
+      const m = samples.get(reviewId) ?? new Map<number, Sample>();
+      m.set(n, clone(sample));
+      samples.set(reviewId, m);
+      return ok(undefined);
+    },
+    async samples(reviewId) {
+      const m = samples.get(reviewId);
+      return ok(m ? [...m.entries()].sort((a, b) => a[0] - b[0]).map(([, s]) => clone(s)) : []);
+    },
+    async saveStage(reviewId, stage, status, checkpoint, error) {
+      stages.set(`${reviewId}:${stage}`, { status, checkpoint: clone(checkpoint), ...(error ? { error } : {}) });
+      return ok(undefined);
+    },
+    async stage(reviewId, stage) {
+      const s = stages.get(`${reviewId}:${stage}`);
+      return ok(s ? clone(s) : null);
+    },
+  };
+}
+
+export function memoryRequirementRepo(): RequirementRepo {
+  const reqs = new Map<string, Requirement>();
+  return {
+    async forIssue(issueId) {
+      return ok([...reqs.values()].filter((r) => r.issueId === issueId).map(clone));
+    },
+    async get(id) {
+      const r = reqs.get(id);
+      return ok(r ? clone(r) : null);
+    },
+    async upsert(r) {
+      reqs.set(r.id, clone(r));
+      return ok(undefined);
+    },
+  };
+}
+
+export function memoryLedgerRepo(): LedgerRepo & { _rows: LedgerRow[] } {
+  const rows: LedgerRow[] = [];
+  return {
+    _rows: rows,
+    async head() {
+      const last = rows.at(-1);
+      return ok(last ? { seq: last.seq, entryHash: last.entryHash } : null);
+    },
+    async append(e) {
+      if (rows.some((r) => r.prevHash === e.prevHash || r.seq === e.seq)) return err(appError('conflict', 'ledger head moved'));
+      rows.push(clone(e));
+      return ok(clone(e));
+    },
+    async range(fromSeq, toSeq) {
+      return ok(rows.filter((r) => r.seq >= fromSeq && r.seq <= toSeq).map(clone));
+    },
+    async all() {
+      return ok(rows.map(clone));
+    },
+  };
+}
+
+export function memoryFeedbackRepo(): FeedbackRepo & { _rows: FeedbackRow[] } {
+  const rows: FeedbackRow[] = [];
+  return {
+    _rows: rows,
+    async dismissedFor(component) {
+      return ok(
+        rows
+          .filter((r) => r.action === 'dismiss' && r.component === component && r.reason)
+          .map((r) => ({ title: r.title, stride: r.stride, reason: r.reason! })),
+      );
+    },
+    async record(f) {
+      rows.push(clone(f));
+      return ok(undefined);
+    },
+  };
+}
+
+export function memoryIssueRepo(): IssueRepo {
+  const issues = new Map<string, IssueRow>();
+  const pages = new Map<string, Set<string>>();
+  return {
+    async upsert(i) {
+      issues.set(i.issueId, clone(i));
+      return ok(undefined);
+    },
+    async get(issueId) {
+      const i = issues.get(issueId);
+      return ok(i ? clone(i) : null);
+    },
+    async byKey(issueKey) {
+      const i = [...issues.values()].find((x) => x.issueKey === issueKey);
+      return ok(i ? clone(i) : null);
+    },
+    async children(issueId) {
+      return ok([...issues.values()].filter((i) => i.parentId === issueId).map(clone));
+    },
+    async linkPage(issueId, pageId) {
+      const s = pages.get(pageId) ?? new Set<string>();
+      s.add(issueId);
+      pages.set(pageId, s);
+      return ok(undefined);
+    },
+    async issuesForPage(pageId) {
+      return ok([...(pages.get(pageId) ?? [])]);
+    },
+  };
+}
+
+export function memoryAttestationRepo(): AttestationRepo {
+  const rows: AttestationRow[] = [];
+  return {
+    async record(a) {
+      rows.push(clone(a));
+      return ok(undefined);
+    },
+    async forIssue(issueKey) {
+      return ok(rows.filter((r) => r.issueKey === issueKey).map(clone));
+    },
+  };
+}
+
+export function memoryUsageRepo(): UsageRepo {
+  const m = new Map<string, { tokensIn: number; tokensOut: number; reviews: number }>();
+  return {
+    async add(month, d) {
+      const cur = m.get(month) ?? { tokensIn: 0, tokensOut: 0, reviews: 0 };
+      m.set(month, { tokensIn: cur.tokensIn + d.tokensIn, tokensOut: cur.tokensOut + d.tokensOut, reviews: cur.reviews + d.reviews });
+      return ok(undefined);
+    },
+    async get(month) {
+      return ok(m.get(month) ?? { tokensIn: 0, tokensOut: 0, reviews: 0 });
+    },
+  };
+}
+
+export function memoryVerdictSink(): VerdictSink & { _written: Map<string, unknown> } {
+  const written = new Map<string, unknown>();
+  return {
+    _written: written,
+    async write(issueId, v) {
+      written.set(issueId, clone(v));
+      return ok(undefined);
+    },
+  };
+}
