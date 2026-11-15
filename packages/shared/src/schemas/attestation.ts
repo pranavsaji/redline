@@ -13,6 +13,8 @@ export const AttestationPayloadSchema = z
     iat: z.number().int(),
     exp: z.number().int(),
     nonce: z.string().min(4).max(64),
+    /** Present when issued under warn-only or break-glass, so a verifier can apply its own policy. */
+    override: z.enum(['warn_only', 'break_glass']).optional(),
   })
   .strict();
 export type AttestationPayload = z.infer<typeof AttestationPayloadSchema>;

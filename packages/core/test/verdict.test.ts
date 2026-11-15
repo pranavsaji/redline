@@ -25,6 +25,11 @@ describe('computeVerdict', () => {
     const r = v.reasons.find((x) => x.code === 'review_stale')!;
     expect(r.action).toEqual({ label: 'Re-run review', href: 'https://demo.atlassian.net/browse/PROJ-1?rerun=1' });
   });
+  it('4b. security: an unknown current context (gather failed) blocks instead of passing', () => {
+    const v = computeVerdict(input({ currentContextHash: null, threats: [], requirements: [] }));
+    expect(v.state).toBe('block');
+    expect(codes(v)).toContain('review_stale');
+  });
   it('5. budget pause blocks until a champion confirms', () => {
     expect(codes(computeVerdict(input({ budgetPaused: true, threats: [], requirements: [] })))).toEqual(['budget_paused']);
     const confirmed = computeVerdict(input({ budgetPaused: true, threats: [], requirements: [], championConfirmations: [{ reviewId: 'rev_1', kind: 'budget' }] }));
@@ -67,12 +72,14 @@ describe('computeVerdict', () => {
     expect(v.overridden).toBe(true);
     expect(codes(v)).toContain('open_requirement');
     expect(computeVerdict(input({ breakGlass: [{ issueId: '10001', until: '2026-11-15T00:00:00Z' }] })).state).toBe('block');
+    expect(v.validUntil).toBe('2026-11-16T00:00:00.000Z');
   });
   it('warn-only turns a block into warn and expires after 14 days', () => {
     const since = new Date(NOW.getTime() - 86_400_000).toISOString();
     const policy = { ...DEFAULT_SITE_POLICY, warnOnly: [{ projectKey: 'PROJ', since, until: '2027-01-01T00:00:00Z' }] };
     const v = computeVerdict(input({ policy }));
     expect(v.state).toBe('warn');
+    expect(v.validUntil).toBe(new Date(new Date(since).getTime() + 14 * 86_400_000).toISOString());
     expect(codes(v)).toContain('open_requirement');
     const later = computeVerdict(input({ policy, now: new Date(NOW.getTime() + 20 * 86_400_000) }));
     expect(later.state).toBe('block');

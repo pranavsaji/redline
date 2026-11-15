@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { decodeAttestation, generateKeyPair } from '@redline/crypto';
-import { computeVerdict, issueAttestation } from '../src/index.js';
+import { computeVerdict, DEFAULT_SITE_POLICY, issueAttestation } from '../src/index.js';
 import { input, requirement } from './fixtures/verdict.js';
 
 const key = generateKeyPair();
@@ -34,5 +34,24 @@ describe('issueAttestation', () => {
     const a = issueAttestation({ issueKey: 'PROJ-1', repo: 'r', commitSha: sha, verdict: v, requirements: reqs, key, nowSec, ttlHours: 24 });
     const b = issueAttestation({ issueKey: 'PROJ-1', repo: 'r', commitSha: sha, verdict: v, requirements: reqs, key, nowSec, ttlHours: 24 });
     expect(a.ok && b.ok && a.value.payload.nonce !== b.value.payload.nonce).toBe(true);
+  });
+
+  it('security: a warn-only verdict is marked in the payload and cannot outlive the warn window', () => {
+    const since = new Date(nowSec * 1000 - 13.5 * 86_400_000).toISOString();
+    const policy = { ...DEFAULT_SITE_POLICY, warnOnly: [{ projectKey: 'PROJ', since, until: '2099-01-01T00:00:00Z' }] };
+    const v = computeVerdict(input({ policy, now: new Date(nowSec * 1000) }));
+    expect(v.state).toBe('warn');
+    const r = issueAttestation({ issueKey: 'PROJ-1', repo: 'r', commitSha: sha, verdict: v, requirements: [requirement()], key, nowSec, ttlHours: 24 });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.payload.override).toBe('warn_only');
+    expect(r.value.payload.exp).toBe(Math.floor(new Date(v.validUntil!).getTime() / 1000));
+  });
+
+  it('security: a break-glass verdict is marked break_glass', () => {
+    const v = computeVerdict(input({ now: new Date(nowSec * 1000), breakGlass: [{ issueId: '10001', until: new Date(nowSec * 1000 + 3600_000).toISOString() }] }));
+    const r = issueAttestation({ issueKey: 'PROJ-1', repo: 'r', commitSha: sha, verdict: v, requirements: [requirement()], key, nowSec, ttlHours: 24 });
+    expect(r.ok && r.value.payload.override).toBe('break_glass');
+    expect(r.ok && r.value.payload.exp).toBe(nowSec + 3600);
   });
 });

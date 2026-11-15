@@ -33,6 +33,8 @@ export const VerdictSchema = z
     reasons: z.array(BlockReasonSchema),
     inheritedFrom: z.array(z.string()),
     overridden: z.boolean().optional(),
+    /** Set for warn-only and break-glass verdicts: when the leniency ends. Attestations never outlive it. */
+    validUntil: z.string().optional(),
     updatedAt: z.string(),
   })
   .strict();

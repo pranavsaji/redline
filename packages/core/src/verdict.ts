@@ -9,7 +9,7 @@ import {
   type Threat,
   type Verdict,
 } from '@redline/shared';
-import { isWarnOnlyActive } from './policy.js';
+import { warnOnlyUntil } from './policy.js';
 
 export interface VerdictInput {
   review: Review | null;
@@ -57,7 +57,9 @@ export function computeVerdict(i: VerdictInput): Verdict {
     else if (IN_PROGRESS.has(r.status))
       reasons.push({ code: 'agent_missing', message: `Review in progress (${r.samplesReceived} of ${r.samplesExpected} agent runs received).` });
 
-    if (i.currentContextHash !== null && i.currentContextHash !== r.contextHash)
+    if (i.currentContextHash === null)
+      reasons.push({ code: 'review_stale', message: 'Redline could not confirm the current design and linked work, so the review may be out of date.', action: rerun });
+    else if (i.currentContextHash !== r.contextHash)
       reasons.push({ code: 'review_stale', message: 'The design or linked work changed since the last review.', action: rerun });
 
     const confirmed = (kind: 'review' | 'budget') => i.championConfirmations.some((c) => c.reviewId === r.id && c.kind === kind);
@@ -103,9 +105,13 @@ export function computeVerdict(i: VerdictInput): Verdict {
 
   const base = { ...(r ? { reviewId: r.id, revision: r.revision } : {}), blockingCount, maxOpenSeverity: maxOpen, reasons, inheritedFrom: [], updatedAt };
   if (reasons.length === 0) return { state: 'pass', ...base };
-  if (r && i.breakGlass.some((b) => b.issueId === r.issueId && i.now.getTime() < new Date(b.until).getTime()))
-    return { state: 'pass', overridden: true, ...base };
-  return { state: isWarnOnlyActive(i.policy, i.projectKey, i.now) ? 'warn' : 'block', ...base };
+  const glass = r ? i.breakGlass.filter((b) => b.issueId === r.issueId && i.now.getTime() < new Date(b.until).getTime()) : [];
+  if (glass.length > 0) {
+    const until = Math.max(...glass.map((b) => new Date(b.until).getTime()));
+    return { state: 'pass', overridden: true, validUntil: new Date(until).toISOString(), ...base };
+  }
+  const warnEnd = warnOnlyUntil(i.policy, i.projectKey, i.now);
+  return warnEnd ? { state: 'warn', validUntil: warnEnd.toISOString(), ...base } : { state: 'block', ...base };
 }
 
 /** A child inherits blocks (and warnings) from reviewed ancestors; reasons are prefixed with the ancestor key. */

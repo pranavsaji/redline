@@ -54,13 +54,20 @@ export function isSensitive(path: string, globs: string[]): boolean {
   return picomatch(globs, { dot: true })(path);
 }
 
-/** Warn-only lasts at most 14 days from when it was switched on, whatever `until` says. */
-export function isWarnOnlyActive(policy: SitePolicy, projectKey: string, now: Date): boolean {
+/** End of the active warn-only window for a project (at most 14 days after it was switched on), or null. */
+export function warnOnlyUntil(policy: SitePolicy, projectKey: string, now: Date): Date | null {
   const t = now.getTime();
-  return policy.warnOnly.some((w) => {
-    if (w.projectKey !== projectKey) return false;
+  let best: number | null = null;
+  for (const w of policy.warnOnly) {
+    if (w.projectKey !== projectKey) continue;
     const since = new Date(w.since).getTime();
     const until = Math.min(new Date(w.until).getTime(), since + WARN_ONLY_MAX_DAYS * 86_400_000);
-    return t >= since && t < until;
-  });
+    if (t >= since && t < until && (best === null || until > best)) best = until;
+  }
+  return best === null ? null : new Date(best);
+}
+
+/** Warn-only lasts at most 14 days from when it was switched on, whatever `until` says. */
+export function isWarnOnlyActive(policy: SitePolicy, projectKey: string, now: Date): boolean {
+  return warnOnlyUntil(policy, projectKey, now) !== null;
 }
