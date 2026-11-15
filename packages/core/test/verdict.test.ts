@@ -111,4 +111,21 @@ describe('combineVerdicts', () => {
     const own = computeVerdict(input({ threats: [], requirements: [] }));
     expect(combineVerdicts(own, [{ issueKey: 'PROJ-1', verdict: warn }]).state).toBe('warn');
   });
+
+  it('security: a warn result takes the earliest leniency window among child and ancestors', () => {
+    const since = new Date(NOW.getTime() - 86_400_000).toISOString();
+    const warnPolicy = { ...DEFAULT_SITE_POLICY, warnOnly: [{ projectKey: 'PROJ', since, until: '2027-01-01T00:00:00Z' }] };
+    const ancestor = computeVerdict(input({ policy: warnPolicy }));
+    const child = computeVerdict(input({ breakGlass: [{ issueId: '10001', until: '2026-12-30T00:00:00Z' }] }));
+    const v = combineVerdicts(child, [{ issueKey: 'PROJ-1', verdict: ancestor }]);
+    expect(v.state).toBe('warn');
+    expect(v.validUntil).toBe(ancestor.validUntil);
+    expect(v.overridden).toBeUndefined();
+  });
+
+  it('security: a lenient ancestor without an end time makes the child block', () => {
+    const own = computeVerdict(input({ threats: [], requirements: [] }));
+    const ancestor = { ...computeVerdict(input()), state: 'warn' as const };
+    expect(combineVerdicts(own, [{ issueKey: 'PROJ-1', verdict: ancestor }]).state).toBe('block');
+  });
 });

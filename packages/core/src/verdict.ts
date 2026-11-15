@@ -123,9 +123,15 @@ export function combineVerdicts(own: Verdict, ancestors: Array<{ issueKey: strin
     const s = a.verdict.maxOpenSeverity;
     if (s && (maxOpen === null || severityRank(s) > severityRank(maxOpen))) maxOpen = s;
   }
-  const anyBlock = own.state === 'block' || relevant.some((a) => a.verdict.state === 'block');
+  const lenient = [...(own.state === 'warn' || own.overridden ? [own] : []), ...relevant.map((a) => a.verdict)];
+  // Leniency is only as long as its shortest window; a lenient party with no end time cannot be trusted at all.
+  const missingEnd = lenient.some((v) => !v.validUntil);
+  const anyBlock = own.state === 'block' || relevant.some((a) => a.verdict.state === 'block') || missingEnd;
+  const { validUntil: _vu, overridden: _ov, ...rest } = own;
+  const windowEnd = anyBlock ? undefined : new Date(Math.min(...lenient.map((v) => new Date(v.validUntil!).getTime()))).toISOString();
   return {
-    ...own,
+    ...rest,
+    ...(windowEnd ? { validUntil: windowEnd } : {}),
     state: anyBlock ? 'block' : 'warn',
     reasons: [...own.reasons, ...relevant.flatMap((a) => a.verdict.reasons.map((r) => ({ ...r, message: `${a.issueKey}: ${r.message}` })))],
     inheritedFrom: [...own.inheritedFrom, ...relevant.map((a) => a.issueKey)],
