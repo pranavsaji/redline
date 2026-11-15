@@ -1,5 +1,5 @@
 app:
-  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000001
+  id: ari:cloud:ecosystem::app/53a2efe5-9150-4e9a-b869-8bd2605d64e0
   runtime:
     name: nodejs22.x
   package:
@@ -11,7 +11,7 @@ modules:
       function: mergeCheck
       name: Redline security attestation
       description: Requires a valid Redline attestation for security-sensitive changes
-      triggers: [on-code-pushed, on-merge]
+      triggers: [ on-code-pushed, on-merge ]
   function:
     - key: mergeCheck
       handler: index.mergeCheck
