@@ -45,6 +45,12 @@ importers:
         specifier: workspace:*
         version: link:../shared
 
+  packages/frameworks:
+    dependencies:
+      '@redline/shared':
+        specifier: workspace:*
+        version: link:../shared
+
   packages/shared:
     dependencies:
       zod:
