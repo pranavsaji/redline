@@ -9,3 +9,8 @@ export * from './ingest.js';
 export * from './requirements.js';
 export * from './ledger.js';
 export * from './acceptance.js';
+export * from './verdict.js';
+export * from './attestation-issuer.js';
+export * from './release.js';
+export * from './incremental.js';
+export * from './posture.js';
