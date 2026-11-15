@@ -3,6 +3,8 @@ import { isSensitive } from './policy.js';
 
 export interface DiffFile {
   path: string;
+  /** Previous path for renames (Bitbucket diffstat `old.path`); scored too, so moving a file out of a sensitive directory is still sensitive. */
+  oldPath?: string;
   status: 'added' | 'modified' | 'removed' | 'renamed';
   linesAdded: number;
   addedText?: string;
@@ -31,14 +33,18 @@ export function scoreDiff(files: DiffFile[], policy: Pick<RepoPolicy, 'sensitive
   const signals = new Set<DiffSignal>();
   const sensitiveFiles: string[] = [];
   for (const f of files) {
-    if (isSensitive(f.path, policy.sensitivePaths)) {
-      sensitiveFiles.push(f.path);
-      signals.add('sensitive_path');
+    const paths = f.oldPath && f.oldPath !== f.path ? [f.path, f.oldPath] : [f.path];
+    for (const p of paths) {
+      if (isSensitive(p, policy.sensitivePaths)) {
+        sensitiveFiles.push(p);
+        signals.add('sensitive_path');
+      }
+      // Deleting or moving auth/crypto code is as security-relevant as editing it.
+      if (AUTH_CRYPTO.test(p)) signals.add('auth_crypto_change');
     }
     if (f.status !== 'removed' && DEPENDENCY_MANIFESTS.test(f.path)) signals.add('new_dependency');
     const text = f.addedText ?? '';
     if (SECRET_PATTERNS.some((p) => p.re.test(text))) signals.add('secret_pattern');
-    if (f.status !== 'removed' && AUTH_CRYPTO.test(f.path)) signals.add('auth_crypto_change');
   }
   const ordered = (Object.keys(WEIGHTS) as DiffSignal[]).filter((s) => signals.has(s));
   const score = Math.min(100, ordered.reduce((n, s) => n + WEIGHTS[s], 0));

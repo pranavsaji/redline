@@ -49,4 +49,16 @@ describe('scoreDiff', () => {
   it('removed files do not count as new dependencies', () => {
     expect(scoreDiff([{ path: 'go.mod', status: 'removed', linesAdded: 0 }], policy).signals).not.toContain('new_dependency');
   });
+
+  it('scores a rename out of a sensitive directory by its old path', () => {
+    const r = scoreDiff([{ path: 'docs/session.ts', oldPath: 'src/auth/session.ts', status: 'renamed', linesAdded: 0 }], policy);
+    expect(r.sensitiveFiles).toEqual(['src/auth/session.ts']);
+    expect(r.signals).toEqual(expect.arrayContaining(['sensitive_path', 'auth_crypto_change']));
+  });
+
+  it('scores deletion of a sensitive file', () => {
+    const r = scoreDiff([{ path: 'src/auth/guard.ts', status: 'removed', linesAdded: 0 }], policy);
+    expect(r.signals).toContain('sensitive_path');
+    expect(r.signals).toContain('auth_crypto_change');
+  });
 });
