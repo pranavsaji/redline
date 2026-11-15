@@ -37,6 +37,42 @@ importers:
         specifier: ^3.2.7
         version: 3.2.7(@types/node@22.20.5)(tsx@4.23.15)(yaml@2.9.1)
 
+  apps/local:
+    dependencies:
+      '@redline/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@redline/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
+      '@redline/evals':
+        specifier: workspace:*
+        version: link:../../evals
+      '@redline/llm-dev':
+        specifier: workspace:*
+        version: link:../../packages/llm-dev
+      '@redline/prompts':
+        specifier: workspace:*
+        version: link:../../packages/prompts
+      '@redline/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+
+  evals:
+    dependencies:
+      '@redline/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      '@redline/llm-dev':
+        specifier: workspace:*
+        version: link:../packages/llm-dev
+      '@redline/prompts':
+        specifier: workspace:*
+        version: link:../packages/prompts
+      '@redline/shared':
+        specifier: workspace:*
+        version: link:../packages/shared
+
   packages/core:
     dependencies:
       '@redline/crypto':
@@ -91,6 +127,15 @@ importers:
 
   packages/frameworks:
     dependencies:
+      '@redline/shared':
+        specifier: workspace:*
+        version: link:../shared
+
+  packages/llm-dev:
+    dependencies:
+      '@redline/core':
+        specifier: workspace:*
+        version: link:../core
       '@redline/shared':
         specifier: workspace:*
         version: link:../shared

@@ -1,0 +1,6 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": { "outDir": "dist", "rootDir": ".", "noEmit": false, "emitDeclarationOnly": true },
+  "include": ["runner", "fixtures"],
+  "references": [{ "path": "../packages/shared" }, { "path": "../packages/core" }, { "path": "../packages/prompts" }, { "path": "../packages/llm-dev" }]
+}

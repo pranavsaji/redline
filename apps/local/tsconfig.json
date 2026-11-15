@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "outDir": "dist", "rootDir": ".", "noEmit": false, "emitDeclarationOnly": true },
+  "include": ["src"],
+  "references": [{ "path": "../../packages/core" }, { "path": "../../packages/llm-dev" }, { "path": "../../evals" }]
+}
