@@ -32,9 +32,11 @@ export function requirementsFor(threats: Threat[], issue: { issueId: string; iss
       const asvsIds = t.mappings.filter((m) => m.framework === 'ASVS5' && getAsvs(m.refId)).map((m) => m.refId);
       let title: string;
       let criteria: Criterion[];
-      if (t.suggestedRequirement) {
-        title = t.suggestedRequirement.title;
-        criteria = [{ given: t.suggestedRequirement.given, when: t.suggestedRequirement.when, then: t.suggestedRequirement.then }];
+      const sr = t.suggestedRequirement;
+      const usable = sr && [sr.title, sr.given, sr.when, sr.then].every((x) => x.trim().length > 0);
+      if (sr && usable) {
+        title = sr.title.trim();
+        criteria = [{ given: sr.given.trim(), when: sr.when.trim(), then: sr.then.trim() }];
       } else {
         title = `Mitigate: ${t.title}`.slice(0, 255);
         criteria = asvsIds.slice(0, 2).map((id) => ({

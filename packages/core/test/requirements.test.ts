@@ -44,4 +44,11 @@ describe('requirementsFor', () => {
   it('requirement ids are stable for the same threat', () => {
     expect(requirementsFor(out.threats, { issueId: '10001', issueKey: ISSUE_KEY }).map((r) => r.id)).toEqual(reqs.map((r) => r.id));
   });
+
+  it('security: empty agent requirement fields fall back to the ASVS template', () => {
+    const t = { ...out.threats[0]!, suggestedRequirement: { title: '  ', given: '', when: 'w', then: '' } };
+    const [r] = requirementsFor([t], { issueId: '10001', issueKey: ISSUE_KEY });
+    expect(r!.title.trim().length).toBeGreaterThan(0);
+    for (const c of r!.criteria) expect(c.then.trim().length).toBeGreaterThan(0);
+  });
 });

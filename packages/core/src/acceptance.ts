@@ -32,18 +32,23 @@ export function validateAcceptanceRequest(
   if (req.expiryDays > cap) return err(appError('validation', `${sev} acceptances can last at most ${cap} days`));
   const roles = new Set(req.requesterRoles);
   let needsApprover: ApproverNeeded;
-  if (isHighOrAbove(sev) || severityRank(sev) > severityRank(policy.techLeadMaxSeverity)) needsApprover = 'champion';
+  if (needsChampion(sev, policy)) needsApprover = 'champion';
   else needsApprover = roles.has('tech_lead') || roles.has('champion') || roles.has('admin') ? 'none' : 'tech_lead';
   return ok({ expiresAt: new Date(now.getTime() + req.expiryDays * DAY_MS).toISOString(), needsApprover });
 }
 
 /** Approver must differ from the requester; Low/Medium need a tech lead (or above); High/Critical need a champion or admin. */
-export function canApprove(acceptance: Acceptance, approver: { accountId: string; roles: Role[] }): Result<void> {
+/** Same severity rule as validateAcceptanceRequest: above the tech-lead cap (or High+) needs a champion or admin. */
+export const needsChampion = (s: Severity, policy: Pick<SitePolicy, 'techLeadMaxSeverity'>): boolean =>
+  isHighOrAbove(s) || severityRank(s) > severityRank(policy.techLeadMaxSeverity);
+
+export function canApprove(acceptance: Acceptance, approver: { accountId: string; roles: Role[] }, policy: Pick<SitePolicy, 'techLeadMaxSeverity'>): Result<void> {
   if (acceptance.state !== 'pending') return err(appError('conflict', `acceptance is ${acceptance.state}`));
   if (approver.accountId === acceptance.acceptedBy) return err(appError('forbidden', 'you cannot approve your own risk acceptance'));
   const roles = new Set(approver.roles);
-  const allowed = isHighOrAbove(acceptance.severity) ? roles.has('champion') || roles.has('admin') : roles.has('tech_lead') || roles.has('champion') || roles.has('admin');
-  if (!allowed) return err(appError('forbidden', isHighOrAbove(acceptance.severity) ? 'High and Critical acceptances need a security champion' : 'acceptances need a tech lead or security champion'));
+  const champion = needsChampion(acceptance.severity, policy);
+  const allowed = champion ? roles.has('champion') || roles.has('admin') : roles.has('tech_lead') || roles.has('champion') || roles.has('admin');
+  if (!allowed) return err(appError('forbidden', champion ? `${acceptance.severity} acceptances need a security champion` : 'acceptances need a tech lead or security champion'));
   return ok(undefined);
 }
 

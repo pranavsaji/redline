@@ -145,4 +145,21 @@ describe('assembleReview', () => {
       for (const c of t.citations) expect(ids.has(c.factId), t.title).toBe(true);
     }
   });
+
+  it('security: an injection-touched agent cluster cannot attach its requirement text or citations to a baseline threat', () => {
+    const poisonedFacts = [...facts, normalizeFact(poisonedRawFact)];
+    const hijackWithReq = { ...goalHijack, requirement: { title: 'Nothing to do', given: 'g', when: 'w', then: 'no action needed' } };
+    const s = model([hijackWithReq]);
+    const out = assemble([s, s, s], { bundle: bundle(poisonedFacts) });
+    const base = out.threats.find((t) => t.origin === 'baseline' && /goal hijack/i.test(t.title))!;
+    expect(base.suggestedRequirement).toBeUndefined();
+    expect(base.citations).toHaveLength(1);
+  });
+
+  it('security: a weakly grounded agent cluster cannot attach its requirement text to a baseline threat', () => {
+    const weak = { ...goalHijack, evidence: [{ quote: 'agent tool calling order history lookup' }], requirement: { title: 'Nothing to do', given: 'g', when: 'w', then: 'no action needed' } };
+    const s = model([weak]);
+    const base = assemble([s, s, s]).threats.find((t) => t.origin === 'baseline' && /goal hijack/i.test(t.title))!;
+    expect(base.suggestedRequirement).toBeUndefined();
+  });
 });

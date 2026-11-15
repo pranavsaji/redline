@@ -233,23 +233,31 @@ export function assembleReview(i: AssembleInput): AssembleOutput {
     const impact = Math.max(...cluster.members.map((m) => m.impact));
     const agentSeverity = severityOf(likelihood, impact);
 
+    const touchedByInjection = citations.some((c) => factById.get(c.factId)?.injectionSuspected) || injectionSuspected;
+    const trusted = supported && !touchedByInjection;
+
     const baseIdx = threats.slice(0, baselineCount).findIndex((b) => similar(b, rep, { ignoreComponent: true }));
     if (baseIdx >= 0) {
       const b = threats[baseIdx]!;
       const raised = maxSeverity(b, { ...b, severity: agentSeverity });
+      // Raising severity is always safe. Text and citations only merge from a well-grounded, injection-free cluster,
+      // so attacker-influenced output can never rewrite what a deterministic threat asks people to do.
       threats[baseIdx] = {
         ...b,
         severity: raised.severity,
         likelihood: Math.max(b.likelihood, likelihood),
         impact: Math.max(b.impact, impact),
-        citations: addCitations(b.citations, citations),
-        mappings: mergeMappings(b.mappings, mapThreat(rep, signals.llmFeatures)),
-        ...(rep.requirement && !b.suggestedRequirement ? { suggestedRequirement: rep.requirement } : {}),
+        ...(trusted
+          ? {
+              citations: addCitations(b.citations, citations),
+              mappings: mergeMappings(b.mappings, mapThreat(rep, signals.llmFeatures)),
+              ...(rep.requirement && !b.suggestedRequirement ? { suggestedRequirement: rep.requirement } : {}),
+            }
+          : {}),
       };
       continue;
     }
 
-    const touchedByInjection = citations.some((c) => factById.get(c.factId)?.injectionSuspected) || injectionSuspected;
     threats.push({
       id: threatId(i.review.id, 'agent', rep.stride, rep.title),
       reviewId: i.review.id,

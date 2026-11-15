@@ -47,17 +47,22 @@ describe('canApprove', () => {
     id: 'acc_1', requirementId: 'req_1', severity, reason: 'r', controls: 'c', acceptedBy: 'dev1', createdAt: now.toISOString(), expiresAt: '2026-12-01T00:00:00Z', state: 'pending',
   });
   it('forbids self-approval', () => {
-    expect(canApprove(pending('Low'), { accountId: 'dev1', roles: ['champion'] })).toMatchObject({ ok: false, error: { code: 'forbidden' } });
+    expect(canApprove(pending('Low'), { accountId: 'dev1', roles: ['champion'] }, DEFAULT_SITE_POLICY)).toMatchObject({ ok: false, error: { code: 'forbidden' } });
   });
   it('forbids a tech lead approving High', () => {
-    expect(canApprove(pending('High'), { accountId: 'lead', roles: ['tech_lead'] })).toMatchObject({ ok: false, error: { code: 'forbidden' } });
+    expect(canApprove(pending('High'), { accountId: 'lead', roles: ['tech_lead'] }, DEFAULT_SITE_POLICY)).toMatchObject({ ok: false, error: { code: 'forbidden' } });
   });
   it('lets a champion approve Critical and a tech lead approve Medium', () => {
-    expect(canApprove(pending('Critical'), { accountId: 'champ', roles: ['champion'] }).ok).toBe(true);
-    expect(canApprove(pending('Medium'), { accountId: 'lead', roles: ['tech_lead'] }).ok).toBe(true);
+    expect(canApprove(pending('Critical'), { accountId: 'champ', roles: ['champion'] }, DEFAULT_SITE_POLICY).ok).toBe(true);
+    expect(canApprove(pending('Medium'), { accountId: 'lead', roles: ['tech_lead'] }, DEFAULT_SITE_POLICY).ok).toBe(true);
+  });
+  it('security: respects a stricter policy cap (tech leads limited to Low cannot approve Medium)', () => {
+    const strict = { ...DEFAULT_SITE_POLICY, techLeadMaxSeverity: 'Low' as const };
+    expect(canApprove(pending('Medium'), { accountId: 'lead', roles: ['tech_lead'] }, strict)).toMatchObject({ ok: false, error: { code: 'forbidden' } });
+    expect(canApprove(pending('Low'), { accountId: 'lead', roles: ['tech_lead'] }, strict).ok).toBe(true);
   });
   it('only pending acceptances can be approved', () => {
-    expect(canApprove({ ...pending('Low'), state: 'active' }, { accountId: 'lead', roles: ['tech_lead'] }).ok).toBe(false);
+    expect(canApprove({ ...pending('Low'), state: 'active' }, { accountId: 'lead', roles: ['tech_lead'] }, DEFAULT_SITE_POLICY).ok).toBe(false);
   });
 });
 
