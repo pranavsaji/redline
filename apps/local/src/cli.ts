@@ -50,7 +50,10 @@ async function main() {
     console.log(`\n${c.id} — ${c.summary}  [${name}${r.value.modelIds.length ? `: ${r.value.modelIds.join(', ')}` : ''}]`);
     console.log(`risk score ${r.value.riskScore} · blocking ${r.value.blocking} · injection suspected ${r.value.injectionSuspected}`);
     for (const t of r.value.threats) console.log(`  ${t.severity.padEnd(8)} ${t.state.padEnd(11)} ${t.stride.padEnd(22)} ${t.title}  (${t.origin}, ${t.votes}/${t.samples})`);
-    if (r.value.modelIds.length) mkdirSync('evals/results', { recursive: true }), writeFileSync('evals/results/MODEL.md', `Model used by claude -p: ${r.value.modelIds.join(', ')} (${new Date().toISOString()})\n`);
+    if (r.value.modelIds.length) {
+      mkdirSync('evals/results', { recursive: true });
+      writeFileSync('evals/results/MODEL.md', `Model used by claude -p: ${r.value.modelIds.join(', ')} (${new Date().toISOString()})\n`);
+    }
     return;
   }
   if (cmd === 'eval') {
