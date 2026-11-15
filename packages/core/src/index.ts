@@ -14,3 +14,4 @@ export * from './attestation-issuer.js';
 export * from './release.js';
 export * from './incremental.js';
 export * from './posture.js';
+export * from './pipeline.js';

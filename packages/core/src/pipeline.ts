@@ -1,0 +1,169 @@
+import { appError, err, ok, type AgentThreatModel, type ArchitectureSketch, type ContextBundle, type Result, type Review, type SitePolicy } from '@redline/shared';
+import {
+  extractPrompt,
+  ExtractFallbackSchema,
+  ExtractOutputSchema,
+  PROMPT_VERSION,
+  ProposalFallbackSchema,
+  ProposalSchema,
+  proposePrompt,
+  type EvidenceItem,
+} from '@redline/prompts';
+import type { z } from 'zod';
+import { scanForInjection } from './context/injection.js';
+import { assembleReview, parseFirstObject, type AssembleOutput } from './ingest.js';
+import type { ClockPort, FeedbackRepo, LlmPort, LlmPurpose, ModelTier, ReviewRepo, Sample } from './ports.js';
+
+export interface PipelineDeps {
+  llm: LlmPort;
+  reviews: ReviewRepo;
+  feedback: FeedbackRepo;
+  clock: ClockPort;
+  policy: SitePolicy;
+}
+
+interface Usage {
+  tokensIn: number;
+  tokensOut: number;
+  modelIds: Set<string>;
+}
+
+const estimate = (system: string, user: string) => Math.ceil((system.length + user.length) / 4);
+
+/** One stage call with the spec's failure ladder: validate → one repair with the validator error → smaller fallback schema → fail. */
+async function callStage<T>(
+  deps: PipelineDeps,
+  usage: Usage,
+  req: { system: string; user: string; purpose: LlmPurpose; tier: ModelTier; maxOutputTokens: number },
+  schema: z.ZodType<T>,
+  fallback: { schema: z.ZodType<T>; instruction: string } | null,
+): Promise<Result<T>> {
+  const call = async (system: string, user: string): Promise<Result<string>> => {
+    if (usage.tokensIn + estimate(system, user) > deps.policy.budget.tokensInPerReview || usage.tokensOut >= deps.policy.budget.tokensOutPerReview)
+      return err(appError('budget', 'review token budget reached'));
+    const r = await deps.llm.complete({ ...req, system, user });
+    if (!r.ok) return r;
+    usage.tokensIn += r.value.tokensIn;
+    usage.tokensOut += r.value.tokensOut;
+    usage.modelIds.add(r.value.modelId);
+    return ok(r.value.text);
+  };
+  const validate = (text: string, s: z.ZodType<T>) => s.safeParse(parseFirstObject(text) ?? undefined);
+
+  const first = await call(req.system, req.user);
+  if (!first.ok) return first;
+  let v = validate(first.value, schema);
+  if (v.success) return ok(v.data);
+  const issue = v.error.issues.slice(0, 3).map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ');
+  const repair = await call(req.system, `${req.user}\n\nYour previous output failed validation: ${issue}. Return only the corrected JSON object.`);
+  if (!repair.ok) return repair;
+  v = validate(repair.value, schema);
+  if (v.success) return ok(v.data);
+  if (fallback) {
+    const fb = await call(req.system, `${req.user}\n\n${fallback.instruction}`);
+    if (!fb.ok) return fb;
+    const fv = validate(fb.value, fallback.schema);
+    if (fv.success) return ok(fv.data);
+  }
+  return err(appError('schema', `${req.purpose} output failed validation after repair and fallback`));
+}
+
+/** Evidence the extractor returned must reference a real fact, quote it, and carry no AI-directed text in its label. */
+function cleanEvidence(items: EvidenceItem[], bundle: ContextBundle): EvidenceItem[] {
+  const ids = new Set(bundle.facts.map((f) => f.id));
+  return items.filter((e) => ids.has(e.factId) && !scanForInjection(e.about).suspected);
+}
+
+/**
+ * The eval/dev review path (Claude Code or Forge LLMs): quarantined extract → N proposals over typed evidence ids →
+ * deterministic assembly. Checkpoints after every stage so a retry resumes rather than restarts.
+ */
+export async function runPipeline(
+  deps: PipelineDeps,
+  review: Review,
+  bundle: ContextBundle,
+  opts: { samples: number; resumeFrom?: 'extract' | 'propose' | 'assemble' },
+): Promise<Result<AssembleOutput>> {
+  const usage: Usage = { tokensIn: review.tokensIn, tokensOut: review.tokensOut, modelIds: new Set(review.modelIds) };
+  const resume = opts.resumeFrom ?? 'extract';
+
+  // Stage 2: quarantined extract.
+  let sketch: ArchitectureSketch;
+  let evidence: EvidenceItem[];
+  const saved = resume !== 'extract' ? await deps.reviews.stage(review.id, 'extract') : ok(null);
+  if (!saved.ok) return saved;
+  const checkpoint = saved.value?.status === 'done' ? (saved.value.checkpoint as { sketch: ArchitectureSketch; evidence: EvidenceItem[] } | undefined) : undefined;
+  if (checkpoint) {
+    ({ sketch, evidence } = checkpoint);
+  } else {
+    await deps.reviews.saveStage(review.id, 'extract', 'running');
+    const p = extractPrompt(bundle.facts);
+    const r = await callStage(deps, usage, { ...p, purpose: 'extract', tier: 'fast', maxOutputTokens: 4000 }, ExtractOutputSchema, {
+      schema: ExtractFallbackSchema.transform((x) => ({ ...x, evidence: [] as EvidenceItem[] })) as unknown as z.ZodType<z.infer<typeof ExtractOutputSchema>>,
+      instruction: 'Return only {"sketch": {...}} with no evidence list.',
+    });
+    if (!r.ok) {
+      await deps.reviews.saveStage(review.id, 'extract', 'failed', undefined, r.error.code);
+      return r;
+    }
+    sketch = r.value.sketch;
+    evidence = cleanEvidence(r.value.evidence, bundle);
+    await deps.reviews.saveStage(review.id, 'extract', 'done', { sketch, evidence });
+  }
+
+  // Stage 3: proposals (self-consistency samples).
+  const byId = new Map(evidence.map((e) => [e.id, e]));
+  const trusted = bundle.facts.filter((f) => f.trustLevel === 'trusted');
+  const samples: Sample[] = [];
+  for (let n = 0; n < opts.samples; n++) {
+    const stageName = `propose:${n}`;
+    if (resume === 'assemble') {
+      const s = await deps.reviews.stage(review.id, stageName);
+      if (s.ok && s.value?.status === 'done') {
+        samples.push(s.value.checkpoint as Sample);
+        continue;
+      }
+    }
+    const p = proposePrompt(sketch, evidence, trusted, n);
+    const r = await callStage(deps, usage, { ...p, purpose: 'propose', tier: 'fast', maxOutputTokens: 4000 }, ProposalSchema, {
+      schema: ProposalFallbackSchema.transform((x) => ({
+        threats: x.threats.map((t) => ({ ...t, scenario: t.title, likelihood: 3, impact: 3 })),
+      })) as unknown as z.ZodType<z.infer<typeof ProposalSchema>>,
+      instruction: 'Return only {"threats": [{"stride","title","component","evidenceIds"}]} — titles only.',
+    });
+    if (!r.ok && r.error.code === 'budget') return r;
+    const sample: Sample = r.ok
+      ? ({
+          schema: 'redline.threatmodel.v1',
+          issueKey: bundle.issueKey,
+          sketch: { components: sketch.components, dataStores: sketch.dataStores, externalServices: sketch.externalServices, trustBoundaries: sketch.trustBoundaries, dataClasses: sketch.dataClasses, exposure: sketch.exposure, llmFeatures: sketch.llmFeatures },
+          threats: r.value.threats.flatMap((t) => {
+            const quotes = t.evidenceIds.map((id) => byId.get(id)?.quote).filter((q): q is string => !!q);
+            if (quotes.length === 0) return [];
+            const { evidenceIds: _ids, ...rest } = t;
+            return [{ ...rest, evidence: quotes.slice(0, 3).map((quote) => ({ quote })) }];
+          }),
+        } satisfies AgentThreatModel)
+      : { failed: r.error.code };
+    samples.push(sample);
+    await deps.reviews.saveStage(review.id, stageName, r.ok ? 'done' : 'failed', sample);
+  }
+  if (samples.every((s) => 'failed' in s)) return err(appError('schema', 'every proposal sample failed validation'));
+
+  // Stages 4–6: deterministic consensus, grounding, mapping, scoring.
+  const dismissals = await Promise.all(sketch.components.slice(0, 10).map((c) => deps.feedback.dismissedFor(c)));
+  const priorDismissed = dismissals.flatMap((d) => (d.ok ? d.value : []));
+  const out = assembleReview({ review, bundle, samples, samplesExpected: opts.samples, priorDismissed, policy: deps.policy, promptVersion: PROMPT_VERSION, now: deps.clock.now() });
+  await deps.reviews.saveThreats(review.id, out.threats, out.discarded);
+  await deps.reviews.update(review.id, {
+    status: out.status,
+    riskScore: out.riskScore,
+    tokensIn: usage.tokensIn,
+    tokensOut: usage.tokensOut,
+    modelIds: [...usage.modelIds],
+    samplesReceived: samples.length,
+    promptVersion: PROMPT_VERSION,
+    updatedAt: deps.clock.now().toISOString(),
+  });
+  return ok(out);
+}

@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^22.20.5
@@ -41,6 +45,9 @@ importers:
       '@redline/frameworks':
         specifier: workspace:*
         version: link:../frameworks
+      '@redline/prompts':
+        specifier: workspace:*
+        version: link:../prompts
       '@redline/shared':
         specifier: workspace:*
         version: link:../shared
@@ -50,6 +57,9 @@ importers:
       yaml:
         specifier: ^2.9.1
         version: 2.9.1
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
     devDependencies:
       '@types/picomatch':
         specifier: ^4.0.3
@@ -72,6 +82,15 @@ importers:
       '@redline/shared':
         specifier: workspace:*
         version: link:../shared
+
+  packages/prompts:
+    dependencies:
+      '@redline/shared':
+        specifier: workspace:*
+        version: link:../shared
+      zod:
+        specifier: ^3.25.0
+        version: 3.25.76
 
   packages/shared:
     dependencies:

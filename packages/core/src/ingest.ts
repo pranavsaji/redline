@@ -70,6 +70,20 @@ function candidates(text: string): string[] {
   return list;
 }
 
+/** First JSON object found in model output (bare, fenced or embedded), or null. Used by the pipeline stages. */
+export function parseFirstObject(text: string): Record<string, unknown> | null {
+  for (const c of candidates(text)) {
+    if (!c.startsWith('{')) continue;
+    try {
+      const v: unknown = JSON.parse(c);
+      if (typeof v === 'object' && v !== null && !Array.isArray(v)) return v as Record<string, unknown>;
+    } catch {
+      /* next candidate */
+    }
+  }
+  return null;
+}
+
 function tryExtract(text: string, expectedIssueKey: string): Result<AgentThreatModel, { code: ExtractErrorCode; message: string }> {
   const parsed: unknown[] = [];
   for (const c of candidates(text)) {
