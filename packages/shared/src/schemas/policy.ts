@@ -13,7 +13,7 @@ export const SitePolicySchema = z
     techLeadMaxSeverity: SeveritySchema,
     agentSamples: z.union([z.literal(1), z.literal(3), z.literal(5)]),
     agentTimeoutMinutes: z.number().int().min(1).max(120),
-    warnOnly: z.array(z.object({ projectKey: z.string(), until: z.string() }).strict()),
+    warnOnly: z.array(z.object({ projectKey: z.string(), since: z.string(), until: z.string() }).strict()),
     attestationTtlHours: z.number().int().min(1).max(168),
     sensitivePaths: z.array(z.string()),
     budget: z
