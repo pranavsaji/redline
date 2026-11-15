@@ -5,3 +5,5 @@ export * from './context/index.js';
 export * from './threats/index.js';
 export * from './baseline/rules.js';
 export * from './scoring.js';
+export * from './ingest.js';
+export * from './requirements.js';

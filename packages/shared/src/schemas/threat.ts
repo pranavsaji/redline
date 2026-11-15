@@ -33,6 +33,10 @@ export const ThreatSchema = z
     citations: z.array(CitationSchema).min(1),
     mappings: z.array(MappingSchema),
     plainLanguage: z.string().max(400),
+    suggestedRequirement: z
+      .object({ title: z.string().max(200), given: z.string().max(300), when: z.string().max(300), then: z.string().max(300) })
+      .strict()
+      .optional(),
   })
   .strict();
 export type Threat = z.infer<typeof ThreatSchema>;
