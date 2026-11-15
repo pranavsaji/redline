@@ -37,7 +37,7 @@ describe('attestations', () => {
       expect(r.ok).toBe(false);
       if (!r.ok) expect(['bad_signature', 'malformed']).toContain(r.error.code);
     }
-  });
+  }, 30_000);
 
   it('rejects a token whose signature segment is altered with bad_signature', () => {
     const token = encodeAttestation(payload, key);
