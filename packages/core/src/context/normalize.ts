@@ -16,6 +16,12 @@ export interface RawFact {
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', '#39': "'" };
 
+/** Untrusted numeric entities must never throw: out-of-range values and lone surrogates become U+FFFD. */
+function safeCodePoint(cp: number): string {
+  if (!Number.isFinite(cp) || cp < 0 || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) return '\uFFFD';
+  return String.fromCodePoint(cp);
+}
+
 export function htmlToText(html: string): string {
   return html
     .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
@@ -24,8 +30,7 @@ export function htmlToText(html: string): string {
     .replace(/&(#\d+|#x[0-9a-f]+|[a-z]+|#39);/gi, (m, e: string) => {
       const k = e.toLowerCase();
       if (ENTITIES[k] !== undefined) return ENTITIES[k];
-      if (k.startsWith('#x')) return String.fromCodePoint(parseInt(k.slice(2), 16));
-      if (k.startsWith('#')) return String.fromCodePoint(parseInt(k.slice(1), 10));
+      if (k.startsWith('#')) return safeCodePoint(k.startsWith('#x') ? parseInt(k.slice(2), 16) : parseInt(k.slice(1), 10));
       return m;
     })
     .replace(/[ \t\f\v\r]+/g, ' ')
@@ -38,13 +43,15 @@ export const factIdOf = (sourceAri: string, version: string): string => `fact_${
 /** Strips HTML, scans the full text for injection, removes invisible characters, redacts secrets, caps the excerpt. */
 export function normalizeFact(raw: RawFact): ContextFact {
   const text = htmlToText(raw.text);
-  const scan = scanForInjection(text);
-  const excerpt = redactSecrets(text.replace(INVISIBLE_CHARS, '')).slice(0, MAX_EXCERPT);
+  const title = htmlToText(raw.title);
+  const scan = scanForInjection(`${title}\n${text}`);
+  const clean = (s: string, max: number) => redactSecrets(s.replace(INVISIBLE_CHARS, '')).slice(0, max);
+  const excerpt = clean(text, MAX_EXCERPT);
   return {
     id: factIdOf(raw.sourceAri, raw.version),
     sourceAri: raw.sourceAri,
     sourceType: raw.sourceType,
-    title: raw.title.slice(0, 500),
+    title: clean(title, 500),
     url: raw.url,
     excerpt,
     trustLevel: raw.trusted ? 'trusted' : 'untrusted',
