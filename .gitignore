@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+coverage/
+.env
+.env.*
+.tmp/
+.superpowers/
+evals/results/raw/
+*.log
+.DS_Store
