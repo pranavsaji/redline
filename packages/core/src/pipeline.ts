@@ -68,6 +68,27 @@ async function callStage<T>(
   return err(appError('schema', `${req.purpose} output failed validation after repair and fallback`));
 }
 
+/** Every model-written sketch string is scanned; anything that reads like an instruction is dropped and flags injection. */
+function sanitizeSketch(sketch: ArchitectureSketch): { sketch: ArchitectureSketch; flagged: boolean } {
+  let flagged = false;
+  const keep = (v: string) => {
+    if (scanForInjection(v).suspected) {
+      flagged = true;
+      return false;
+    }
+    return true;
+  };
+  const clean: ArchitectureSketch = {
+    ...sketch,
+    components: sketch.components.filter(keep),
+    dataStores: sketch.dataStores.filter(keep),
+    externalServices: sketch.externalServices.filter(keep),
+    trustBoundaries: sketch.trustBoundaries.filter(keep),
+    flows: sketch.flows.filter((f) => keep(f.from) && keep(f.to) && keep(f.data)),
+  };
+  return { sketch: clean, flagged: flagged || sketch.injectionSuspected };
+}
+
 /** Evidence the extractor returned must reference a real fact, quote it, and carry no AI-directed text in its label. */
 function cleanEvidence(items: EvidenceItem[], bundle: ContextBundle): EvidenceItem[] {
   const ids = new Set(bundle.facts.map((f) => f.id));
@@ -106,7 +127,8 @@ export async function runPipeline(
       await deps.reviews.saveStage(review.id, 'extract', 'failed', undefined, r.error.code);
       return r;
     }
-    sketch = r.value.sketch;
+    const sanitized = sanitizeSketch(r.value.sketch);
+    sketch = { ...sanitized.sketch, injectionSuspected: sanitized.flagged };
     evidence = cleanEvidence(r.value.evidence, bundle);
     await deps.reviews.saveStage(review.id, 'extract', 'done', { sketch, evidence });
   }
@@ -151,9 +173,13 @@ export async function runPipeline(
   if (samples.every((s) => 'failed' in s)) return err(appError('schema', 'every proposal sample failed validation'));
 
   // Stages 4–6: deterministic consensus, grounding, mapping, scoring.
-  const dismissals = await Promise.all(sketch.components.slice(0, 10).map((c) => deps.feedback.dismissedFor(c)));
+  // Dismissal lookups use only trusted Jira components, never names the model produced.
+  const dismissals = await Promise.all((bundle.components ?? []).slice(0, 10).map((c) => deps.feedback.dismissedFor(c)));
   const priorDismissed = dismissals.flatMap((d) => (d.ok ? d.value : []));
-  const out = assembleReview({ review, bundle, samples, samplesExpected: opts.samples, priorDismissed, policy: deps.policy, promptVersion: PROMPT_VERSION, now: deps.clock.now() });
+  const out = assembleReview({
+    review, bundle, samples, samplesExpected: opts.samples, priorDismissed, policy: deps.policy, promptVersion: PROMPT_VERSION, now: deps.clock.now(),
+    injectionSuspected: sketch.injectionSuspected,
+  });
   await deps.reviews.saveThreats(review.id, out.threats, out.discarded);
   await deps.reviews.update(review.id, {
     status: out.status,

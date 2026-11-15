@@ -33,6 +33,8 @@ export const ContextBundleSchema = z
     partialReasons: z.array(z.string()),
     contextHash: z.string(),
     gatheredAt: z.string(),
+    /** Trusted Jira component names of the work item (set by Redline from Jira fields, never from model output). */
+    components: z.array(z.string().max(255)).optional(),
   })
   .strict();
 export type ContextBundle = z.infer<typeof ContextBundleSchema>;

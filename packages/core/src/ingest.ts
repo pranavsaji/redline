@@ -130,6 +130,8 @@ export interface AssembleInput {
   now: Date;
   /** 'final' is used by the timeout sweeper: assemble with whatever arrived. */
   mode?: 'progress' | 'final';
+  /** Extra injection signal from outside the facts (e.g. the quarantined extractor flagged the material). */
+  injectionSuspected?: boolean;
 }
 export interface AssembleOutput {
   threats: Threat[];
@@ -184,11 +186,12 @@ export function assembleReview(i: AssembleInput): AssembleOutput {
   const valid = i.samples.filter((s): s is AgentThreatModel => !isFailedSample(s));
   const discarded: DiscardedThreat[] = i.samples.flatMap((s, n) => (isFailedSample(s) ? [{ title: `Agent run ${n + 1}: ${s.failed}`, reason: 'schema' as const }] : []));
   const signals = raiseSignals(extractSignals(facts), valid);
-  const injectionSuspected = facts.some((f) => f.injectionSuspected);
+  const injectionSuspected = facts.some((f) => f.injectionSuspected) || i.injectionSuspected === true;
   const factById = new Map(facts.map((f) => [f.id, f]));
   const voteBase = Math.max(1, valid.length);
+  // When the material shows signs of injection, earlier dismissals are not applied: suppression must never be steerable by attacker text.
   const isDismissed = (t: { stride: Stride; title: string; component: string }) =>
-    i.priorDismissed.some((d) => similar(t, { ...d, component: t.component }, { ignoreComponent: true }));
+    !injectionSuspected && i.priorDismissed.some((d) => similar(t, { ...d, component: t.component }, { ignoreComponent: true }));
 
   // 1. Baseline threats (deterministic, always cited verbatim).
   const threats: Threat[] = [];

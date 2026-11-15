@@ -162,4 +162,17 @@ describe('assembleReview', () => {
     const base = assemble([s, s, s]).threats.find((t) => t.origin === 'baseline' && /goal hijack/i.test(t.title))!;
     expect(base.suggestedRequirement).toBeUndefined();
   });
+
+  it('security: prior dismissals are not applied when the bundle shows injection', () => {
+    const poisonedFacts = [...facts, normalizeFact(poisonedRawFact)];
+    const out = assemble([model([]), model([]), model([])], { bundle: bundle(poisonedFacts), priorDismissed: [{ title: 'Payment amount or recipient manipulated', stride: 'Tampering', reason: 'false_positive' }] });
+    expect(out.threats.some((t) => t.title === 'Payment amount or recipient manipulated')).toBe(true);
+  });
+
+  it('security: an external injection signal (from the extractor) is honoured', () => {
+    const s = model([refundAbuse]);
+    const out = assemble([s, s, s], { injectionSuspected: true });
+    expect(out.injectionSuspected).toBe(true);
+    expect(out.threats.find((t) => t.title === refundAbuse.title)!.state).toBe('needs_human');
+  });
 });
