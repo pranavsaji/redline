@@ -79,7 +79,7 @@ async function scopedReview(deps: CoreDeps, v: Viewer, reviewId: string, cache: 
   const [facts, threats] = await Promise.all([deps.reviews.facts(reviewId), deps.reviews.threats(reviewId)]);
   if (!facts.ok || !threats.ok) return null;
   const scoped = await scopeForViewer(deps, v.accountId, v.issueId, facts.value, threats.value, cache);
-  return { ...scoped, threats: [...scoped.threats].sort(bySeverity) };
+  return { ...scoped, threats: [...scoped.threats].sort(bySeverity), allThreatIds: threats.value.map((t) => t.id) };
 }
 
 export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | Denied> {
@@ -124,7 +124,9 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
 
   // Added/removed per revision count only threats this viewer can see (each revision scoped with its own facts).
   const revisions = history.value.slice(-HISTORY_REVISIONS);
-  const threatSets = await Promise.all(revisions.map(async (r) => (await scopedReview(deps, v, r.id, cache))?.threats ?? []));
+  const scopedRevisions = await Promise.all(revisions.map((r) => scopedReview(deps, v, r.id, cache)));
+  if (scopedRevisions.some((x) => x === null)) return { error: 'unavailable' };
+  const threatSets = scopedRevisions.map((x) => x!.threats);
   const hist = revisions.map((r, i) => {
     const cur = threatSets[i] ?? [];
     const prev = i > 0 ? (threatSets[i - 1] ?? []) : [];
@@ -132,15 +134,13 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
     return { revision: r.revision, createdAt: r.createdAt, riskScore: r.riskScore, status: r.status, added: d.added.length, removed: d.removed.length };
   });
 
-  const allThreatIds = new Set<string>();
-  if (review) {
-    const all = await deps.reviews.threats(review.id);
-    if (all.ok) for (const t of all.value) allThreatIds.add(t.id);
-  }
-  const visibleThreatIds = new Set(threats.map((t) => t.id));
-  // Requirements for threats this viewer can see, plus ones with progress that are not tied to a hidden current threat.
-  const shownRequirements = requirements.value.filter((r) => visibleThreatIds.has(r.threatId) || (r.status !== 'Open' && !allThreatIds.has(r.threatId)));
-  const hiddenRequirements = requirements.value.filter((r) => allThreatIds.has(r.threatId) && !visibleThreatIds.has(r.threatId)).length;
+  // Fail closed: a requirement is shown only when its threat is visible to this viewer in the latest review or in one
+  // of the scoped history revisions; everything else (hidden sources, revisions too old to scope) is only counted.
+  const visibleThreatIds = new Set([...threats.map((t) => t.id), ...threatSets.flat().map((t) => t.id)]);
+  const latestIds = new Set(threats.map((t) => t.id));
+  const shownRequirements = requirements.value.filter((r) => (r.status === 'Open' ? latestIds.has(r.threatId) : visibleThreatIds.has(r.threatId)));
+  const existingThreatIds = new Set(scopedRevisions.flatMap((x) => x!.allThreatIds));
+  const hiddenRequirements = requirements.value.filter((r) => existingThreatIds.has(r.threatId) && !visibleThreatIds.has(r.threatId)).length;
   const reqIds = new Set(requirements.value.map((r) => r.id));
   const acceptances = rebuildAcceptances(ledger.value, deps.clock.now()).filter((a) => a.issueId === v.issueId || reqIds.has(a.requirementId));
 

@@ -139,6 +139,23 @@ describe('panel.get security: discarded threats and history are viewer-scoped', 
     expect(dto.hiddenRequirements).toBe(1);
   });
 
+  it('a verified requirement from an older revision whose threat the viewer cannot see stays hidden (fail closed)', async () => {
+    const { t, reviewId, secret } = await withSecretPage();
+    await t.deps.reviews.saveThreats(reviewId, [threat(reviewId, 9, secret.id)], []);
+    await handleJob(t.deps, { kind: 'gather', issueId: ISSUE, reason: 'rerun' });
+    await t.deps.requirements.upsert({ id: 'req_old_secret', threatId: 'thr_9', issueId: ISSUE, issueKey: 'PAY-7', title: 'Old secret-derived requirement', criteria: [{ given: 'g', when: 'w', then: 't' }], asvsIds: [], severity: 'High', status: 'Verified' });
+    t.deps.confluence = { canRead: async () => ok(false) } as never;
+    const dto = await panelGet(t.deps, viewer());
+    if ('error' in dto) throw new Error(dto.error);
+    expect(dto.requirements.map((r) => r.title)).not.toContain('Old secret-derived requirement');
+  });
+
+  it('a failed threat lookup makes panel.get unavailable rather than showing unscoped requirements', async () => {
+    const { t } = await reviewed();
+    t.deps.reviews.threats = async () => ({ ok: false, error: { code: 'upstream', message: 'sql down' } });
+    expect(await panelGet(t.deps, viewer())).toEqual({ error: 'unavailable' });
+  });
+
   it('history added/removed counts only threats the viewer can see', async () => {
     const { t, reviewId, secret, visibleFactId } = await withSecretPage();
     await t.deps.reviews.saveThreats(reviewId, [threat(reviewId, 1, secret.id), threat(reviewId, 2, visibleFactId)], []);
@@ -154,7 +171,10 @@ describe('panel.get requirements', () => {
     const { t } = await reviewed();
     const base = { issueId: ISSUE, issueKey: 'PAY-7', criteria: [{ given: 'g', when: 'w', then: 't' }], asvsIds: [], severity: 'High' as const };
     await t.deps.requirements.upsert({ ...base, id: 'req_orphan', threatId: 'thr_gone', title: 'Orphan', status: 'Open' });
-    await t.deps.requirements.upsert({ ...base, id: 'req_done', threatId: 'thr_gone2', title: 'Verified earlier', status: 'Verified' });
+    const dto0 = await panelGet(t.deps, viewer());
+    if ('error' in dto0) throw new Error(dto0.error);
+    const visibleThreat = dto0.threats[0]!.id;
+    await t.deps.requirements.upsert({ ...base, id: 'req_done', threatId: visibleThreat, title: 'Verified earlier', status: 'Verified' });
     const dto = await panelGet(t.deps, viewer());
     if ('error' in dto) throw new Error(dto.error);
     const titles = dto.requirements.map((r) => r.title);
