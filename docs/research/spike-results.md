@@ -64,3 +64,10 @@ A CREATE action shows a **confirmation card** ("Submit Redline threat model", wi
 Administer Jira). Permission checks now impersonate the account being checked (`asUser(accountId)` +
 `GET /rest/api/3/mypermissions`, scopes `read:jira-work`/`read:jira-user` with `allowImpersonation: true`).
 The first automation run (before this fix) shows in the rule's "Debug agent response" as two get-review-context calls and no submit.
+
+## Task 20 live run (app 5.4.x): issue panel
+
+- PAY-7 (AI support agent with refunds) reviewed unattended in 53 s. The panel shows 11 threats, the top one Critical and agreed by 3 of 3 runs ("Someone could trick the AI into giving them money…", ASI01/ASI02/LLM01/LLM06). It also shows 11 matching requirements and the verdict "Blocks Done and merge" (8 open at High or above).
+- PAY-6, reviewed before the clustering fix, had all 9 agent threats discarded as "too few runs agreed". The runs had worded the same threats differently, which led to `sameThreat()` (shared evidence) in `packages/core/src/threats/cluster.ts`.
+- Panel load is about 1–2 s in the Jira iframe (resolver plus permission checks).
+- `forge deploy` lint scans `ui/node_modules` and takes about 10 minutes. Run `forge lint` only when the manifest changes, and otherwise deploy with `--no-verify` (about 40 s).
