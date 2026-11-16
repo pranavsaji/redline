@@ -1,0 +1,18 @@
+import type { Role } from '@redline/core';
+import type { SitePolicy } from '@redline/shared';
+import type { CoreDeps } from '../deps.js';
+
+/**
+ * Roles for showing or hiding controls (every write re-checks on the server). developer = can edit the work item;
+ * tech_lead / champion = member of the policy's groups; admin = Jira administrator. Lookup failures grant nothing.
+ */
+export async function rolesOf(deps: Pick<CoreDeps, 'jira'>, accountId: string, issueId: string, policy: SitePolicy): Promise<Role[]> {
+  const [edit, groups, admin] = await Promise.all([deps.jira.canEdit(accountId, issueId), deps.jira.groupsOf(accountId), deps.jira.isAdmin(accountId)]);
+  const roles: Role[] = ['viewer'];
+  if (edit.ok && edit.value) roles.push('developer');
+  const g = groups.ok ? groups.value : [];
+  if (g.includes(policy.techLeadGroup)) roles.push('tech_lead');
+  if (g.includes(policy.championGroup)) roles.push('champion');
+  if (admin.ok && admin.value) roles.push('admin');
+  return roles;
+}

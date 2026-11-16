@@ -5,6 +5,16 @@ import type { JiraIssue } from '../adapters/jira.js';
 import { isBudgetPaused } from './budget.js';
 
 export const contextKey = (issueId: string) => `ctx:${issueId}`;
+/** KVS copy of the last written verdict, so the panel reads it without a Jira round-trip. */
+export const verdictKey = (issueId: string) => `verdict:${issueId}`;
+
+async function mirror(deps: CoreDeps, issueId: string, v: unknown): Promise<void> {
+  try {
+    await deps.state.set(verdictKey(issueId), v);
+  } catch {
+    // best effort: the property is the source of truth for the gates
+  }
+}
 const MAX_ANCESTORS = 5;
 
 type Ledgered = {
@@ -89,6 +99,7 @@ async function writeFailClosed(deps: CoreDeps, issueId: string, panelUrl: string
     updatedAt: deps.clock.now().toISOString(),
   };
   await deps.verdicts.write(issueId, { ...v, panelUrl });
+  await mirror(deps, issueId, { ...v, panelUrl });
 }
 
 /**
@@ -134,7 +145,9 @@ export async function refreshVerdict(deps: CoreDeps, issueId: string): Promise<R
   }
 
   const final = combineVerdicts(own.value.verdict, ancestors);
-  const written = await deps.verdicts.write(issue.id, { ...final, panelUrl, ...(own.value.notApplicable && final.state === 'pass' ? { notApplicable: true } : {}) });
+  const value = { ...final, panelUrl, ...(own.value.notApplicable && final.state === 'pass' ? { notApplicable: true } : {}) };
+  const written = await deps.verdicts.write(issue.id, value);
   if (!written.ok) return written;
+  await mirror(deps, issue.id, value);
   return ok(final);
 }

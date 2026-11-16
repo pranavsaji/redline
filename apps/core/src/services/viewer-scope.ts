@@ -12,6 +12,13 @@ export interface ViewerScoped {
 const PAGE = /:page\/(\d{1,20})$/;
 const ISSUE = /:issue\/(\d{1,18})(?:#[a-z]+)?$/;
 
+/** Permission answers shared across several scopeForViewer calls in one request (e.g. one per revision). */
+export interface ScopeCache {
+  pages: Map<string, Promise<boolean>>;
+  issues: Map<string, Promise<boolean>>;
+}
+export const newScopeCache = (): ScopeCache => ({ pages: new Map(), issues: new Map() });
+
 /**
  * A review's bundle was gathered with the app's access, scoped to whoever triggered it. Before anything is shown to a
  * viewer (issue panel, get-review-context for the agent), drop what this viewer cannot read: Confluence pages they
@@ -25,9 +32,10 @@ export async function scopeForViewer(
   issueId: string,
   facts: readonly ContextFact[],
   threats: readonly Threat[],
+  cache: ScopeCache = newScopeCache(),
 ): Promise<ViewerScoped> {
-  const pageChecks = new Map<string, Promise<boolean>>();
-  const issueChecks = new Map<string, Promise<boolean>>();
+  const pageChecks = cache.pages;
+  const issueChecks = cache.issues;
   const can = (cache: Map<string, Promise<boolean>>, id: string, check: () => Promise<{ ok: boolean; value?: boolean }>) => {
     if (!cache.has(id)) cache.set(id, viewerAccountId ? check().then((r) => r.ok && r.value === true, () => false) : Promise.resolve(false));
     return cache.get(id)!;

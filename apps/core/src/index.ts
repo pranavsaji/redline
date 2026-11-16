@@ -10,3 +10,4 @@ export {
   getReviewContextHandler,
   submitThreatModelHandler,
 } from './handlers.js';
+export { panelResolver } from './resolvers/index.js';
