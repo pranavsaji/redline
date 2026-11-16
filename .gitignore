@@ -9,5 +9,4 @@ coverage/
 evals/results/raw/
 *.log
 .DS_Store
-apps/core/static/automation-config/main.js
 dist-types/

@@ -1,4 +1,6 @@
 import { InvocationError, InvocationErrorCode } from '@forge/events';
+import { getReviewContext } from './actions/get-review-context.js';
+import { submitThreatModel } from './actions/submit-threat-model.js';
 import { composeCore, type ForgeContext } from './composition.js';
 import { reviewConsumer } from './consumers/review-consumer.js';
 import { daily } from './jobs/daily.js';
@@ -31,3 +33,13 @@ export async function jobConsumerHandler(event: { body?: unknown; retryContext?:
 export const sweeperHandler = async (_e: unknown, ctx: ForgeContext) => sweep(composeCore(ctx));
 export const hourlyHandler = async (_e: unknown, ctx: ForgeContext) => hourly(composeCore(ctx));
 export const dailyHandler = async (_e: unknown, ctx: ForgeContext) => daily(composeCore(ctx));
+
+type ActionPayload = { context?: { cloudId?: unknown } } & Record<string, unknown>;
+const actionCtx = (payload: ActionPayload, ctx?: ForgeContext): ForgeContext => ({
+  ...(ctx ?? {}),
+  ...(typeof payload.context?.cloudId === 'string' ? { cloudId: payload.context.cloudId } : {}),
+});
+
+/** Rovo actions (agent-invoked). Identity comes only from payload.context.accountId. */
+export const getReviewContextHandler = async (payload: ActionPayload, ctx?: ForgeContext) => getReviewContext(payload, composeCore(actionCtx(payload, ctx)));
+export const submitThreatModelHandler = async (payload: ActionPayload, ctx?: ForgeContext) => submitThreatModel(payload, composeCore(actionCtx(payload, ctx)));

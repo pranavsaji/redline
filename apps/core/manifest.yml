@@ -38,70 +38,47 @@ modules:
   jira:issuePanel:
     - key: redline-panel
       resource: panel
-      resolver:
-        function: spikeResolver
       title: Redline security review
       icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
   action:
-    - key: ping
-      name: Ping Redline
-      function: pingFn
+    - key: get-review-context
+      name: Get Redline review context
+      function: getReviewContextFn
       actionVerb: GET
-      description: Health check that returns the issue key it was given.
+      description: Returns the work item's security review context (design, linked work, pages, incidents) and the JSON output contract. Call this first when reviewing a work item.
       inputs:
         issueKey:
           title: Issue key
           type: string
           required: true
-          description: The Jira work item key
-    - key: save-threat-model
-      name: "Redline: save threat model"
-      function: ingestThreatModelSpike
-      actionVerb: CREATE
-      description: Saves the Redline agent's threat model for a work item.
-      config:
-        resource: automation-config
-        render: default
-      inputs:
-        issueKey:
-          title: Issue key
-          type: string
-          required: true
-          description: The Jira work item key
-        agentResponse:
-          title: Agent response
-          type: string
-          required: true
-          description: The Redline agent's response
+          description: The Jira work item key, for example PAY-7
     - key: submit-threat-model
       name: Submit Redline threat model
       function: submitThreatModelFn
       actionVerb: CREATE
-      description: Saves the Redline agent's threat model JSON for a Jira work item. Call this once with the full JSON.
+      description: Saves the threat model JSON for a Jira work item as one agent run. Call this once with the complete JSON.
       inputs:
         issueKey:
           title: Issue key
           type: string
           required: true
-          description: The Jira work item key, e.g. PAY-1
-        threatModel:
+          description: The Jira work item key, for example PAY-7
+        threatModelJson:
           title: Threat model JSON
           type: string
           required: true
-          description: The complete threat model as a JSON string
-  automation:actionProvider:
-    - key: redline-automation
-      actions: [ save-threat-model ]
+          description: The complete threat model as a JSON string with "schema" set to "redline.threatmodel.v1"
   rovo:agent:
     - key: redline-reviewer
       name: Redline
-      description: Security reviewer for Jira work items.
-      prompt: You are Redline Security Reviewer. First call ping with the issue key you
-        are given. Then call submit-threat-model with that issue key and threatModel set to
-        the JSON string {"spike":true,"threats":[]}. Reply with both results.
+      description: Security reviewer for Jira work items. Builds cited STRIDE threat models and explains what must be fixed before Done or merge.
+      prompt: resource:agent-prompt;prompt.md
       conversationStarters:
-        - Ping PROJ-1
-      actions: [ ping, submit-threat-model ]
+        - What do I need to fix before PROJ-142 can merge?
+        - Is release 4.2 safe to ship?
+        - Which acceptances expire this month?
+        - Explain threat T-7 like I'm new to security
+      actions: [ get-review-context, submit-threat-model ]
   function:
     - key: lifecycleFn
       handler: index.lifecycleHandler
@@ -118,19 +95,15 @@ modules:
       handler: index.hourlyHandler
     - key: dailyFn
       handler: index.dailyHandler
+    - key: getReviewContextFn
+      handler: index.getReviewContextHandler
     - key: submitThreatModelFn
-      handler: index.submitThreatModelSpike
-    - key: spikeResolver
-      handler: index.spikeResolver
-    - key: pingFn
-      handler: index.ping
-    - key: ingestThreatModelSpike
-      handler: index.ingestThreatModelSpike
+      handler: index.submitThreatModelHandler
 resources:
   - key: panel
     path: static/panel
-  - key: automation-config
-    path: static/automation-config
+  - key: agent-prompt
+    path: agent
 permissions:
   scopes:
     - read:jira-work

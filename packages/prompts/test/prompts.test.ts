@@ -26,6 +26,7 @@ describe('prompts', () => {
     const p = automationPrompt('PROJ-142');
     expect(p).toContain('PROJ-142');
     expect(p).toMatch(/only the JSON/i);
+    expect(p).toContain('submit-threat-model with issueKey "PROJ-142" and threatModelJson');
   });
 
   it('extract prompt wraps every untrusted excerpt in nonce delimiters and keeps untrusted text out of everything else', () => {

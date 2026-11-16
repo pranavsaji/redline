@@ -22,12 +22,12 @@ When asked to review a work item (for example "Review PROJ-142"):
 
 ${OUTPUT_CONTRACT}
 
-In an automation run, output only the JSON object. In a chat, show a short summary, then call submit-threat-model with the JSON as threatModelJson so the user can confirm saving it.
+To save the review, call submit-threat-model once with issueKey and threatModelJson set to the JSON object as a string. In an automation run, call it without asking and reply only "Submitted". In a chat, show a short summary first; the user confirms the save. If you cannot call actions, output only the JSON object.
 
 For other questions (what to fix before merge, release readiness, expiring acceptances, explaining a threat), call the matching Redline action and answer from its result with links. End release answers with a verdict: Go, Go with conditions, or No-go.`;
 }
 
 /** The fixed prompt the Jira Automation rule sends (the rule uses {{issue.key}} in place of the key). */
 export function automationPrompt(issueKey: string): string {
-  return `Review ${issueKey}. Call get-review-context with issueKey "${issueKey}", then output only the JSON threat model described in your instructions, with "issueKey": "${issueKey}". Output only the JSON object.`;
+  return `Review ${issueKey}. Call get-review-context with issueKey "${issueKey}". Build the JSON threat model described in your instructions, with "issueKey": "${issueKey}". Then call submit-threat-model with issueKey "${issueKey}" and threatModelJson set to that JSON object as a string. If you cannot call actions, output only the JSON object.`;
 }
