@@ -31,8 +31,8 @@ export async function jobConsumerHandler(event: { body?: unknown; retryContext?:
     return new InvocationError({ retryAfter: 60, retryReason: InvocationErrorCode.FUNCTION_RETRY_REQUEST });
 }
 
-/** jira:workflowValidator (function form): reads the verdict property only. */
-export const validateTransitionHandler = async (args: { issue?: { key?: string; id?: string } }) => validateTransition(args);
+/** jira:workflowValidator `redline-gate`: reads the verdict from app storage (never the user-editable property). */
+export const validateTransitionHandler = async (args: { issue?: { key?: string; id?: string } }, ctx: ForgeContext) => validateTransition(composeCore(ctx), args);
 
 export const sweeperHandler = async (_e: unknown, ctx: ForgeContext) => sweep(composeCore(ctx));
 export const hourlyHandler = async (_e: unknown, ctx: ForgeContext) => hourly(composeCore(ctx));

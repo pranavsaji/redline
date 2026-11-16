@@ -2,19 +2,16 @@ import { combineVerdicts, computeVerdict, rebuildAcceptances, type LedgerRow } f
 import { appError, err, ok, type BlockReason, type Requirement, type Result, type SitePolicy, type Verdict } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
 import type { JiraIssue } from '../adapters/jira.js';
+import { log } from '../adapters/log.js';
 import { isBudgetPaused } from './budget.js';
 
 export const contextKey = (issueId: string) => `ctx:${issueId}`;
-/** KVS copy of the last written verdict, so the panel reads it without a Jira round-trip. */
+/**
+ * The authoritative verdict, in app storage only the app can write. The Done gate and the panel read it. The
+ * `redline.verdict` issue property is a copy for JQL and display: anyone who can edit the work item can edit it.
+ */
 export const verdictKey = (issueId: string) => `verdict:${issueId}`;
 
-async function mirror(deps: CoreDeps, issueId: string, v: unknown): Promise<void> {
-  try {
-    await deps.state.set(verdictKey(issueId), v);
-  } catch {
-    // best effort: the property is the source of truth for the gates
-  }
-}
 const MAX_ANCESTORS = 5;
 
 type Ledgered = {
@@ -82,7 +79,7 @@ async function ownVerdict(
   panelUrl: string,
   now: Date,
 ): Promise<Result<{ verdict: Verdict; reviewed: boolean; notApplicable: boolean; requirements: Requirement[]; riskScore?: number }>> {
-  if (!policy.reviewIssueTypes.includes(issue.issueType.name)) return ok({ verdict: notApplicable(now), reviewed: false, notApplicable: true, requirements: [] });
+  if (!policy.enabledProjects.includes(issue.project.key) || !policy.reviewIssueTypes.includes(issue.issueType.name)) return ok({ verdict: notApplicable(now), reviewed: false, notApplicable: true, requirements: [] });
   const latest = await deps.reviews.latest(issue.id);
   if (!latest.ok) return latest;
   const review = latest.value;
@@ -136,8 +133,7 @@ async function writeFailClosed(deps: CoreDeps, issueId: string, panelUrl: string
     updatedAt: deps.clock.now().toISOString(),
   };
   const value = { ...v, panelUrl, message: gateMessage(v, new Map(), panelUrl, policy?.ok ? policy.value.guardedTransitions : ['Done']) };
-  await deps.verdicts.write(issueId, value);
-  await mirror(deps, issueId, value);
+  await write(deps, issueId, value);
 }
 
 /**
@@ -152,10 +148,15 @@ function requirementSubtaskVerdict(req: Requirement, story: Verdict, storyKey: s
   return { state: story.state, ...(story.validUntil ? { validUntil: story.validUntil } : {}), blockingCount: 1, maxOpenSeverity: req.severity, reasons, ...base };
 }
 
+/** App storage first (the gate reads it; failure is an error so the job retries), then the issue property (display). */
 async function write(deps: CoreDeps, issueId: string, value: Verdict & Record<string, unknown>): Promise<Result<void>> {
-  const written = await deps.verdicts.write(issueId, value);
-  if (!written.ok) return written;
-  await mirror(deps, issueId, value);
+  try {
+    await deps.state.set(verdictKey(issueId), value);
+  } catch (e) {
+    return err(appError('upstream', `kvs: ${e instanceof Error ? e.message : String(e)}`));
+  }
+  const prop = await deps.verdicts.write(issueId, value);
+  if (!prop.ok) log('verdict.property_failed', { issueId, code: prop.error.code });
   return ok(undefined);
 }
 

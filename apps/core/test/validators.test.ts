@@ -1,75 +1,94 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
-import { ok, err, appError } from '@redline/shared';
-import { NOT_REVIEWED_MESSAGE, VALIDATOR_EXPRESSION } from '../src/validators/expression.js';
-import { createValidateTransition } from '../src/validators/validate-transition.js';
+import { handleJob } from '../src/consumers/review-consumer.js';
+import { refreshVerdict, verdictKey } from '../src/services/verdict-service.js';
+import { NOT_REVIEWED_MESSAGE, validateTransition } from '../src/validators/validate-transition.js';
+import { coreDeps, jiraIssue } from './support/core-deps.js';
 
-/**
- * The expression uses only syntax Jira expressions and JavaScript share (property access, ==, ?:, ??, string
- * literals), so evaluating it as JavaScript checks its logic. A missing property is null in Jira, undefined here.
- */
-const evaluate = (property: unknown) => new Function('issue', `return ${VALIDATOR_EXPRESSION};`)({ properties: { 'redline.verdict': property } }) as unknown;
+const ISSUE = '10042';
+const args = (over: { key?: string; id?: string } = { key: 'PAY-7', id: ISSUE }) => ({ issue: over });
 
-describe('VALIDATOR_EXPRESSION (Done gate, EN-2)', () => {
-  it('passes pass and warn verdicts', () => {
-    expect(evaluate({ state: 'pass', message: 'x' })).toBe(true);
-    expect(evaluate({ state: 'warn', message: 'x' })).toBe(true);
+describe('Done gate (jira:workflowValidator, EN-2)', () => {
+  it('a block shows the verdict message', async () => {
+    const t = coreDeps();
+    await handleJob(t.deps, { kind: 'gather', issueId: ISSUE, reason: 'created' });
+    const out = await validateTransition(t.deps, args());
+    expect(out).toEqual({ result: false, errorMessage: expect.stringMatching(/^Redline blocks Done: .*Open the Redline panel: https:\/\/one-atlas-mefc\.atlassian\.net\/browse\/PAY-7$/) });
   });
 
-  it('a block returns the verdict message, which Jira shows as the error', () => {
-    expect(evaluate({ state: 'block', message: 'Redline blocks Done: 2 open … Open the Redline panel: https://x/browse/PAY-7' })).toBe('Redline blocks Done: 2 open … Open the Redline panel: https://x/browse/PAY-7');
+  it('pass and warn let the transition through', async () => {
+    const t = coreDeps();
+    t.kv.data.set(verdictKey(ISSUE), { state: 'pass', message: 'ok' });
+    expect(await validateTransition(t.deps, args())).toEqual({ result: true });
+    t.kv.data.set(verdictKey(ISSUE), { state: 'warn', message: 'ok' });
+    expect(await validateTransition(t.deps, args())).toEqual({ result: true });
   });
 
-  it('no property blocks with the not-reviewed message', () => {
-    expect(evaluate(undefined)).toBe(NOT_REVIEWED_MESSAGE);
-    expect(evaluate(null)).toBe(NOT_REVIEWED_MESSAGE);
+  it('security: a "pass" written into the user-editable issue property does not open the gate (it reads app storage)', async () => {
+    const t = coreDeps();
+    await handleJob(t.deps, { kind: 'gather', issueId: ISSUE, reason: 'created' });
+    await t.jira.setProperty(ISSUE, 'redline.verdict', { state: 'pass', message: 'forged' });
+    t.verdicts._written.set(ISSUE, { state: 'pass' } as never);
+    expect(await validateTransition(t.deps, args())).toMatchObject({ result: false });
   });
 
-  it('fails closed: an unknown state or a block without a message still blocks with a string', () => {
-    expect(typeof evaluate({ state: 'mystery' })).toBe('string');
-    expect(typeof evaluate({})).toBe('string');
-    expect(typeof evaluate({ state: 'block' })).toBe('string');
+  it('no stored verdict: computes it once, then applies it (a never-reviewed item blocks with how to run a review)', async () => {
+    const t = coreDeps();
+    const out = await validateTransition(t.deps, args());
+    expect(out.result).toBe(false);
+    expect(out.errorMessage).toMatch(/has not reviewed this work item yet/);
+    expect(t.kv.data.has(verdictKey(ISSUE))).toBe(true);
   });
 
-  it('is one line (safe in YAML) and is what the manifest uses', () => {
-    expect(VALIDATOR_EXPRESSION).not.toMatch(/[\r\n]/);
+  it('a not-applicable issue type passes once its verdict is computed', async () => {
+    const bug = jiraIssue({ id: '10050', key: 'PAY-9', issueType: { id: '10004', name: 'Bug', subtask: false } });
+    const t = coreDeps({ issues: [bug] });
+    expect(await validateTransition(t.deps, args({ key: 'PAY-9', id: '10050' }))).toEqual({ result: true });
+  });
+
+  it('a work item in a project Redline is not enabled for passes (a shared workflow must not block other projects)', async () => {
+    const other = jiraIssue({ id: '10060', key: 'OPS-1', project: { id: '10001', key: 'OPS' } });
+    const t = coreDeps({ issues: [other] });
+    expect(await validateTransition(t.deps, args({ key: 'OPS-1', id: '10060' }))).toEqual({ result: true });
+  });
+
+  it('resolves the id from the key when Jira sends only the key', async () => {
+    const t = coreDeps();
+    t.kv.data.set(verdictKey(ISSUE), { state: 'pass' });
+    expect(await validateTransition(t.deps, args({ key: 'PAY-7' }))).toEqual({ result: true });
+  });
+
+  it('fails closed: storage errors, malformed values and unknown states block', async () => {
+    const t = coreDeps();
+    t.kv.data.set(verdictKey(ISSUE), 'nope');
+    expect(await validateTransition(t.deps, args())).toMatchObject({ result: false, errorMessage: expect.any(String) });
+    t.kv.data.set(verdictKey(ISSUE), { state: 'mystery' });
+    expect(await validateTransition(t.deps, args())).toMatchObject({ result: false });
+    t.deps.state.get = async () => Promise.reject(new Error('kvs down'));
+    expect(await validateTransition(t.deps, args())).toMatchObject({ result: false, errorMessage: expect.stringMatching(/could not read/i) });
+    expect(await validateTransition(t.deps, { issue: {} })).toMatchObject({ result: false });
+  });
+
+  it('NOT_REVIEWED_MESSAGE says what to do', () => {
+    expect(NOT_REVIEWED_MESSAGE).toMatch(/Run review/);
+  });
+
+  it('the manifest gate is the function validator; no expression validator reads the user-editable property', () => {
     const m = parse(readFileSync(new URL('../manifest.yml', import.meta.url), 'utf8')) as { modules: Record<string, Array<Record<string, unknown>>> };
-    const gate = m.modules['jira:workflowValidator']?.find((v) => v.key === 'redline-gate');
-    expect(gate?.expression).toBe(VALIDATOR_EXPRESSION);
-    const fallback = m.modules['jira:workflowValidator']?.find((v) => v.key === 'redline-gate-function');
-    expect(fallback?.function).toBe('validateTransitionFn');
+    const validators = m.modules['jira:workflowValidator'] ?? [];
+    expect(validators.map((v) => v.key)).toEqual(['redline-gate']);
+    expect(validators[0]).toMatchObject({ function: 'validateTransitionFn' });
+    expect(validators[0]).not.toHaveProperty('expression');
   });
 });
 
-describe('validateTransition (function fallback, reads the property only)', () => {
-  const read = (value: unknown) => async () => ok(value);
-
-  it('block → result false with the property message', async () => {
-    const v = createValidateTransition(read({ state: 'block', message: 'Redline blocks Done: PAY-100' }));
-    expect(await v({ issue: { key: 'PAY-7' } })).toEqual({ result: false, errorMessage: 'Redline blocks Done: PAY-100' });
-  });
-
-  it('pass and warn → true', async () => {
-    expect(await createValidateTransition(read({ state: 'pass' }))({ issue: { key: 'PAY-7' } })).toEqual({ result: true });
-    expect(await createValidateTransition(read({ state: 'warn' }))({ issue: { key: 'PAY-7' } })).toEqual({ result: true });
-  });
-
-  it('absent → the not-reviewed message', async () => {
-    expect(await createValidateTransition(read(null))({ issue: { key: 'PAY-7' } })).toEqual({ result: false, errorMessage: NOT_REVIEWED_MESSAGE });
-  });
-
-  it('a read failure or a malformed value blocks (fail closed)', async () => {
-    const failed = createValidateTransition(async () => err(appError('upstream', 'jira down')));
-    expect(await failed({ issue: { key: 'PAY-7' } })).toMatchObject({ result: false, errorMessage: expect.stringMatching(/could not read/i) });
-    expect(await createValidateTransition(read('nope'))({ issue: { key: 'PAY-7' } })).toMatchObject({ result: false });
-    expect(await createValidateTransition(read({ state: 'block', message: 42 }))({ issue: { key: 'PAY-7' } })).toMatchObject({ result: false, errorMessage: expect.any(String) });
-  });
-
-  it('prefers the issue id when Jira sends one', async () => {
-    const seen: string[] = [];
-    const v = createValidateTransition(async (ref) => (seen.push(ref), ok({ state: 'pass' })));
-    await v({ issue: { key: 'PAY-7', id: '10042' } });
-    expect(seen).toEqual(['10042']);
+describe('the gate copy in app storage is authoritative', () => {
+  it('refreshVerdict fails (so the job retries) when the app-storage write fails, instead of leaving a stale verdict', async () => {
+    const t = coreDeps();
+    t.kv.data.set(verdictKey(ISSUE), { state: 'pass' });
+    t.deps.state.set = async () => Promise.reject(new Error('kvs down'));
+    const r = await refreshVerdict(t.deps, ISSUE);
+    expect(r.ok).toBe(false);
   });
 });
