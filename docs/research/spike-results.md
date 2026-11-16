@@ -78,3 +78,11 @@ The first automation run (before this fix) shows in the rule's "Debug agent resp
 - PAY-7 → Done: HTTP 400, "Redline blocks Done: 8 open security requirement(s) at High or above (create the subtasks in the Redline panel). Open the Redline panel: https://one-atlas-mefc.atlassian.net/browse/PAY-7". First call 3.4 s (recomputed a pre-message verdict, cold start), warm call 0.6 s.
 - Bypass check: a user `PUT {"state":"pass"}` into the `redline.verdict` issue property succeeds (200: anyone who can edit the item can write it) and the transition is still blocked, because the gate reads app storage. An expression validator over the property would have passed.
 - `apps/core` uses `bundler: manual` (`dist/`): run `node build.mjs` before `forge deploy`, or the old bundle ships ("i[Q.functionName] is not a function" for a new handler).
+
+## Live: requirements as sub-tasks (Task 21, 2026-11-16, demo site)
+
+- PAY-7 panel → Requirements → "Create sub-tasks (11)" created PAY-8 … PAY-18 (type Sub-task, label `redline`, Given/When/Then + ASVS ids + panel link in the description).
+- The gate message then named keys: "Redline blocks Done: 8 open security requirement(s) at High or above: PAY-15, PAY-8, PAY-18, PAY-17, PAY-9 and 3 more. Open the Redline panel: …/browse/PAY-7".
+- JQL over the indexed property works: `project = PAY AND redlineState = block`.
+- A requirement sub-task follows its own requirement: PAY-8 → Done is blocked with "This security requirement is not verified yet. Add evidence on PAY-7 in the Redline panel."
+- Re-run Automation rule: a duplicated "Use agent" flow needs its own Rovo connection login ("This connection needs to be re-authenticated" → Log in), which Automation will not save without. Left for the site owner; the original create rule is unchanged and still "Logged in to Rovo".
