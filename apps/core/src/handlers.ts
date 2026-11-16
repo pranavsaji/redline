@@ -9,6 +9,7 @@ import { sweep } from './jobs/sweeper.js';
 import { onInstallJobs } from './triggers/on-install.js';
 import { onIssueChange } from './triggers/on-issue-change.js';
 import { onPageChange } from './triggers/on-page-change.js';
+import { validateTransition } from './validators/validate-transition.js';
 
 /** Forge entry points for triggers, the job queue and scheduled jobs. Each builds its dependencies per invocation. */
 export async function issueEventHandler(event: unknown, ctx: ForgeContext): Promise<void> {
@@ -29,6 +30,9 @@ export async function jobConsumerHandler(event: { body?: unknown; retryContext?:
   if (!r.ok && (r.error.code === 'upstream' || r.error.code === 'timeout') && (event.retryContext?.retryCount ?? 0) < 3)
     return new InvocationError({ retryAfter: 60, retryReason: InvocationErrorCode.FUNCTION_RETRY_REQUEST });
 }
+
+/** jira:workflowValidator (function form): reads the verdict property only. */
+export const validateTransitionHandler = async (args: { issue?: { key?: string; id?: string } }) => validateTransition(args);
 
 export const sweeperHandler = async (_e: unknown, ctx: ForgeContext) => sweep(composeCore(ctx));
 export const hourlyHandler = async (_e: unknown, ctx: ForgeContext) => hourly(composeCore(ctx));

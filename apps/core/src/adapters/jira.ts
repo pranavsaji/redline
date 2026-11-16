@@ -60,6 +60,8 @@ export interface JiraClient {
   groupsOf(accountId: string): Promise<Result<string[]>>;
   isAdmin(accountId: string): Promise<Result<boolean>>;
   setProperty(issueId: string, key: string, value: unknown): Promise<Result<void>>;
+  /** The property's value, or null when the work item has no such property. */
+  getProperty(issueIdOrKey: string, key: string): Promise<Result<unknown>>;
   /** The project's sub-task issue type id (Redline requirements are created as sub-tasks). */
   subtaskType(projectId: string): Promise<Result<string>>;
   createSubtask(parentId: string, fields: { summary: string; description: AdfDoc; labels: string[]; issueTypeId: string }): Promise<Result<{ id: string; key: string }>>;
@@ -392,6 +394,15 @@ export function createJiraClient(request: FetchLike, opts: JiraClientOptions = {
       if (!ISSUE_REF.test(issueId)) return badRef('issue id');
       if (!PROPERTY_KEY.test(key)) return badRef('property key');
       return voidOf(await call(`/rest/api/3/issue/${seg(issueId)}/properties/${seg(key)}`, json('PUT', value)));
+    },
+
+    async getProperty(issueIdOrKey, key) {
+      if (!ISSUE_REF.test(issueIdOrKey)) return badRef('issue id');
+      if (!PROPERTY_KEY.test(key)) return badRef('property key');
+      const r = await call(`/rest/api/3/issue/${seg(issueIdOrKey)}/properties/${seg(key)}`);
+      if (!r.ok) return r.error.code === 'not_found' ? ok(null) : r;
+      const v = (r.value as { value?: unknown } | undefined)?.value;
+      return ok(v === undefined ? null : v);
     },
 
     async subtaskType(projectId) {

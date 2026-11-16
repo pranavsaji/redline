@@ -42,6 +42,15 @@ modules:
         function: panelResolverFn
       title: Redline security review
       icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+  jira:workflowValidator:
+    - key: redline-gate
+      name: Redline security gate
+      description: Blocks the transition while Redline's verdict for the work item is block (open security requirements, or a missing, failed or out-of-date review).
+      expression: "issue.properties['redline.verdict'] == null ? 'Redline has not reviewed this work item yet. Open the Redline panel and click Run review.' : (issue.properties['redline.verdict'].state == 'pass' || issue.properties['redline.verdict'].state == 'warn' ? true : (issue.properties['redline.verdict'].message ?? 'Redline blocks this transition. Open the Redline panel on this work item to see why.'))"
+    - key: redline-gate-function
+      name: Redline security gate (function)
+      description: The same check run as a function. Use it only if the expression validator is unavailable on your site.
+      function: validateTransitionFn
   jira:entityProperty:
     - key: redline-verdict-index
       entityType: issue
@@ -117,6 +126,8 @@ modules:
       handler: index.getReviewContextHandler
     - key: submitThreatModelFn
       handler: index.submitThreatModelHandler
+    - key: validateTransitionFn
+      handler: index.validateTransitionHandler
 resources:
   - key: panel
     path: ui/build

@@ -237,6 +237,16 @@ describe('jira client: writes', () => {
     expect(await none.jira.subtaskType('1 OR 1')).toMatchObject({ ok: false, error: { code: 'validation' } });
   });
 
+  it('getProperty returns the value, null when the property is absent', async () => {
+    const { jira } = client([
+      [/GET \/rest\/api\/3\/issue\/PAY-7\/properties\/redline\.verdict$/, { status: 200, body: JSON.stringify({ key: 'redline.verdict', value: { state: 'block' } }) }],
+      [/GET \/rest\/api\/3\/issue\/PAY-8\/properties\/redline\.verdict$/, { status: 404, body: '{}' }],
+    ]);
+    expect(await jira.getProperty('PAY-7', 'redline.verdict')).toEqual({ ok: true, value: { state: 'block' } });
+    expect(await jira.getProperty('PAY-8', 'redline.verdict')).toEqual({ ok: true, value: null });
+    expect(await jira.getProperty('PAY 8', 'redline.verdict')).toMatchObject({ ok: false, error: { code: 'validation' } });
+  });
+
   it('addLabel / removeLabel use the update verbs', async () => {
     const { jira, calls } = client([[/PUT \/rest\/api\/3\/issue\/10042$/, { status: 204 }]]);
     await jira.addLabel('10042', 'redline-review');
