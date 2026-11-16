@@ -49,6 +49,15 @@ describe('panel.get', () => {
     expect(dto.roles).toContain('developer');
   });
 
+  it('computes and stores the verdict when the KVS copy is missing (items reviewed before the mirror existed)', async () => {
+    const { t } = await reviewed();
+    t.kv.data.delete('verdict:10042');
+    const dto = await panelGet(t.deps, viewer());
+    if ('error' in dto) throw new Error(dto.error);
+    expect(dto.verdict?.state).toBe('block');
+    expect(t.kv.data.has('verdict:10042')).toBe(true);
+  });
+
   it('a never-reviewed item returns review null and no threats', async () => {
     const t = coreDeps({ issues: [jiraIssue({ id: ISSUE, key: 'PAY-7' })] });
     const dto = await panelGet(t.deps, viewer());
@@ -119,6 +128,17 @@ describe('panel.get security: discarded threats and history are viewer-scoped', 
     expect(dto.hiddenDiscarded).toBe(0);
   });
 
+  it('requirements derived from threats the viewer cannot see are withheld', async () => {
+    const { t, reviewId, secret } = await withSecretPage();
+    await t.deps.reviews.saveThreats(reviewId, [threat(reviewId, 1, secret.id)], []);
+    await t.deps.requirements.upsert({ id: 'req_secret', threatId: 'thr_1', issueId: ISSUE, issueKey: 'PAY-7', title: 'Secret-derived requirement', criteria: [{ given: 'g', when: 'w', then: 't' }], asvsIds: [], severity: 'High', status: 'Open' });
+    t.deps.confluence = { canRead: async () => ok(false) } as never;
+    const dto = await panelGet(t.deps, viewer());
+    if ('error' in dto) throw new Error(dto.error);
+    expect(dto.requirements.map((r) => r.title)).not.toContain('Secret-derived requirement');
+    expect(dto.hiddenRequirements).toBe(1);
+  });
+
   it('history added/removed counts only threats the viewer can see', async () => {
     const { t, reviewId, secret, visibleFactId } = await withSecretPage();
     await t.deps.reviews.saveThreats(reviewId, [threat(reviewId, 1, secret.id), threat(reviewId, 2, visibleFactId)], []);
@@ -126,6 +146,20 @@ describe('panel.get security: discarded threats and history are viewer-scoped', 
     const dto = await panelGet(t.deps, viewer());
     if ('error' in dto) throw new Error(dto.error);
     expect(dto.history).toEqual([expect.objectContaining({ revision: 1, added: 1, removed: 0 })]);
+  });
+});
+
+describe('panel.get requirements', () => {
+  it('lists requirements for the current threats plus any with progress, not orphans from earlier assemblies', async () => {
+    const { t } = await reviewed();
+    const base = { issueId: ISSUE, issueKey: 'PAY-7', criteria: [{ given: 'g', when: 'w', then: 't' }], asvsIds: [], severity: 'High' as const };
+    await t.deps.requirements.upsert({ ...base, id: 'req_orphan', threatId: 'thr_gone', title: 'Orphan', status: 'Open' });
+    await t.deps.requirements.upsert({ ...base, id: 'req_done', threatId: 'thr_gone2', title: 'Verified earlier', status: 'Verified' });
+    const dto = await panelGet(t.deps, viewer());
+    if ('error' in dto) throw new Error(dto.error);
+    const titles = dto.requirements.map((r) => r.title);
+    expect(titles).not.toContain('Orphan');
+    expect(titles).toContain('Verified earlier');
   });
 });
 

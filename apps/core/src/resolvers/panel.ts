@@ -6,7 +6,7 @@ import { log } from '../adapters/log.js';
 import { RERUN_LABEL } from '../triggers/on-issue-change.js';
 import { checkRerunLimit } from '../services/rate-limit.js';
 import { rolesOf } from '../services/roles.js';
-import { verdictKey } from '../services/verdict-service.js';
+import { refreshVerdict, verdictKey } from '../services/verdict-service.js';
 import { newScopeCache, scopeForViewer, type ScopeCache } from '../services/viewer-scope.js';
 
 export const PAGE_SIZE = 50;
@@ -43,6 +43,7 @@ export interface PanelDto {
   hiddenDiscarded: number;
   facts: FactDto[];
   requirements: Requirement[];
+  hiddenRequirements: number;
   acceptances: Acceptance[];
   history: Array<{ revision: number; createdAt: string; riskScore: number; status: Review['status']; added: number; removed: number }>;
   samples: { received: number; expected: number };
@@ -94,6 +95,12 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
   ]);
   if (!latest.ok || !history.ok || !requirements.ok || !ledger.ok || !policy.ok) return { error: 'unavailable' };
   const review = latest.value;
+  let verdict = stored ?? null;
+  if (!verdict && review) {
+    // No KVS copy yet (reviewed before the mirror existed): compute it once, which also stores it.
+    const fresh = await refreshVerdict(deps, v.issueId);
+    if (fresh.ok) verdict = (await deps.state.get<Verdict & { panelUrl?: string }>(verdictKey(v.issueId)).catch(() => undefined)) ?? fresh.value;
+  }
   const roles = await rolesOf(deps, v.accountId, v.issueId, policy.value);
 
   const cache = newScopeCache();
@@ -125,13 +132,22 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
     return { revision: r.revision, createdAt: r.createdAt, riskScore: r.riskScore, status: r.status, added: d.added.length, removed: d.removed.length };
   });
 
+  const allThreatIds = new Set<string>();
+  if (review) {
+    const all = await deps.reviews.threats(review.id);
+    if (all.ok) for (const t of all.value) allThreatIds.add(t.id);
+  }
+  const visibleThreatIds = new Set(threats.map((t) => t.id));
+  // Requirements for threats this viewer can see, plus ones with progress that are not tied to a hidden current threat.
+  const shownRequirements = requirements.value.filter((r) => visibleThreatIds.has(r.threatId) || (r.status !== 'Open' && !allThreatIds.has(r.threatId)));
+  const hiddenRequirements = requirements.value.filter((r) => allThreatIds.has(r.threatId) && !visibleThreatIds.has(r.threatId)).length;
   const reqIds = new Set(requirements.value.map((r) => r.id));
   const acceptances = rebuildAcceptances(ledger.value, deps.clock.now()).filter((a) => a.issueId === v.issueId || reqIds.has(a.requirementId));
 
   return {
     issueId: v.issueId,
     issueKey: auth.issueKey,
-    verdict: stored ?? null,
+    verdict,
     review,
     threats: threats.slice(0, PAGE_SIZE),
     threatsCursor: threats.length > PAGE_SIZE ? PAGE_SIZE : null,
@@ -140,7 +156,8 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
     discarded,
     hiddenDiscarded,
     facts,
-    requirements: requirements.value,
+    requirements: shownRequirements,
+    hiddenRequirements,
     acceptances,
     history: hist,
     samples: { received: review?.samplesReceived ?? 0, expected: review?.samplesExpected ?? 0 },

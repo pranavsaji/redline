@@ -23,7 +23,11 @@ async function applyAssembly(deps: CoreDeps, review: Review, bundle: ContextBund
   const out = assembleReview({ review, bundle, samples, samplesExpected: review.samplesExpected, priorDismissed, policy, promptVersion: PROMPT_VERSION, now: deps.clock.now(), mode });
   const saved = await deps.reviews.saveThreats(review.id, out.threats, out.discarded);
   if (!saved.ok) return saved;
-  for (const req of requirementsFor(out.threats, { issueId: review.issueId, issueKey: review.issueKey })) {
+  // Until every agent run is in, consensus is provisional: only rule-based threats get requirement rows, so threats
+  // that later lose the vote never leave orphan requirements behind.
+  const settled = out.status !== 'awaiting_agent';
+  const forRequirements = settled ? out.threats : out.threats.filter((t) => t.origin === 'baseline');
+  for (const req of requirementsFor(forRequirements, { issueId: review.issueId, issueKey: review.issueKey })) {
     const existing = await deps.requirements.get(req.id);
     if (!existing.ok) return existing;
     const row = existing.value ? { ...existing.value, threatId: req.threatId, severity: req.severity, issueKey: req.issueKey } : req;

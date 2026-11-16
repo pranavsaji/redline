@@ -1,5 +1,5 @@
 import type { AgentThreat, Stride } from '@redline/shared';
-import { jaccard } from './text.js';
+import { jaccard, normalizeText } from './text.js';
 
 interface Comparable {
   stride: Stride;
@@ -18,6 +18,37 @@ export function similar(a: Comparable, b: Comparable, opts: { ignoreComponent?: 
   return a.component.trim().toLowerCase() === b.component.trim().toLowerCase() || jaccard(a.component, b.component) >= COMPONENT_THRESHOLD;
 }
 
+const EVIDENCE_THRESHOLD = 0.6;
+const LOOSE_TITLE_THRESHOLD = 0.2;
+const LOOSE_TEXT_THRESHOLD = 0.25;
+
+/** Two quotes point at the same passage: one contains the other, or their words overlap strongly. */
+function sameEvidence(a: AgentThreat, b: AgentThreat): boolean {
+  for (const x of a.evidence)
+    for (const y of b.evidence) {
+      const nx = normalizeText(x.quote);
+      const ny = normalizeText(y.quote);
+      if (nx.length > 0 && ny.length > 0 && (nx.includes(ny) || ny.includes(nx) || jaccard(x.quote, y.quote) >= EVIDENCE_THRESHOLD)) return true;
+    }
+  return false;
+}
+
+const componentsMatch = (a: Comparable, b: Comparable) =>
+  a.component.trim().toLowerCase() === b.component.trim().toLowerCase() || jaccard(a.component, b.component) >= COMPONENT_THRESHOLD;
+
+/**
+ * Whether two agent runs reported the same threat. Runs word titles and name components differently, so besides the
+ * strict rule (similar titles and components) two threats also match when they share a STRIDE category, cite the same
+ * passage, and their titles or scenarios overlap at least loosely.
+ */
+export function sameThreat(a: AgentThreat, b: AgentThreat): boolean {
+  if (a.stride !== b.stride) return false;
+  const t = jaccard(a.title, b.title);
+  const e = sameEvidence(a, b);
+  if (t >= TITLE_THRESHOLD && (componentsMatch(a, b) || e)) return true;
+  return e && (componentsMatch(a, b) || t >= LOOSE_TITLE_THRESHOLD || jaccard(`${a.title} ${a.scenario}`, `${b.title} ${b.scenario}`) >= LOOSE_TEXT_THRESHOLD);
+}
+
 export interface Cluster {
   representative: AgentThreat;
   members: AgentThreat[];
@@ -31,7 +62,7 @@ export function clusterSamples(samples: ReadonlyArray<readonly AgentThreat[]>): 
   const clusters: Cluster[] = [];
   samples.forEach((sample, idx) => {
     for (const threat of sample) {
-      const c = clusters.find((cl) => cl.members.some((m) => similar(m, threat)));
+      const c = clusters.find((cl) => cl.members.some((m) => sameThreat(m, threat)));
       if (c) {
         c.members.push(threat);
         if (!c.sampleIndexes.includes(idx)) c.sampleIndexes.push(idx);

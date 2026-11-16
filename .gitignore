@@ -10,3 +10,4 @@ evals/results/raw/
 *.log
 .DS_Store
 dist-types/
+apps/core/ui/build/

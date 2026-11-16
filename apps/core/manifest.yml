@@ -38,6 +38,8 @@ modules:
   jira:issuePanel:
     - key: redline-panel
       resource: panel
+      resolver:
+        function: panelResolverFn
       title: Redline security review
       icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
   action:
@@ -100,13 +102,15 @@ modules:
       handler: index.hourlyHandler
     - key: dailyFn
       handler: index.dailyHandler
+    - key: panelResolverFn
+      handler: index.panelResolver
     - key: getReviewContextFn
       handler: index.getReviewContextHandler
     - key: submitThreatModelFn
       handler: index.submitThreatModelHandler
 resources:
   - key: panel
-    path: static/panel
+    path: ui/build
   - key: agent-prompt
     path: agent
 permissions:

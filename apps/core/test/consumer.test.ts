@@ -119,6 +119,19 @@ describe('assemble job', () => {
     expect(verdictOf(t, '10042')!.reasons.map((r) => r.code)).not.toContain('agent_missing');
   });
 
+  it('while runs are still arriving, only rule-based threats get requirement rows (no orphans from partial consensus)', async () => {
+    const t = coreDeps();
+    await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
+    const rev = (await t.deps.reviews.latest('10042')) as { ok: true; value: { id: string } };
+    await t.deps.reviews.saveSample(rev.value.id, 1, sample('PAY-10042'));
+    await handleJob(t.deps, { kind: 'assemble', reviewId: rev.value.id });
+    const threats = (await t.deps.reviews.threats(rev.value.id)) as { ok: true; value: Array<{ id: string; origin: string }> };
+    const agentIds = new Set(threats.value.filter((x) => x.origin === 'agent').map((x) => x.id));
+    expect(agentIds.size).toBeGreaterThan(0);
+    const reqs = (await t.deps.requirements.forIssue('10042')) as { ok: true; value: Array<{ threatId: string }> };
+    expect(reqs.value.some((r) => agentIds.has(r.threatId))).toBe(false);
+  });
+
   it('a failed sample still counts as received', async () => {
     const t = coreDeps();
     await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });

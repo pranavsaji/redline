@@ -95,6 +95,30 @@ describe('clusterSamples + consensus', () => {
   });
 });
 
+describe('clusterSamples: the same threat in different words (live finding, PAY-6)', () => {
+  const run = (title: string, component: string, quote: string, stride: AgentThreat['stride'] = 'Spoofing'): AgentThreat => ({
+    stride, title, component, scenario: 'An attacker reuses an old sign-in link to take over the account.', likelihood: 4, impact: 4, evidence: [{ quote }],
+  });
+  const Q = 'Tokens are stored in the users table and do not expire until used.';
+
+  it('merges runs that cite the same evidence even when titles and components are worded differently', () => {
+    const clusters = clusterSamples([
+      [run('Permanent magic links allow account takeover if email is compromised', 'magic link', Q)],
+      [run('Non-expiring tokens allow long-term account takeover', 'auth tokens', 'Tokens are stored in the users table and do not expire until used')],
+      [run('Permanent account takeover via non-expiring tokens', 'password reset service', Q)],
+    ]);
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0]!.sampleIndexes).toEqual([0, 1, 2]);
+  });
+
+  it('does not merge different STRIDE categories, or same-category threats with unrelated evidence and titles', () => {
+    expect(clusterSamples([[run('Magic links never expire', 'auth', Q)], [run('Magic links never expire', 'auth', Q, 'InformationDisclosure')]])).toHaveLength(2);
+    expect(
+      clusterSamples([[run('Magic links never expire', 'auth', Q)], [run('Support staff impersonate customers', 'admin console', 'Support staff can sign in as any customer from the admin console.')]]),
+    ).toHaveLength(2);
+  });
+});
+
 describe('mapThreat', () => {
   it('drops invalid agent ids, keeps valid ones and adds STRIDE defaults', () => {
     const m = mapThreat(t({ stride: 'Spoofing', asvs: ['V99.1.1', 'V6.2.1'], cwe: ['287', 'CWE-0'] }), false);
