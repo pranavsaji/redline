@@ -212,28 +212,18 @@ export async function threatExplain(deps: CoreDeps, v: Viewer, p: { reviewId?: u
 }
 
 /**
- * Teamwork Graph enrichment, run as the viewer (graph is asUser only). Graph facts are added to the latest review
- * (origin 'graph', never part of contextHash). Without registered queries this reports partial and adds nothing.
+ * Teamwork Graph enrichment, run as the viewer (graph is asUser only). The facts reflect what this viewer can see, so
+ * they are returned to this viewer only and never stored in the shared review (another viewer may not see them).
  */
 export async function panelEnrich(
   deps: CoreDeps,
   v: Viewer & { cloudId: string },
   enricher: { enrich(issueAri: string): Promise<import('@redline/shared').Result<{ facts: ContextFact[]; partial: boolean; reasons: string[] }>> },
-): Promise<{ added: number; partial: boolean } | Denied> {
+): Promise<{ added: number; partial: boolean; facts: FactDto[] } | Denied> {
   const auth = await authorise(deps, v, 'browse');
   if ('error' in auth) return auth;
-  const latest = await deps.reviews.latest(v.issueId);
-  if (!latest.ok) return { error: 'unavailable' };
-  if (!latest.value) return { added: 0, partial: true };
   const r = await enricher.enrich(`ari:cloud:jira:${v.cloudId}:issue/${v.issueId}`);
-  if (!r.ok) return { added: 0, partial: true };
-  const existing = await deps.reviews.facts(latest.value.id);
-  if (!existing.ok) return { error: 'unavailable' };
-  const known = new Set(existing.value.map((f) => f.sourceAri));
-  const fresh = r.value.facts.filter((f) => f.origin === 'graph' && !known.has(f.sourceAri));
-  if (fresh.length > 0) {
-    const saved = await deps.reviews.saveFacts(latest.value.id, [...existing.value, ...fresh]);
-    if (!saved.ok) return { error: 'unavailable' };
-  }
-  return { added: fresh.length, partial: r.value.partial };
+  if (!r.ok) return { added: 0, partial: true, facts: [] };
+  const facts = r.value.facts.filter((f) => f.origin === 'graph').map(toFactDto);
+  return { added: facts.length, partial: r.value.partial, facts };
 }

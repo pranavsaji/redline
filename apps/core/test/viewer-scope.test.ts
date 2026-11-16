@@ -29,10 +29,10 @@ function clients(pageCalls: string[] = []) {
 }
 
 describe('scopeForViewer (security)', () => {
-  it('drops pages, incidents and linked issues the viewer cannot read; keeps the work item itself and graph ids', async () => {
+  it('drops pages, incidents and linked issues the viewer cannot read; keeps the work item itself', async () => {
     const r = await scopeForViewer(clients(), 'acc-viewer', '10042', FACTS, []);
-    expect(r.facts.map((f) => f.id)).toEqual(['main', 'meta', 'pageOk', 'linkOk', 'graph']);
-    expect(r.hiddenFacts).toBe(2);
+    expect(r.facts.map((f) => f.id)).toEqual(['main', 'meta', 'pageOk', 'linkOk']);
+    expect(r.hiddenFacts).toBe(3);
   });
 
   it('prunes citations to hidden facts, and hides a threat whose every citation is hidden', async () => {
@@ -50,6 +50,12 @@ describe('scopeForViewer (security)', () => {
     const r = await scopeForViewer(broken, 'acc', '10042', FACTS, []);
     expect(r.facts.some((f) => f.sourceType === 'confluence_page')).toBe(false);
     const none = await scopeForViewer(c, '', '10042', FACTS, []);
-    expect(none.facts.map((f) => f.id)).toEqual(['main', 'meta', 'graph']);
+    expect(none.facts.map((f) => f.id)).toEqual(['main', 'meta']);
+  });
+
+  it('denies by default any source type it cannot verify (e.g. graph commits, teams)', async () => {
+    const extra = [fact('commit', 'ari:cloud:graph::commit/abc', 'commit'), fact('team', 'ari:cloud:identity::team/t1', 'team'), fact('rev', 'ari:redline:review/rev_1', 'review'), fact('cmt', 'ari:cloud:jira:c:issue-comment/5', 'jira_comment')];
+    const r = await scopeForViewer(clients(), 'acc', '10042', extra, []);
+    expect(r.facts.map((f) => f.id)).toEqual(['rev', 'cmt']);
   });
 });

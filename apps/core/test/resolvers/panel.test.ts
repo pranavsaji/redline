@@ -165,14 +165,14 @@ describe('threat.explain', () => {
   });
 });
 
-describe('panel.enrich', () => {
-  it('adds new graph facts to the latest review and reports partial', async () => {
+describe('panel.enrich (security: graph facts are per viewer)', () => {
+  it('returns new graph facts to the asking viewer only and never stores them in the shared review', async () => {
     const { t, reviewId } = await reviewed();
     const graphFact = normalizeFact({ sourceAri: 'ari:cloud:graph::commit/abc', sourceType: 'commit', title: 'Linked commit abc', url: '', text: '', version: 'graph', trusted: true, origin: 'graph' });
     const enricher = { enrich: async () => ok({ facts: [graphFact], partial: true, reasons: ['scope_or_empty:issueTeam'] }) };
-    expect(await panelEnrich(t.deps, { ...viewer(), cloudId: 'c' }, enricher)).toEqual({ added: 1, partial: true });
-    expect(await panelEnrich(t.deps, { ...viewer(), cloudId: 'c' }, enricher)).toEqual({ added: 0, partial: true });
+    const r = await panelEnrich(t.deps, { ...viewer(), cloudId: 'c' }, enricher);
+    expect(r).toEqual({ added: 1, partial: true, facts: [expect.objectContaining({ id: graphFact.id, origin: 'graph', sourceType: 'commit' })] });
     const facts = (await t.deps.reviews.facts(reviewId)) as { ok: true; value: Array<{ origin: string }> };
-    expect(facts.value.filter((f) => f.origin === 'graph')).toHaveLength(1);
+    expect(facts.value.some((f) => f.origin === 'graph')).toBe(false);
   });
 });

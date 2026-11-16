@@ -24,7 +24,8 @@ export const newScopeCache = (): ScopeCache => ({ pages: new Map(), issues: new 
  * viewer (issue panel, get-review-context for the agent), drop what this viewer cannot read: Confluence pages they
  * cannot read, and linked issues / incidents they cannot browse. Citations to dropped facts are removed, and a threat
  * left with no citation is hidden. The work item itself is assumed browsable (callers check that first). Any failed
- * permission check hides the fact (fail closed). Gates are unaffected: they count every threat.
+ * permission check, and any source type that cannot be checked, hides the fact (fail closed). Gates are unaffected:
+ * they count every threat.
  */
 export async function scopeForViewer(
   c: { jira: Pick<JiraClient, 'canBrowse'>; confluence: Pick<ConfluenceClient, 'canRead'> },
@@ -53,7 +54,9 @@ export async function scopeForViewer(
         if (id === issueId) return true;
         return can(issueChecks, id, () => c.jira.canBrowse(viewerAccountId, id));
       }
-      return true;
+      // Redline's own earlier-review summary and unrestricted comments on this work item are visible to anyone who can
+      // browse it. Every other source type (graph commits, teams, components…) cannot be checked here: deny by default.
+      return f.sourceType === 'review' || f.sourceType === 'jira_comment';
     }),
   );
   const kept = facts.filter((_, n) => visible[n]);
