@@ -1,0 +1,1 @@
+{ "data": { "customQuery": { "edges": [ { "node": { "columns": [ { "key": "t", "value": { "__typename": "CypherQueryResultNode", "id": "ari:cloud:identity::team/t-1" } } ] } } ], "pageInfo": { "hasNextPage": false } } }, "errors": [ { "message": "partial", "extensions": { "code": "STORAGE_UNAVAILABLE" } } ] }

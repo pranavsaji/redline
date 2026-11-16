@@ -8,7 +8,7 @@
     "module": "ESNext",
     "moduleResolution": "Bundler"
   },
-  "include": ["src", "test"],
+  "include": ["src", "test", "scripts"],
   "exclude": ["src/config", "static", "dist"],
   "references": [
     { "path": "../../packages/shared" },

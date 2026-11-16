@@ -1,0 +1,4 @@
+{ "data": { "customQuery": { "edges": [
+  { "node": { "columns": [ { "key": "c", "value": { "__typename": "CypherQueryResultNode", "id": "ari:cloud:graph::commit/abc123" } } ] } },
+  { "node": { "columns": [ { "key": "c", "value": { "__typename": "CypherQueryResultNode", "id": "ari:cloud:graph::commit/def456" } } ] } }
+], "pageInfo": { "hasNextPage": false, "endCursor": null } } } }

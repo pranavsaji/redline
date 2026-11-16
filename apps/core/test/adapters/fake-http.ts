@@ -17,12 +17,12 @@ export interface Call {
 }
 
 /** A scripted requestJira / requestConfluence: each route pattern answers with its queue of replies in order. */
-export function fakeHttp(routes: Array<[RegExp, Reply | Reply[]]>): { request: FetchLike; calls: Call[] } {
-  const queues = routes.map(([re, r]) => ({ re, replies: Array.isArray(r) ? [...r] : [r], last: Array.isArray(r) ? r[r.length - 1]! : r }));
+export function fakeHttp(routes: Array<[RegExp, Reply | Reply[]] | [RegExp, Reply | Reply[], RegExp]>): { request: FetchLike; calls: Call[] } {
+  const queues = routes.map(([re, r, bodyRe]) => ({ re, bodyRe, replies: Array.isArray(r) ? [...r] : [r], last: Array.isArray(r) ? r[r.length - 1]! : r }));
   const calls: Call[] = [];
   const request: FetchLike = async (path, init) => {
     calls.push({ path, init });
-    const q = queues.find((x) => x.re.test(`${init?.method ?? 'GET'} ${path}`));
+    const q = queues.find((x) => x.re.test(`${init?.method ?? 'GET'} ${path}`) && (!x.bodyRe || x.bodyRe.test(init?.body ?? '')));
     if (!q) throw new Error(`no fake route for ${init?.method ?? 'GET'} ${path}`);
     const reply = q.replies.length > 0 ? q.replies.shift()! : q.last;
     const headers = new Map(Object.entries(reply.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v]));
