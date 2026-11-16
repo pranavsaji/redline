@@ -77,3 +77,23 @@ describe('confluence client', () => {
     expect(!r.ok && r.error.code).toBe('conflict');
   });
 });
+
+describe('confluence client: canRead', () => {
+  it('asks the content permission check for the user and read operation', async () => {
+    const { c, calls } = client([[/POST \/wiki\/rest\/api\/content\/98305\/permission\/check/, { status: 200, body: '{"hasPermission":true}' }]]);
+    expect(await c.canRead('98305', 'acc-1')).toEqual({ ok: true, value: true });
+    expect(JSON.parse(calls[0]!.init!.body!)).toEqual({ subject: { type: 'user', identifier: 'acc-1' }, operation: 'read' });
+  });
+
+  it('no account, a 403/404, or a malformed answer → false', async () => {
+    const { c } = client([
+      [/content\/1\/permission/, { status: 403, body: '{}' }],
+      [/content\/2\/permission/, { status: 404, body: '{}' }],
+      [/content\/3\/permission/, { status: 200, body: '{"hasPermission":"yes"}' }],
+    ]);
+    expect(await c.canRead('98305', '')).toEqual({ ok: true, value: false });
+    expect(await c.canRead('1', 'a')).toEqual({ ok: true, value: false });
+    expect(await c.canRead('2', 'a')).toEqual({ ok: true, value: false });
+    expect(await c.canRead('3', 'a')).toEqual({ ok: true, value: false });
+  });
+});

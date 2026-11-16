@@ -18,6 +18,8 @@ export interface ConfluenceClient {
   createPage(i: { spaceId: string; parentId: string; title: string; storage: string }): Promise<Result<{ id: string; url: string }>>;
   /** `version` is the version you read; the update is sent as version + 1, so a concurrent edit returns `conflict`. */
   updatePage(i: { id: string; title: string; version: number; storage: string }): Promise<Result<void>>;
+  /** Whether `accountId` may read the page. No account, a denied/missing page or an unexpected answer is false. */
+  canRead(pageId: string, accountId: string): Promise<Result<boolean>>;
 }
 
 const NUMERIC_ID = /^\d{1,20}$/;
@@ -76,6 +78,16 @@ export function createConfluenceClient(request: FetchLike, opts: HttpOptions = {
         body: JSON.stringify({ id: i.id, status: 'current', title: i.title, version: { number: i.version + 1 }, body: storageBody(i.storage) }),
       });
       return r.ok ? ok(undefined) : r;
+    },
+
+    async canRead(pageId, accountId) {
+      if (!accountId || !NUMERIC_ID.test(pageId)) return ok(false);
+      const r = await call(`/wiki/rest/api/content/${seg(pageId)}/permission/check`, {
+        method: 'POST',
+        body: JSON.stringify({ subject: { type: 'user', identifier: accountId }, operation: 'read' }),
+      });
+      if (!r.ok) return r.error.code === 'forbidden' || r.error.code === 'not_found' ? ok(false) : r;
+      return ok((r.value as { hasPermission?: unknown } | undefined)?.hasPermission === true);
     },
   };
 }

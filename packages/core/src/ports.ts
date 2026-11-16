@@ -37,8 +37,15 @@ export interface LlmPort {
   complete(req: LlmRequest): Promise<Result<LlmResponse>>;
 }
 
+export interface GatherOptions {
+  /**
+   * The person whose action caused this gather. Content the app can read but this person cannot (restricted
+   * Confluence pages, incidents under issue security) is left out of the bundle. Without an actor it is left out too.
+   */
+  actorAccountId?: string;
+}
 export interface ContextGatherer {
-  gather(issueId: string): Promise<Result<ContextBundle>>;
+  gather(issueId: string, opts?: GatherOptions): Promise<Result<ContextBundle>>;
 }
 
 export type FailedSample = { failed: string };

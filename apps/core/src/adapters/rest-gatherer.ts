@@ -1,4 +1,4 @@
-import { contextHash, normalizeFact, type ClockPort, type ContextGatherer, type IssueRepo, type RawFact, type ReviewRepo } from '@redline/core';
+import { contextHash, normalizeFact, type ClockPort, type ContextGatherer, type GatherOptions, type IssueRepo, type RawFact, type ReviewRepo } from '@redline/core';
 import { sha256Hex } from '@redline/crypto';
 import { ok, type ContextBundle, type ContextFact, type Result } from '@redline/shared';
 import type { ConfluenceClient } from './confluence.js';
@@ -43,6 +43,10 @@ const hostOf = (url: string): string | null => {
  * CE-1 over REST, as the app. Trusted: key, type, status, project, components, fix versions, earlier reviews.
  * Untrusted: summary, description, parent/children/linked summaries, comments, Confluence page bodies, incidents.
  * Any sub-fetch failure sets `partial` with a named reason (CE-5, CE-6); only the work item itself is required.
+ *
+ * Security: the app can read more than the people who see the bundle. Linked Confluence pages and incidents are
+ * included only when the actor (the person whose action caused this gather) can read them; with no actor they are left
+ * out. Left-out pages still count towards `contextHash` (by id and version) so the hash never depends on who triggered it.
  */
 export function restGatherer(d: RestGathererDeps): ContextGatherer {
   const issueAri = (id: string) => `ari:cloud:jira:${d.cloudId}:issue/${id}`;
@@ -51,12 +55,15 @@ export function restGatherer(d: RestGathererDeps): ContextGatherer {
   const issueText = (i: JiraIssue) => `${i.summary}\n${i.description}`.trim();
 
   return {
-    async gather(issueId): Promise<Result<ContextBundle>> {
+    async gather(issueId, opts: GatherOptions = {}): Promise<Result<ContextBundle>> {
+      const actor = opts.actorAccountId ?? '';
       const main = await d.jira.issue(issueId);
       if (!main.ok) return main;
       const issue = main.value;
       const facts: RawFact[] = [];
       const reasons: string[] = [];
+      /** Sources left out for permission reasons: hashed, never shown. */
+      const withheld: Array<{ sourceAri: string; version: string }> = [];
 
       facts.push(
         raw({
@@ -128,18 +135,19 @@ export function restGatherer(d: RestGathererDeps): ContextGatherer {
       } else reasons.push('comments_unavailable');
 
       if (incidents.ok) {
-        for (const i of incidents.value) {
-          if (!INCIDENT_TYPES.has(i.issueType.name.toLowerCase()) || !i.labels.includes('incident')) continue;
-          facts.push(
-            raw({
-              sourceAri: `${issueAri(i.id)}#incident`,
-              sourceType: 'incident',
-              title: `${i.issueType.name} ${i.key}: ${i.summary}`,
-              url: browse(i.key),
-              text: issueText(i),
-              trusted: false,
-            }),
-          );
+        const candidates = incidents.value.filter((i) => INCIDENT_TYPES.has(i.issueType.name.toLowerCase()) && i.labels.includes('incident'));
+        if (!actor && candidates.length > 0) reasons.push('incidents_unverified');
+        const visible = actor ? await Promise.all(candidates.map((i) => d.jira.canBrowse(actor, i.id))) : [];
+        for (const [n, i] of candidates.entries()) {
+          const sourceAri = `${issueAri(i.id)}#incident`;
+          const version = versionOf(i.key, i.summary, i.description);
+          const v = visible[n];
+          if (!actor || !v || !v.ok || !v.value) {
+            withheld.push({ sourceAri, version });
+            if (actor) reasons.push(v && !v.ok ? `incident_unverified:${i.key}` : `incident_restricted:${i.key}`);
+            continue;
+          }
+          facts.push(raw({ sourceAri, sourceType: 'incident', title: `${i.issueType.name} ${i.key}: ${i.summary}`, url: browse(i.key), text: issueText(i), version, trusted: false }));
         }
       } else reasons.push('incidents_unavailable');
 
@@ -151,10 +159,16 @@ export function restGatherer(d: RestGathererDeps): ContextGatherer {
         }
         if (pageLinks.size > MAX_PAGES) reasons.push('confluence_pages_truncated');
         const ids = [...pageLinks.keys()].slice(0, MAX_PAGES);
-        const pages = await Promise.all(ids.map((id) => d.confluence.page(id)));
-        for (const [n, p] of pages.entries()) {
-          const id = ids[n]!;
+        // The app reads each page for its version (hashing only); the body is used only when the actor may read it.
+        const [pages, readable] = await Promise.all([
+          Promise.all(ids.map((id) => d.confluence.page(id))),
+          Promise.all(ids.map((id) => (actor ? d.confluence.canRead(id, actor) : Promise.resolve(null)))),
+        ]);
+        for (const [n, id] of ids.entries()) {
+          const p = pages[n]!;
+          const sourceAri = `ari:cloud:confluence:${d.cloudId}:page/${id}`;
           if (!p.ok) {
+            withheld.push({ sourceAri, version: 'unavailable' });
             reasons.push(`confluence_page_unavailable:${id}`);
             continue;
           }
@@ -165,19 +179,17 @@ export function restGatherer(d: RestGathererDeps): ContextGatherer {
             reasons.push(`confluence_page_other_site:${id}`);
             continue;
           }
-          facts.push(
-            raw({
-              sourceAri: `ari:cloud:confluence:${d.cloudId}:page/${p.value.id}`,
-              sourceType: 'confluence_page',
-              title: p.value.title,
-              url: p.value.url,
-              text: p.value.storage,
-              version: `v${p.value.version}-${versionOf(p.value.storage)}`,
-              trusted: false,
-            }),
-          );
+          // Linked even when withheld: a restricted page's edits must still mark the review out of date.
           const linked = await d.issues.linkPage(issue.id, p.value.id);
           if (!linked.ok) reasons.push(`page_link_unsaved:${id}`);
+          const version = `v${p.value.version}-${versionOf(p.value.storage)}`;
+          const r = readable[n];
+          if (!actor || !r || !r.ok || !r.value) {
+            withheld.push({ sourceAri, version });
+            reasons.push(!actor ? `confluence_page_unverified:${id}` : r && !r.ok ? `confluence_page_unavailable:${id}` : `confluence_page_restricted:${id}`);
+            continue;
+          }
+          facts.push(raw({ sourceAri, sourceType: 'confluence_page', title: p.value.title, url: p.value.url, text: p.value.storage, version, trusted: false }));
         }
       } else reasons.push('remote_links_unavailable');
 
@@ -212,7 +224,7 @@ export function restGatherer(d: RestGathererDeps): ContextGatherer {
         facts: normalized,
         partial: reasons.length > 0,
         partialReasons: reasons,
-        contextHash: contextHash(normalized),
+        contextHash: contextHash([...normalized, ...withheld]),
         gatheredAt: d.clock.now().toISOString(),
         components: issue.components.map((c) => c.slice(0, 255)),
       });
