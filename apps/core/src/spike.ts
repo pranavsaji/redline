@@ -17,10 +17,6 @@ export async function ping(payload: { issueKey?: string }): Promise<{ pong: true
   return { pong: true, issueKey: typeof payload.issueKey === 'string' ? payload.issueKey : null };
 }
 
-export async function onInstall(): Promise<void> {
-  console.log(JSON.stringify({ event: 'installed' }));
-}
-
 export async function ingestThreatModelSpike(payload: { issueKey?: unknown; agentResponse?: unknown }): Promise<{ received: number }> {
   const raw = typeof payload.agentResponse === 'string' ? payload.agentResponse : '';
   console.log(JSON.stringify({ event: 'ingest_spike', issueKey: typeof payload.issueKey === 'string' ? payload.issueKey : null, bytes: raw.length }));

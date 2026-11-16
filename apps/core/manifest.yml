@@ -10,9 +10,31 @@ modules:
     - key: main
       engine: mysql
   trigger:
-    - key: on-install
-      function: onInstall
-      events: [ avi:forge:installed:app ]
+    - key: lifecycle
+      function: lifecycleFn
+      events: [ avi:forge:installed:app, avi:forge:upgraded:app ]
+    - key: issue-events
+      function: issueEventsFn
+      events: [ avi:jira:created:issue, avi:jira:updated:issue ]
+      filter:
+        ignoreSelf: true
+    - key: page-events
+      function: pageEventsFn
+      events: [ avi:confluence:updated:page ]
+  consumer:
+    - key: redline-jobs-consumer
+      queue: redline-jobs
+      function: jobConsumerFn
+  scheduledTrigger:
+    - key: sweeper
+      function: sweeperFn
+      interval: fiveMinute
+    - key: hourly
+      function: hourlyFn
+      interval: hour
+    - key: daily
+      function: dailyFn
+      interval: day
   jira:issuePanel:
     - key: redline-panel
       resource: panel
@@ -81,8 +103,21 @@ modules:
         - Ping PROJ-1
       actions: [ ping, submit-threat-model ]
   function:
-    - key: onInstall
-      handler: index.onInstall
+    - key: lifecycleFn
+      handler: index.lifecycleHandler
+    - key: issueEventsFn
+      handler: index.issueEventHandler
+    - key: pageEventsFn
+      handler: index.pageEventHandler
+    - key: jobConsumerFn
+      handler: index.jobConsumerHandler
+      timeoutSeconds: 300
+    - key: sweeperFn
+      handler: index.sweeperHandler
+    - key: hourlyFn
+      handler: index.hourlyHandler
+    - key: dailyFn
+      handler: index.dailyHandler
     - key: submitThreatModelFn
       handler: index.submitThreatModelSpike
     - key: spikeResolver
@@ -100,4 +135,9 @@ permissions:
   scopes:
     - read:jira-work
     - write:jira-work
+    - read:jira-user
     - storage:app
+    - read:confluence-content.summary
+    - read:confluence-content.permission
+    - read:page:confluence
+    - write:page:confluence
