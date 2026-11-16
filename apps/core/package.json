@@ -18,7 +18,8 @@
     "@redline/db": "workspace:*",
     "@redline/frameworks": "workspace:*",
     "@redline/prompts": "workspace:*",
-    "@redline/shared": "workspace:*"
+    "@redline/shared": "workspace:*",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

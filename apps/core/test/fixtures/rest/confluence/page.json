@@ -1,0 +1,1 @@
+{ "id": "98305", "title": "Refund design", "spaceId": "4456", "version": { "number": 3 }, "body": { "storage": { "value": "<p>The webhook trusts <strong>X-Signature</strong>.</p>", "representation": "storage" } }, "_links": { "webui": "/spaces/PAY/pages/98305/Refund+design", "base": "https://one-atlas-mefc.atlassian.net/wiki" } }
