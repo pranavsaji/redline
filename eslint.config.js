@@ -1,7 +1,7 @@
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/coverage/**', '.superpowers/**'] },
+  { ignores: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/coverage/**', '.superpowers/**', 'apps/*/static/**/main.js'] },
   ...tseslint.configs.recommended,
   {
     rules: {
