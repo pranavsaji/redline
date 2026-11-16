@@ -9,6 +9,9 @@ modules:
   sql:
     - key: main
       engine: mysql
+  webtrigger:
+    - key: spike-run
+      function: spikeWebtriggerFn
   trigger:
     - key: on-install
       function: onInstall
@@ -64,6 +67,8 @@ modules:
         - Ping PROJ-1
       actions: [ ping ]
   function:
+    - key: spikeWebtriggerFn
+      handler: index.spikeWebtrigger
     - key: onInstall
       handler: index.onInstall
     - key: spikeResolver
@@ -78,5 +83,6 @@ resources:
 permissions:
   scopes:
     - read:jira-work
+    - read:jira-user
     - write:jira-work
     - storage:app

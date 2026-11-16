@@ -17,6 +17,16 @@ await build({
   logLevel: 'warning',
   loader: { '.json': 'json' },
 });
+await build({
+  entryPoints: ['src/config/main.ts'],
+  outfile: 'static/config/main.js',
+  bundle: true,
+  platform: 'browser',
+  target: 'es2022',
+  format: 'iife',
+  legalComments: 'none',
+  logLevel: 'warning',
+});
 writeFileSync('dist/package.json', JSON.stringify({ name: 'redline-bundle', private: true, type: 'commonjs' }, null, 2));
 if (existsSync('src/prebuilt')) cpSync('src/prebuilt', 'dist', { recursive: true });
 console.log('built dist/index.js');

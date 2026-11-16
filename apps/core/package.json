@@ -8,16 +8,17 @@
   },
   "dependencies": {
     "@forge/api": "^8.5.0",
-    "@forge/sql": "^4.0.10",
-    "@forge/kvs": "^2.1.2",
+    "@forge/bridge": "^7.3.0",
     "@forge/events": "^3.0.10",
+    "@forge/kvs": "^2.1.2",
     "@forge/resolver": "^2.0.2",
-    "@redline/shared": "workspace:*",
-    "@redline/crypto": "workspace:*",
+    "@forge/sql": "^4.0.10",
     "@redline/core": "workspace:*",
+    "@redline/crypto": "workspace:*",
     "@redline/db": "workspace:*",
+    "@redline/frameworks": "workspace:*",
     "@redline/prompts": "workspace:*",
-    "@redline/frameworks": "workspace:*"
+    "@redline/shared": "workspace:*"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"
