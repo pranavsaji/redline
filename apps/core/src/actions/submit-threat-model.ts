@@ -5,6 +5,7 @@ import { log } from '../adapters/log.js';
 import { handleJob } from '../consumers/review-consumer.js';
 import { RECENT_INGESTS_KEY } from '../services/budget.js';
 import { checkRerunLimit } from '../services/rate-limit.js';
+import { consumeSubmissionToken } from '../services/submission-token.js';
 import { callerOf, ISSUE_KEY, type ActionPayload } from './common.js';
 
 export interface IngestResult {
@@ -69,13 +70,14 @@ export async function ingestSample(deps: CoreDeps, issueKey: string, raw: string
 
 export type SubmitResult =
   | { saved: true; valid: boolean; received: number; expected: number; message: string }
-  | { saved: false; error: 'invalid_input' | 'not_found' | 'project_not_enabled' | 'complete' | 'budget' | 'rate_limited' | 'unavailable' };
+  | { saved: false; error: 'invalid_input' | 'invalid_token' | 'not_found' | 'project_not_enabled' | 'complete' | 'budget' | 'rate_limited' | 'unavailable' };
 
 /**
  * CREATE action the agent calls to save its threat model (Automation "take actions" runs it unattended; chat and
- * assignment sessions show a confirmation card). Requires that the caller can edit the work item.
+ * assignment sessions show a confirmation card). Requires that the caller can edit the work item and presents the
+ * single-use token get-review-context issued to them for this work item.
  */
-export async function submitThreatModel(payload: ActionPayload & { issueKey?: unknown; threatModelJson?: unknown }, deps: CoreDeps): Promise<SubmitResult> {
+export async function submitThreatModel(payload: ActionPayload & { issueKey?: unknown; threatModelJson?: unknown; submissionToken?: unknown }, deps: CoreDeps): Promise<SubmitResult> {
   const issueKey = typeof payload.issueKey === 'string' ? payload.issueKey.trim() : '';
   if (!ISSUE_KEY.test(issueKey) || typeof payload.threatModelJson !== 'string') return { saved: false, error: 'invalid_input' };
   const caller = callerOf(payload);
@@ -85,6 +87,10 @@ export async function submitThreatModel(payload: ActionPayload & { issueKey?: un
   const allowed = await deps.jira.canEdit(caller, issue.value.id);
   if (!allowed.ok) return { saved: false, error: 'unavailable' };
   if (!allowed.value) return { saved: false, error: 'not_found' };
+  if (!(await consumeSubmissionToken(deps, payload.submissionToken, { issueId: issue.value.id, accountId: caller }))) {
+    log('action.submit.invalid_token', { issueId: issue.value.id });
+    return { saved: false, error: 'invalid_token' };
+  }
 
   const r = await ingestSample(deps, issue.value.key, payload.threatModelJson, 'agent', caller);
   if (!r.ok) {

@@ -63,6 +63,11 @@ modules:
           type: string
           required: true
           description: The Jira work item key, for example PAY-7
+        submissionToken:
+          title: Submission token
+          type: string
+          required: true
+          description: The submissionToken returned by get-review-context for this same work item
         threatModelJson:
           title: Threat model JSON
           type: string

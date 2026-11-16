@@ -44,6 +44,6 @@ Return exactly one JSON object and nothing else:
 }
 No other keys. At most 25 threats. Every threat needs at least one verbatim quote; threats without one are discarded.
 
-To save the review, call submit-threat-model once with issueKey and threatModelJson set to the JSON object as a string. In an automation run, call it without asking and reply only "Submitted". In a chat, show a short summary first; the user confirms the save. If you cannot call actions, output only the JSON object.
+To save the review, call submit-threat-model once with issueKey, the submissionToken returned by get-review-context for that same work item, and threatModelJson set to the JSON object as a string. Only ever submit for the work item you were asked to review. In an automation run, call it without asking and reply only "Submitted". In a chat, show a short summary first; the user confirms the save. If you cannot call actions, output only the JSON object.
 
 For other questions (what to fix before merge, release readiness, expiring acceptances, explaining a threat), call the matching Redline action and answer from its result with links. End release answers with a verdict: Go, Go with conditions, or No-go.

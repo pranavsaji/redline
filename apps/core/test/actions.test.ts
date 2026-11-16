@@ -5,6 +5,14 @@ import { getReviewContext } from '../src/actions/get-review-context.js';
 import { ingestSample, submitThreatModel } from '../src/actions/submit-threat-model.js';
 import { handleJob } from '../src/consumers/review-consumer.js';
 import { coreDeps, drain, jiraIssue } from './support/core-deps.js';
+import type { CoreDeps } from '../src/deps.js';
+
+/** The agent's real sequence: fetch context (gets a single-use token), then submit with it. */
+async function submit(deps: CoreDeps, issueKey: string, threatModelJson: unknown, accountId = 'acc-1') {
+  const c = await getReviewContext({ issueKey, ...ctx(accountId) }, deps);
+  const submissionToken = 'submissionToken' in c ? c.submissionToken : 'none';
+  return submitThreatModel({ issueKey, threatModelJson: threatModelJson as string, submissionToken, ...ctx(accountId) }, deps);
+}
 
 const KEY = 'PAY-7';
 const ctx = (accountId?: string) => ({ context: accountId ? { accountId, agentId: 'agent-1', cloudId: 'c' } : {} });
@@ -86,7 +94,7 @@ describe('submit-threat-model (CREATE action) and ingestSample', () => {
     const t = setup();
     await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
     t.pushed.length = 0;
-    const r = await submitThreatModel({ issueKey: KEY, threatModelJson: proseWrapped, ...ctx('acc-1') }, t.deps);
+    const r = await submit(t.deps, KEY, proseWrapped);
     expect(r).toMatchObject({ saved: true, valid: true, received: 1, expected: 3 });
     const rev = (await t.deps.reviews.latest('10042')) as { ok: true; value: { id: string } };
     const samples = await t.deps.reviews.samples(rev.value.id);
@@ -99,7 +107,7 @@ describe('submit-threat-model (CREATE action) and ingestSample', () => {
     const t = setup();
     await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
     t.pushed.length = 0;
-    const r = await submitThreatModel({ issueKey: KEY, threatModelJson: 'I could not find anything.', ...ctx('acc-1') }, t.deps);
+    const r = await submit(t.deps, KEY, 'I could not find anything.');
     expect(r).toMatchObject({ saved: true, valid: false, received: 1 });
     const rev = (await t.deps.reviews.latest('10042')) as { ok: true; value: { id: string } };
     const samples = await t.deps.reviews.samples(rev.value.id);
@@ -110,14 +118,14 @@ describe('submit-threat-model (CREATE action) and ingestSample', () => {
   it('an empty agent response counts toward the Rovo-credits signal', async () => {
     const t = setup();
     await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
-    await submitThreatModel({ issueKey: KEY, threatModelJson: '  ', ...ctx('acc-1') }, t.deps);
+    await submit(t.deps, KEY, '  ');
     expect(t.kv.data.get('ingest:recent')).toEqual([false]);
   });
 
   it('the 3rd sample sets status ready after the consumer runs', async () => {
     const t = setup();
     await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
-    for (let i = 0; i < 3; i++) await submitThreatModel({ issueKey: KEY, threatModelJson: JSON.stringify(MODEL), ...ctx('acc-1') }, t.deps);
+    for (let i = 0; i < 3; i++) await submit(t.deps, KEY, JSON.stringify(MODEL));
     await drain((j) => handleJob(t.deps, j), t.pushed);
     const l = await t.deps.reviews.latest('10042');
     expect(l.ok && l.value).toMatchObject({ status: 'ready', samplesReceived: 3 });
@@ -126,14 +134,14 @@ describe('submit-threat-model (CREATE action) and ingestSample', () => {
   it('a 4th sample is refused once all agent runs are in', async () => {
     const t = setup();
     await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
-    for (let i = 0; i < 3; i++) await submitThreatModel({ issueKey: KEY, threatModelJson: JSON.stringify(MODEL), ...ctx('acc-1') }, t.deps);
-    const r = await submitThreatModel({ issueKey: KEY, threatModelJson: JSON.stringify(MODEL), ...ctx('acc-1') }, t.deps);
+    for (let i = 0; i < 3; i++) await submit(t.deps, KEY, JSON.stringify(MODEL));
+    const r = await submit(t.deps, KEY, JSON.stringify(MODEL));
     expect(r).toMatchObject({ saved: false, error: 'complete' });
   });
 
   it('with no open review, a submission first creates one (synchronous gather), then stores the sample', async () => {
     const t = setup();
-    const r = await submitThreatModel({ issueKey: KEY, threatModelJson: JSON.stringify(MODEL), ...ctx('acc-1') }, t.deps);
+    const r = await submit(t.deps, KEY, JSON.stringify(MODEL));
     expect(r).toMatchObject({ saved: true, received: 1 });
     const l = await t.deps.reviews.latest('10042');
     expect(l.ok && l.value).toMatchObject({ revision: 1, status: 'awaiting_agent' });
@@ -141,13 +149,13 @@ describe('submit-threat-model (CREATE action) and ingestSample', () => {
 
   it('a caller who cannot edit the work item cannot submit (and learns nothing about it)', async () => {
     const t = setup({ canEdit: false });
-    const r = await submitThreatModel({ issueKey: KEY, threatModelJson: JSON.stringify(MODEL), ...ctx('acc-1') }, t.deps);
+    const r = await submit(t.deps, KEY, JSON.stringify(MODEL));
     expect(r).toEqual({ saved: false, error: 'not_found' });
   });
 
   it('a project that is not enabled is refused', async () => {
     const t = coreDeps({ issues: [jiraIssue({ id: '10042', key: 'HR-1', project: { id: '9', key: 'HR' } })] });
-    const r = await submitThreatModel({ issueKey: 'HR-1', threatModelJson: JSON.stringify({ ...MODEL, issueKey: 'HR-1' }), ...ctx('acc-1') }, t.deps);
+    const r = await submit(t.deps, 'HR-1', JSON.stringify({ ...MODEL, issueKey: 'HR-1' }));
     expect(r).toEqual({ saved: false, error: 'project_not_enabled' });
   });
 
@@ -160,8 +168,60 @@ describe('submit-threat-model (CREATE action) and ingestSample', () => {
 
   it('rejects malformed inputs without touching anything', async () => {
     const t = setup();
-    expect(await submitThreatModel({ issueKey: 'not a key', threatModelJson: '{}', ...ctx('acc-1') }, t.deps)).toEqual({ saved: false, error: 'invalid_input' });
-    expect(await submitThreatModel({ issueKey: KEY, threatModelJson: 42 as never, ...ctx('acc-1') }, t.deps)).toEqual({ saved: false, error: 'invalid_input' });
+    expect(await submitThreatModel({ issueKey: 'not a key', threatModelJson: '{}', submissionToken: 'x', ...ctx('acc-1') }, t.deps)).toEqual({ saved: false, error: 'invalid_input' });
+    expect(await submitThreatModel({ issueKey: KEY, threatModelJson: 42 as never, submissionToken: 'x', ...ctx('acc-1') }, t.deps)).toEqual({ saved: false, error: 'invalid_input' });
     expect(t.gatherer.calls).toHaveLength(0);
+  });
+
+  describe('security: a submission must carry the single-use token from get-review-context', () => {
+    const ready = async () => {
+      const t = setup();
+      await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
+      return t;
+    };
+    const tokenFor = async (t: ReturnType<typeof setup>, issueKey: string, accountId = 'acc-1') => {
+      const c = await getReviewContext({ issueKey, ...ctx(accountId) }, t.deps);
+      if (!('submissionToken' in c)) throw new Error('no token');
+      return c.submissionToken;
+    };
+
+    it('no token, an unknown token, or a token reused a second time is refused', async () => {
+      const t = await ready();
+      const base = { issueKey: KEY, threatModelJson: JSON.stringify(MODEL), ...ctx('acc-1') };
+      expect(await submitThreatModel(base, t.deps)).toEqual({ saved: false, error: 'invalid_token' });
+      expect(await submitThreatModel({ ...base, submissionToken: 'deadbeef'.repeat(4) }, t.deps)).toEqual({ saved: false, error: 'invalid_token' });
+      const tok = await tokenFor(t, KEY);
+      expect(await submitThreatModel({ ...base, submissionToken: tok }, t.deps)).toMatchObject({ saved: true });
+      expect(await submitThreatModel({ ...base, submissionToken: tok }, t.deps)).toEqual({ saved: false, error: 'invalid_token' });
+    });
+
+    it('a token issued for another work item cannot submit for this one (no cross-issue writes)', async () => {
+      const t = coreDeps({ issues: [jiraIssue({ id: '10042', key: KEY }), jiraIssue({ id: '10043', key: 'PAY-8' })] });
+      await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
+      const tok = await tokenFor(t as never, 'PAY-8');
+      const r = await submitThreatModel({ issueKey: KEY, threatModelJson: JSON.stringify(MODEL), submissionToken: tok, ...ctx('acc-1') }, t.deps);
+      expect(r).toEqual({ saved: false, error: 'invalid_token' });
+    });
+
+    it('a token issued to another caller is refused', async () => {
+      const t = await ready();
+      const tok = await tokenFor(t, KEY, 'acc-other');
+      const r = await submitThreatModel({ issueKey: KEY, threatModelJson: JSON.stringify(MODEL), submissionToken: tok, ...ctx('acc-1') }, t.deps);
+      expect(r).toEqual({ saved: false, error: 'invalid_token' });
+    });
+
+    it('a token expires after 30 minutes', async () => {
+      const t = await ready();
+      const tok = await tokenFor(t, KEY);
+      t.clock.advance(31 * 60_000);
+      const r = await submitThreatModel({ issueKey: KEY, threatModelJson: JSON.stringify(MODEL), submissionToken: tok, ...ctx('acc-1') }, t.deps);
+      expect(r).toEqual({ saved: false, error: 'invalid_token' });
+    });
+
+    it('the token is never stored in plain form (KVS holds its hash)', async () => {
+      const t = await ready();
+      const tok = await tokenFor(t, KEY);
+      expect(JSON.stringify([...t.kv.data.keys(), ...t.kv.data.values()])).not.toContain(tok);
+    });
   });
 });

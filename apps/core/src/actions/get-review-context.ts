@@ -1,10 +1,13 @@
 import { buildReviewContext, type ReviewContextDto } from '@redline/core';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
+import { issueSubmissionToken } from '../services/submission-token.js';
 import { scopeForViewer } from '../services/viewer-scope.js';
 import { callerOf, ISSUE_KEY, type ActionPayload } from './common.js';
 
-export type GetReviewContextResult = ReviewContextDto | { error: 'not_found' | 'invalid_input' | 'unavailable' };
+export type GetReviewContextResult =
+  | (ReviewContextDto & { submissionToken: string; instructions: string })
+  | { error: 'not_found' | 'invalid_input' | 'unavailable' };
 
 /**
  * GET action the agent calls first. Gathers fresh context scoped to the caller (pages/incidents they can read), then
@@ -31,6 +34,16 @@ export async function getReviewContext(payload: ActionPayload & { issueKey?: unk
   const latest = await deps.reviews.latest(issue.value.id);
   const open = latest.ok && latest.value && latest.value.status === 'awaiting_agent' ? latest.value : null;
   const revision = open ? open.revision : (latest.ok && latest.value ? latest.value.revision : 0) + 1;
+  let submissionToken: string;
+  try {
+    submissionToken = await issueSubmissionToken(deps, { issueId: issue.value.id, accountId: caller, revision });
+  } catch {
+    return { error: 'unavailable' };
+  }
   log('action.context', { issueId: issue.value.id, facts: scoped.facts.length, hidden: scoped.hiddenFacts, revision });
-  return buildReviewContext({ ...bundle.value, facts: scoped.facts }, { revision });
+  return {
+    ...buildReviewContext({ ...bundle.value, facts: scoped.facts }, { revision }),
+    submissionToken,
+    instructions: `To save the review, call submit-threat-model with issueKey "${issue.value.key}", this submissionToken, and threatModelJson. The token works once, only for ${issue.value.key}, for 30 minutes.`,
+  };
 }
