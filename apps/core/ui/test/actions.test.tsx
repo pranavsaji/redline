@@ -2,7 +2,7 @@
 import './setup-dom.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import userEventLib from '@testing-library/user-event';
 import axe from 'axe-core';
 import { IssuePanel } from '../src/panel/IssuePanel.js';
 import { mockApi } from '../src/mock-bridge.js';
@@ -11,6 +11,8 @@ import type { PanelApi } from '../src/bridge.js';
 import type { PanelDto } from '../src/types.js';
 
 afterEach(cleanup);
+// No per-keystroke timers: typing a URL is one task, not forty.
+const userEvent = userEventLib.setup({ delay: null });
 
 const withRoles = (state: string, roles: PanelDto['roles']): PanelApi => {
   const base = mockApi(state);

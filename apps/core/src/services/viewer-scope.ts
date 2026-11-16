@@ -80,6 +80,8 @@ export function citesOnlyTheWorkItem(threat: Pick<Threat, 'citations'>, facts: r
   return threat.citations.every((c) => {
     const f = byId.get(c.factId);
     if (!f) return false;
+    // Comment facts are only ever gathered from this work item's own comments, and restricted ones are dropped before
+    // they become facts (rest-gatherer). The facts passed here are this work item's own review's.
     if (f.sourceType === 'review' || f.sourceType === 'jira_comment') return true;
     return f.sourceType === 'jira_issue' && ISSUE.exec(f.sourceAri)?.[1] === issueId;
   });

@@ -193,6 +193,12 @@ describe('panel.rerun', () => {
     expect(await panelRerun(t.deps, viewer())).toEqual({ error: 'rate_limited' });
   });
 
+  it('when the label is already there it is removed and added again, so the Automation re-run rule fires every time', async () => {
+    const t = coreDeps({ issues: [jiraIssue({ id: ISSUE, key: 'PAY-7', labels: ['redline-review'] })] });
+    expect(await panelRerun(t.deps, viewer())).toEqual({ ok: true });
+    expect(t.jira.labels).toEqual(['-redline-review', '+redline-review']);
+  });
+
   it('needs edit permission', async () => {
     const { t } = await reviewed({ canEdit: false });
     expect(await panelRerun(t.deps, viewer())).toEqual({ error: 'not_found' });

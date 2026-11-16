@@ -180,12 +180,17 @@ export async function panelThreats(deps: CoreDeps, v: Viewer, p: { cursor?: unkn
   return { threats: page, cursor: from + PAGE_SIZE < scoped.threats.length ? from + PAGE_SIZE : null };
 }
 
-/** Adds the redline-review label (visible in Jira, also starts the Automation agent rule) and queues the gather. */
+/** (Re-)adds the redline-review label (visible in Jira; starts the Automation re-run rule) and queues the gather. */
 export async function panelRerun(deps: CoreDeps, v: Viewer): Promise<{ ok: true } | Denied> {
   const auth = await authorise(deps, v, 'edit');
   if ('error' in auth) return auth;
   const limit = await checkRerunLimit(deps, v.accountId);
   if (!limit.ok) return { error: limit.error.code === 'budget' ? 'rate_limited' : 'unavailable' };
+  // Automation's "Labels changed" trigger only fires on a change, so a label left over from the last re-run is removed first.
+  if (auth.issue.labels.includes(RERUN_LABEL)) {
+    const removed = await deps.jira.removeLabel(v.issueId, RERUN_LABEL);
+    if (!removed.ok) log('panel.rerun.label_failed', { issueId: v.issueId, code: removed.error.code });
+  }
   const label = await deps.jira.addLabel(v.issueId, RERUN_LABEL);
   if (!label.ok) log('panel.rerun.label_failed', { issueId: v.issueId, code: label.error.code });
   // The issue trigger ignores the app's own edits, so the gather is queued here as well.
