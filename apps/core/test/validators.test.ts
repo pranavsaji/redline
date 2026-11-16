@@ -41,6 +41,13 @@ describe('Done gate (jira:workflowValidator, EN-2)', () => {
     expect(t.kv.data.has(verdictKey(ISSUE))).toBe(true);
   });
 
+  it('a stored verdict from before messages existed is recomputed, so the error says why', async () => {
+    const t = coreDeps();
+    await handleJob(t.deps, { kind: 'gather', issueId: ISSUE, reason: 'created' });
+    t.kv.data.set(verdictKey(ISSUE), { state: 'block', blockingCount: 1, reasons: [] });
+    expect(await validateTransition(t.deps, args())).toEqual({ result: false, errorMessage: expect.stringMatching(/^Redline blocks Done: /) });
+  });
+
   it('a not-applicable issue type passes once its verdict is computed', async () => {
     const bug = jiraIssue({ id: '10050', key: 'PAY-9', issueType: { id: '10004', name: 'Bug', subtask: false } });
     const t = coreDeps({ issues: [bug] });

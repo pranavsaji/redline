@@ -33,7 +33,9 @@ export async function validateTransition(deps: CoreDeps, args: { issue?: { key?:
   };
   let v = await read();
   if (!v.ok) return blocked(UNREADABLE);
-  if (v.value === undefined || v.value === null) {
+  // Verdicts stored before the gate message existed are recomputed once so the error can say why.
+  const stale = (x: unknown) => typeof x === 'object' && x !== null && (x as { state?: unknown }).state === 'block' && typeof (x as { message?: unknown }).message !== 'string';
+  if (v.value === undefined || v.value === null || stale(v.value)) {
     const fresh = await refreshVerdict(deps, id);
     if (!fresh.ok) {
       log('validator.refresh_failed', { code: fresh.error.code });
