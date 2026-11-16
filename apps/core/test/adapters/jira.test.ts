@@ -285,3 +285,29 @@ describe('jira client: restricted comments (security)', () => {
     expect(r.ok && r.value.map((c) => [c.id, c.restricted])).toEqual([['1', false], ['2', true]]);
   });
 });
+
+describe('jira client: permission checks as the user (impersonation)', () => {
+  it('canBrowse/canEdit/isAdmin ask Jira as that user via mypermissions when a user transport is given', async () => {
+    const app = fakeHttp([[/GET \/rest\/api\/3\/issue\/PAY-7\?/, { status: 200, body: fixture('jira', 'issue') }]]);
+    const asUserCalls: string[] = [];
+    const user = (accountId: string) =>
+      fakeHttp([
+        [/mypermissions\?issueId=10042&permissions=BROWSE_PROJECTS/, { status: 200, body: JSON.stringify({ permissions: { BROWSE_PROJECTS: { havePermission: accountId === 'acc-ok' } } }) }],
+        [/mypermissions\?issueId=10042&permissions=EDIT_ISSUES/, { status: 200, body: '{"permissions":{"EDIT_ISSUES":{"havePermission":false}}}' }],
+        [/mypermissions\?permissions=ADMINISTER/, { status: 200, body: '{"permissions":{"ADMINISTER":{"havePermission":true}}}' }],
+      ]).request;
+    const jira = createJiraClient(app.request, { sleep: noSleep().sleep, asUser: (a) => (asUserCalls.push(a), user(a)) });
+    expect(await jira.canBrowse('acc-ok', 'PAY-7')).toEqual({ ok: true, value: true });
+    expect(await jira.canBrowse('acc-no', '10042')).toEqual({ ok: true, value: false });
+    expect(await jira.canEdit('acc-ok', '10042')).toEqual({ ok: true, value: false });
+    expect(await jira.isAdmin('acc-ok')).toEqual({ ok: true, value: true });
+    expect(asUserCalls).toEqual(['acc-ok', 'acc-no', 'acc-ok', 'acc-ok']);
+    expect(app.calls.some((c) => c.path.includes('permissions/check'))).toBe(false);
+  });
+
+  it('a 404/403 for the user means no permission', async () => {
+    const user = () => fakeHttp([[/mypermissions/, { status: 404, body: '{}' }]]).request;
+    const jira = createJiraClient(fakeHttp([]).request, { sleep: noSleep().sleep, asUser: user });
+    expect(await jira.canBrowse('acc', '10042')).toEqual({ ok: true, value: false });
+  });
+});

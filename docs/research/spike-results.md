@@ -48,3 +48,19 @@ A CREATE action shows a **confirmation card** ("Submit Redline threat model", wi
 2. **Assignment (user's question answered: yes):** assigning the work item to Redline starts a session that does the same, with one Confirm click on the submit card.
 3. **Rovo chat:** the same actions, with the same confirmation.
 
+
+## Task 19 live run (2026-11-16, demo site, app 5.3.0)
+
+| Step | Result |
+|---|---|
+| Automation rule "Redline: security review on create (3 agent runs)": Work item created → 3 × "Use agent: Redline" with **Let this agent take actions** on | Enabled, scoped to Payments |
+| PAY-6 created 05:30:39Z | Trigger created revision 1 (`awaiting_agent`) at 05:30:43Z |
+| Agent run 1 / 2 / 3: get-review-context → submit-threat-model (with the single-use token) | Samples saved 05:30:54, 05:31:11, 05:31:25 — all valid, no human in the loop |
+| Review `ready` | 05:31:25Z (**47 s** after the work item was created) |
+| `redline.verdict` | `block`, 2 open High requirements, panel link |
+| Interactive session (PAY-5, Agents menu) | Same actions; one Confirm click on the submit card; late sample after the 15-min timeout was assembled in final mode → `ready` |
+
+**Finding:** Jira's bulk `POST /rest/api/3/permissions/check` returns **403** when an app asks about another user (it needs
+Administer Jira). Permission checks now impersonate the account being checked (`asUser(accountId)` +
+`GET /rest/api/3/mypermissions`, scopes `read:jira-work`/`read:jira-user` with `allowImpersonation: true`).
+The first automation run (before this fix) shows in the rule's "Debug agent response" as two get-review-context calls and no submit.

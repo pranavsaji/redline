@@ -259,8 +259,25 @@ export function adfToText(doc: unknown): string {
 
 // ---------- client ----------
 
-export function createJiraClient(request: FetchLike, opts: HttpOptions = {}): JiraClient {
+export interface JiraClientOptions extends HttpOptions {
+  /**
+   * Transport acting as a given user (Forge `asUser(accountId)`, needs allowImpersonation). When present, permission
+   * checks ask Jira as that user (`mypermissions`); the app-level bulk check needs Administer Jira, which apps lack.
+   */
+  asUser?: (accountId: string) => FetchLike;
+}
+
+export function createJiraClient(request: FetchLike, opts: JiraClientOptions = {}): JiraClient {
   const call = httpJson(request, opts);
+  const userCall = (accountId: string) => httpJson(opts.asUser!(accountId), opts);
+
+  async function myPermission(accountId: string, permission: string, issueId?: string): Promise<Result<boolean>> {
+    const q = issueId ? `issueId=${seg(issueId)}&permissions=${permission}` : `permissions=${permission}`;
+    const r = await userCall(accountId)(`/rest/api/3/mypermissions?${q}`);
+    if (!r.ok) return r.error.code === 'not_found' || r.error.code === 'forbidden' || r.error.code === 'validation' ? ok(false) : r;
+    const perms = (r.value as { permissions?: Record<string, { havePermission?: unknown }> } | undefined)?.permissions;
+    return ok(perms?.[permission]?.havePermission === true);
+  }
   const json = (method: 'POST' | 'PUT', body: unknown) => ({ method, body: JSON.stringify(body) });
 
   async function issue(idOrKey: string): Promise<Result<JiraIssue>> {
@@ -283,6 +300,7 @@ export function createJiraClient(request: FetchLike, opts: HttpOptions = {}): Ji
     const id = await resolveId(idOrKey);
     if (!id.ok) return id;
     if (id.value === null) return ok(false);
+    if (opts.asUser) return myPermission(accountId, permission, id.value);
     const r = await call('/rest/api/3/permissions/check', json('POST', { accountId, projectPermissions: [{ permissions: [permission], issues: [Number(id.value)] }] }));
     if (!r.ok) return r.error.code === 'not_found' ? ok(false) : r;
     const p = parse(
@@ -361,6 +379,7 @@ export function createJiraClient(request: FetchLike, opts: HttpOptions = {}): Ji
 
     async isAdmin(accountId) {
       if (!accountId) return ok(false);
+      if (opts.asUser) return myPermission(accountId, 'ADMINISTER');
       const r = await call('/rest/api/3/permissions/check', json('POST', { accountId, globalPermissions: ['ADMINISTER'] }));
       if (!r.ok) return r;
       const p = parse(z.object({ globalPermissions: z.array(z.string()).nullish() }), r.value, 'permissions check');
@@ -411,11 +430,15 @@ export function createJiraClient(request: FetchLike, opts: HttpOptions = {}): Ji
   };
 }
 
-/** Forge-backed client. `as: 'user'` needs a user context (resolvers, actions); everything else runs as the app. */
+/**
+ * Forge-backed client. `as: 'user'` needs a user context (resolvers, actions); everything else runs as the app.
+ * Permission checks always impersonate the account being checked (read:jira-work allowImpersonation).
+ */
 export function jiraClient(as: 'app' | 'user'): JiraClient {
   const request: FetchLike = (path, init) => {
     const product = as === 'app' ? api.asApp() : api.asUser();
     return product.requestJira(assumeTrustedRoute(path), init);
   };
-  return createJiraClient(request);
+  const asUser = (accountId: string): FetchLike => (path, init) => api.asUser(accountId).requestJira(assumeTrustedRoute(path), init);
+  return createJiraClient(request, { asUser });
 }

@@ -79,14 +79,18 @@ export type SubmitResult =
  */
 export async function submitThreatModel(payload: ActionPayload & { issueKey?: unknown; threatModelJson?: unknown; submissionToken?: unknown }, deps: CoreDeps): Promise<SubmitResult> {
   const issueKey = typeof payload.issueKey === 'string' ? payload.issueKey.trim() : '';
-  if (!ISSUE_KEY.test(issueKey) || typeof payload.threatModelJson !== 'string') return { saved: false, error: 'invalid_input' };
+  const deny = <E extends Extract<SubmitResult, { saved: false }>['error']>(reason: string, error: E) => {
+    log('action.submit.denied', { reason, hasCaller: callerOf(payload) !== '', bytes: typeof payload.threatModelJson === 'string' ? payload.threatModelJson.length : -1 });
+    return { saved: false as const, error };
+  };
+  if (!ISSUE_KEY.test(issueKey) || typeof payload.threatModelJson !== 'string') return deny('invalid_input', 'invalid_input');
   const caller = callerOf(payload);
-  if (!caller) return { saved: false, error: 'not_found' };
+  if (!caller) return deny('no_caller', 'not_found');
   const issue = await deps.jira.issue(issueKey);
-  if (!issue.ok) return { saved: false, error: issue.error.code === 'not_found' || issue.error.code === 'forbidden' ? 'not_found' : 'unavailable' };
+  if (!issue.ok) return deny(`issue_${issue.error.code}`, issue.error.code === 'not_found' || issue.error.code === 'forbidden' ? 'not_found' : 'unavailable');
   const allowed = await deps.jira.canEdit(caller, issue.value.id);
-  if (!allowed.ok) return { saved: false, error: 'unavailable' };
-  if (!allowed.value) return { saved: false, error: 'not_found' };
+  if (!allowed.ok) return deny(`edit_check_${allowed.error.code}`, 'unavailable');
+  if (!allowed.value) return deny('no_edit', 'not_found');
   if (!(await consumeSubmissionToken(deps, payload.submissionToken, { issueId: issue.value.id, accountId: caller }))) {
     log('action.submit.invalid_token', { issueId: issue.value.id });
     return { saved: false, error: 'invalid_token' };

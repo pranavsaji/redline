@@ -111,11 +111,13 @@ resources:
     path: agent
 permissions:
   scopes:
-    - read:jira-work
-    - write:jira-work
-    - read:jira-user
-    - storage:app
-    - read:confluence-content.summary
-    - read:confluence-content.permission
-    - read:page:confluence
-    - write:page:confluence
+    read:jira-work:
+      allowImpersonation: true
+    write:jira-work: {}
+    read:jira-user:
+      allowImpersonation: true
+    storage:app: {}
+    read:confluence-content.summary: {}
+    read:confluence-content.permission: {}
+    read:page:confluence: {}
+    write:page:confluence: {}

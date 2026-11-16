@@ -16,14 +16,18 @@ export type GetReviewContextResult =
  */
 export async function getReviewContext(payload: ActionPayload & { issueKey?: unknown }, deps: CoreDeps): Promise<GetReviewContextResult> {
   const issueKey = typeof payload.issueKey === 'string' ? payload.issueKey.trim() : '';
-  if (!ISSUE_KEY.test(issueKey)) return { error: 'invalid_input' };
+  const deny = (reason: string, error: 'not_found' | 'invalid_input' | 'unavailable') => {
+    log('action.context.denied', { reason, hasCaller: callerOf(payload) !== '' });
+    return { error };
+  };
+  if (!ISSUE_KEY.test(issueKey)) return deny('invalid_key', 'invalid_input');
   const caller = callerOf(payload);
-  if (!caller) return { error: 'not_found' };
+  if (!caller) return deny('no_caller', 'not_found');
   const issue = await deps.jira.issue(issueKey);
-  if (!issue.ok) return { error: issue.error.code === 'not_found' || issue.error.code === 'forbidden' ? 'not_found' : 'unavailable' };
+  if (!issue.ok) return deny(`issue_${issue.error.code}`, issue.error.code === 'not_found' || issue.error.code === 'forbidden' ? 'not_found' : 'unavailable');
   const allowed = await deps.jira.canBrowse(caller, issue.value.id);
-  if (!allowed.ok) return { error: 'unavailable' };
-  if (!allowed.value) return { error: 'not_found' };
+  if (!allowed.ok) return deny(`browse_check_${allowed.error.code}`, 'unavailable');
+  if (!allowed.value) return deny('no_browse', 'not_found');
 
   const bundle = await deps.gatherer.gather(issue.value.id, { actorAccountId: caller });
   if (!bundle.ok) {
