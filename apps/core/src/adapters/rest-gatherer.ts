@@ -121,7 +121,7 @@ export function restGatherer(d: RestGathererDeps): ContextGatherer {
       } else reasons.push('children_unavailable');
 
       if (comments.ok) {
-        for (const c of comments.value)
+        for (const c of comments.value.filter((x) => !x.restricted))
           facts.push(
             raw({
               sourceAri: `ari:cloud:jira:${d.cloudId}:issue-comment/${c.id}`,

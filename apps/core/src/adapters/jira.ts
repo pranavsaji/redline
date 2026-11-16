@@ -46,6 +46,8 @@ export interface JiraComment {
   body: string;
   author: string;
   created: string;
+  /** Visible only to a role or group: never gather it (the app can read it, the issue's audience may not). */
+  restricted: boolean;
 }
 
 export interface JiraClient {
@@ -327,14 +329,14 @@ export function createJiraClient(request: FetchLike, opts: HttpOptions = {}): Ji
       const p = parse(
         z.object({
           comments: z.array(
-            z.object({ id: z.string(), body: z.unknown().optional(), author: z.object({ accountId: z.string() }).nullish(), created: z.string().nullish() }),
+            z.object({ id: z.string(), body: z.unknown().optional(), author: z.object({ accountId: z.string() }).nullish(), created: z.string().nullish(), visibility: z.unknown().optional() }),
           ),
         }),
         r.value,
         'comments',
       );
       if (!p.ok) return p;
-      return ok(p.value.comments.map((c) => ({ id: c.id, body: adfToText(c.body), author: c.author?.accountId ?? '', created: c.created ?? '' })));
+      return ok(p.value.comments.map((c) => ({ id: c.id, body: adfToText(c.body), author: c.author?.accountId ?? '', created: c.created ?? '', restricted: c.visibility != null })));
     },
 
     async remoteLinks(issueId) {

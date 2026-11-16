@@ -161,7 +161,7 @@ describe('jira client: reads', () => {
     ]);
     expect(await jira.comments('10042')).toEqual({
       ok: true,
-      value: [{ id: '200', body: 'Uses the shared secret', author: 'acc-2', created: '2026-11-11T09:00:00.000+0000' }],
+      value: [{ id: '200', body: 'Uses the shared secret', author: 'acc-2', created: '2026-11-11T09:00:00.000+0000', restricted: false }],
     });
     expect(await jira.comments('10043')).toEqual({ ok: true, value: [] });
   });
@@ -271,5 +271,17 @@ describe('adfToText', () => {
     let deep: Record<string, unknown> = { type: 'text', text: 'bottom' };
     for (let i = 0; i < 500; i++) deep = { type: 'paragraph', content: [deep] };
     expect(() => adfToText({ type: 'doc', content: [deep] })).not.toThrow();
+  });
+});
+
+describe('jira client: restricted comments (security)', () => {
+  it('marks comments with a visibility restriction', async () => {
+    const body = JSON.stringify({ comments: [
+      { id: '1', author: { accountId: 'a' }, created: 't', body: 'open' },
+      { id: '2', author: { accountId: 'a' }, created: 't', body: 'admins only', visibility: { type: 'role', value: 'Administrators' } },
+    ] });
+    const { jira } = client([[/comment/, { status: 200, body }]]);
+    const r = await jira.comments('10042');
+    expect(r.ok && r.value.map((c) => [c.id, c.restricted])).toEqual([['1', false], ['2', true]]);
   });
 });

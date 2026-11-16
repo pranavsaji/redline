@@ -1,24 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SITE_POLICY } from '@redline/core';
 import { signB64, verifyB64 } from '@redline/crypto';
-import { kvsConfigStore, type KvsPort } from '../../src/adapters/kvs-config.js';
+import { kvsConfigStore } from '../../src/adapters/kvs-config.js';
+import { memoryKvs } from '../support/memory-kvs.js';
 import { kvsSigningKeys } from '../../src/adapters/signing-keys.js';
-
-export function memoryKvs(): KvsPort & { data: Map<string, unknown>; secrets: Map<string, unknown> } {
-  const data = new Map<string, unknown>();
-  const secrets = new Map<string, unknown>();
-  const clone = <T>(v: T): T => (v === undefined ? v : structuredClone(v));
-  return {
-    data,
-    secrets,
-    get: async <T>(k: string) => clone(data.get(k)) as T | undefined,
-    set: async (k, v) => void data.set(k, clone(v)),
-    delete: async (k) => void data.delete(k),
-    getSecret: async <T>(k: string) => clone(secrets.get(k)) as T | undefined,
-    setSecret: async (k, v) => void secrets.set(k, clone(v)),
-    deleteSecret: async (k) => void secrets.delete(k),
-  };
-}
 
 describe('kvsConfigStore', () => {
   it('returns the default policy when nothing is stored', async () => {

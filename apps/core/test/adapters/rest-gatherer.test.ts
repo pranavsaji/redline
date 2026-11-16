@@ -162,4 +162,14 @@ describe('restGatherer', () => {
       expect(none.value.contextHash).toBe(allowed.value.contextHash);
     });
   });
+
+  it('security: restricted comments are never gathered', async () => {
+    const body = JSON.stringify({ comments: [
+      { id: '1', author: { accountId: 'a' }, created: 't', body: 'open note' },
+      { id: '2', author: { accountId: 'a' }, created: 't', body: 'the prod DB password is hunter2', visibility: { type: 'group', value: 'admins' } },
+    ] });
+    const r = await setup({ comments: { status: 200, body } }).g.gather('10042', ACTOR);
+    const comments = r.ok ? r.value.facts.filter((f) => f.sourceType === 'jira_comment') : [];
+    expect(comments.map((f) => f.excerpt)).toEqual(['open note']);
+  });
 });
