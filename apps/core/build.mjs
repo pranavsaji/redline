@@ -19,7 +19,7 @@ await build({
 });
 await build({
   entryPoints: ['src/config/main.ts'],
-  outfile: 'static/config/main.js',
+  outfile: 'static/automation-config/main.js',
   bundle: true,
   platform: 'browser',
   target: 'es2022',

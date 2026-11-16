@@ -15,7 +15,7 @@ modules:
       events: [ avi:forge:installed:app ]
   jira:issuePanel:
     - key: redline-panel
-      resource: config
+      resource: panel
       resolver:
         function: spikeResolver
       title: Redline security review
@@ -32,13 +32,13 @@ modules:
           type: string
           required: true
           description: The Jira work item key
-    - key: ingest-threat-model
-      name: "Redline: ingest threat model"
+    - key: save-threat-model
+      name: "Redline: save threat model"
       function: ingestThreatModelSpike
       actionVerb: CREATE
       description: Saves the Redline agent's threat model for a work item.
       config:
-        resource: config
+        resource: automation-config
         render: default
       inputs:
         issueKey:
@@ -53,7 +53,7 @@ modules:
           description: The Redline agent's response
   automation:actionProvider:
     - key: redline-automation
-      actions: [ ingest-threat-model ]
+      actions: [ save-threat-model ]
   rovo:agent:
     - key: redline-reviewer
       name: Redline
@@ -73,8 +73,10 @@ modules:
     - key: ingestThreatModelSpike
       handler: index.ingestThreatModelSpike
 resources:
-  - key: config
-    path: static/config
+  - key: panel
+    path: static/panel
+  - key: automation-config
+    path: static/automation-config
 permissions:
   scopes:
     - read:jira-work
