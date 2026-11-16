@@ -3,6 +3,8 @@ import queryKeys from '../../graph/query-keys.json';
 import { composeCore } from '../composition.js';
 import { forgeGraphRequest, graphEnricher } from '../adapters/graph-enricher.js';
 import { panelEnrich, panelGet, panelRerun, panelThreats, threatExplain, type Viewer } from './panel.js';
+import { requirementsCreate, requirementsSetStatus } from './requirements.js';
+import { reviewConfirm, threatsTriage } from './threats.js';
 
 type Ctx = { accountId?: unknown; cloudId?: unknown; extension?: { issue?: { id?: unknown } } };
 
@@ -33,6 +35,22 @@ resolver.define('panel.enrich', async ({ context }) => {
 resolver.define('threat.explain', async ({ payload, context }) => {
   const v = viewerOf(context as Ctx);
   return threatExplain(composeCore({ cloudId: v.cloudId }), v, (payload ?? {}) as { reviewId?: unknown; threatId?: unknown });
+});
+resolver.define('requirements.create', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return requirementsCreate(composeCore({ cloudId: v.cloudId }), v, payload ?? {});
+});
+resolver.define('requirements.setStatus', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return requirementsSetStatus(composeCore({ cloudId: v.cloudId }), v, payload ?? {});
+});
+resolver.define('threats.triage', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return threatsTriage(composeCore({ cloudId: v.cloudId }), v, payload ?? {});
+});
+resolver.define('review.confirm', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return reviewConfirm(composeCore({ cloudId: v.cloudId }), v, payload ?? {});
 });
 
 export const panelResolver = resolver.getDefinitions();

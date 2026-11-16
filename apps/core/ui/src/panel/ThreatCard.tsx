@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import Button from '@atlaskit/button/new';
 import Lozenge from '@atlaskit/lozenge';
 import { token } from '@atlaskit/tokens';
@@ -13,7 +13,18 @@ const GROUNDING: Record<Threat['grounding'], { label: string; appearance: 'succe
   unsupported: { label: 'Unsupported', appearance: 'removed' },
 };
 
-export function ThreatCard({ threat, facts, explain }: { threat: Threat; facts: Map<string, FactDto>; explain: (t: Threat) => Promise<ThreatExplanation | null> }) {
+export function ThreatCard({
+  threat,
+  facts,
+  explain,
+  children,
+}: {
+  threat: Threat;
+  facts: Map<string, FactDto>;
+  explain: (t: Threat) => Promise<ThreatExplanation | null>;
+  /** Extra controls inside the card (champion triage). */
+  children?: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const [explained, setExplained] = useState<ThreatExplanation | null>(null);
   const [explaining, setExplaining] = useState(false);
@@ -105,6 +116,7 @@ export function ThreatCard({ threat, facts, explain }: { threat: Threat; facts: 
           )}
         </div>
       )}
+      {children}
     </article>
   );
 }

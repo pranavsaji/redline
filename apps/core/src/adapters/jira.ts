@@ -60,6 +60,8 @@ export interface JiraClient {
   groupsOf(accountId: string): Promise<Result<string[]>>;
   isAdmin(accountId: string): Promise<Result<boolean>>;
   setProperty(issueId: string, key: string, value: unknown): Promise<Result<void>>;
+  /** The project's sub-task issue type id (Redline requirements are created as sub-tasks). */
+  subtaskType(projectId: string): Promise<Result<string>>;
   createSubtask(parentId: string, fields: { summary: string; description: AdfDoc; labels: string[]; issueTypeId: string }): Promise<Result<{ id: string; key: string }>>;
   addLabel(issueId: string, label: string): Promise<Result<void>>;
   removeLabel(issueId: string, label: string): Promise<Result<void>>;
@@ -390,6 +392,16 @@ export function createJiraClient(request: FetchLike, opts: JiraClientOptions = {
       if (!ISSUE_REF.test(issueId)) return badRef('issue id');
       if (!PROPERTY_KEY.test(key)) return badRef('property key');
       return voidOf(await call(`/rest/api/3/issue/${seg(issueId)}/properties/${seg(key)}`, json('PUT', value)));
+    },
+
+    async subtaskType(projectId) {
+      if (!NUMERIC_ID.test(projectId)) return badRef('project id');
+      const r = await call(`/rest/api/3/issuetype/project?projectId=${seg(projectId)}`);
+      if (!r.ok) return r;
+      const p = parse(z.array(z.object({ id: z.string(), subtask: z.boolean().nullish() })), r.value, 'issue types');
+      if (!p.ok) return p;
+      const sub = p.value.find((t) => t.subtask === true);
+      return sub ? ok(sub.id) : err(appError('not_found', 'this project has no sub-task issue type'));
     },
 
     async createSubtask(parentId, f) {

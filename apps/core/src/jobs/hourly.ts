@@ -1,9 +1,9 @@
 import type { ReviewStatus } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
-import type { AdfDoc, AdfNode } from '../adapters/jira.js';
 import { log } from '../adapters/log.js';
+import { OPS_CONFIG_KEY, opsAlert } from '../services/ops-alert.js';
 
-export const OPS_CONFIG_KEY = 'config:ops';
+export { OPS_CONFIG_KEY };
 const STATUSES: ReviewStatus[] = ['queued', 'gathering', 'awaiting_agent', 'modeling', 'ready', 'failed', 'agent_timeout'];
 const FAILURE_RATE = 0.2;
 
@@ -39,16 +39,11 @@ export async function hourly(deps: CoreDeps): Promise<void> {
   }
   if (total === 0 || bad / total <= FAILURE_RATE) return;
 
-  const ids = Array.isArray(ops.accountIds) ? ops.accountIds.filter((a): a is string => typeof a === 'string').slice(0, 10) : [];
-  const content: AdfNode[] = [];
-  for (const id of ids) content.push({ type: 'mention', attrs: { id } }, { type: 'text', text: ' ' });
-  content.push({ type: 'text', text: `Redline: ${bad} of ${total} security reviews in the last hour failed or timed out. Work items stay blocked until they are re-run. Check the site's Rovo credits and the Redline admin page.` });
-  const adf: AdfDoc = { type: 'doc', version: 1, content: [{ type: 'paragraph', content }] };
-  const c = await deps.jira.comment(ops.issueKey, adf);
-  if (!c.ok) {
-    log('alert.failrate.comment_failed', { code: c.error.code });
-    return;
-  }
-  await deps.state.set(alertKey, true);
+  const sent = await opsAlert(
+    deps,
+    alertKey,
+    `Redline: ${bad} of ${total} security reviews in the last hour failed or timed out. Work items stay blocked until they are re-run. Check the site's Rovo credits and the Redline admin page.`,
+  );
+  if (!sent) return;
   log('alert.failrate', { bad, total });
 }

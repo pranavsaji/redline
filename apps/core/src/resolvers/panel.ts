@@ -2,6 +2,7 @@ import { rebuildAcceptances, threatDiff, type DiscardedThreat, type Role } from 
 import { cweById, getAsvs } from '@redline/frameworks';
 import { severityRank, type Acceptance, type ContextFact, type Requirement, type Review, type Threat, type Verdict } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
+import type { JiraIssue } from '../adapters/jira.js';
 import { log } from '../adapters/log.js';
 import { RERUN_LABEL } from '../triggers/on-issue-change.js';
 import { checkRerunLimit } from '../services/rate-limit.js';
@@ -65,17 +66,18 @@ const toFactDto = (f: ContextFact): FactDto => ({
   origin: f.origin,
 });
 
-async function authorise(deps: CoreDeps, v: Viewer, need: 'browse' | 'edit'): Promise<{ issueKey: string } | Denied> {
+/** The work item exists and the viewer may browse (or edit) it. Every resolver starts here. */
+export async function authorise(deps: CoreDeps, v: Viewer, need: 'browse' | 'edit'): Promise<{ issueKey: string; issue: JiraIssue } | Denied> {
   if (!v.accountId || !/^\d{1,18}$/.test(v.issueId)) return { error: 'not_found' };
   const issue = await deps.jira.issue(v.issueId);
   if (!issue.ok) return { error: issue.error.code === 'not_found' || issue.error.code === 'forbidden' ? 'not_found' : 'unavailable' };
   const allowed = need === 'browse' ? await deps.jira.canBrowse(v.accountId, v.issueId) : await deps.jira.canEdit(v.accountId, v.issueId);
   if (!allowed.ok) return { error: 'unavailable' };
-  return allowed.value ? { issueKey: issue.value.key } : { error: 'not_found' };
+  return allowed.value ? { issueKey: issue.value.key, issue: issue.value } : { error: 'not_found' };
 }
 
 /** Threats and facts the viewer may see, most severe first. */
-async function scopedReview(deps: CoreDeps, v: Viewer, reviewId: string, cache: ScopeCache = newScopeCache()) {
+export async function scopedReview(deps: CoreDeps, v: Viewer, reviewId: string, cache: ScopeCache = newScopeCache()) {
   const [facts, threats] = await Promise.all([deps.reviews.facts(reviewId), deps.reviews.threats(reviewId)]);
   if (!facts.ok || !threats.ok) return null;
   const scoped = await scopeForViewer(deps, v.accountId, v.issueId, facts.value, threats.value, cache);

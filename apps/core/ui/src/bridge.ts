@@ -1,12 +1,28 @@
-import type { ApiError, PanelDto, Threat, ThreatExplanation } from './types.js';
+import type { ApiError, Evidence, FactDto, PanelDto, Requirement, RequirementStatus, Threat, ThreatExplanation } from './types.js';
+
+export type TriageInput =
+  | { threatId: string; op: 'accept' }
+  | { threatId: string; op: 'dismiss'; reason: string; note?: string }
+  | { threatId: string; op: 'edit'; patch: Partial<Pick<Threat, 'title' | 'likelihood' | 'impact' | 'component'>> }
+  | { threatId: string; op: 'merge'; intoThreatId: string }
+  | { threatId: string; op: 'split'; parts: Array<{ title: string }> };
+
+export interface CreatedRequirements {
+  created: Array<{ requirementId: string; subtaskKey: string }>;
+  skipped: Array<{ threatId: string; reason: string }>;
+}
 
 /** Everything the panel asks the backend. The Forge implementation and the local mock share this interface. */
 export interface PanelApi {
   get(): Promise<PanelDto | ApiError>;
   threats(cursor: number): Promise<{ threats: Threat[]; cursor: number | null } | ApiError>;
   rerun(): Promise<{ ok: true } | ApiError>;
-  enrich(): Promise<{ added: number; partial: boolean; facts: import('./types.js').FactDto[] } | ApiError>;
+  enrich(): Promise<{ added: number; partial: boolean; facts: FactDto[] } | ApiError>;
   explain(reviewId: string, threatId: string): Promise<ThreatExplanation | ApiError>;
+  createRequirements(threatIds: string[]): Promise<CreatedRequirements | ApiError>;
+  setStatus(requirementId: string, status: RequirementStatus, evidence?: Pick<Evidence, 'kind' | 'ref'>): Promise<Requirement | ApiError>;
+  triage(input: TriageInput): Promise<Threat[] | ApiError>;
+  confirm(reviewId: string, kind: 'review' | 'budget'): Promise<{ seq: number } | ApiError>;
 }
 
 export async function forgeApi(): Promise<PanelApi> {
@@ -17,7 +33,20 @@ export async function forgeApi(): Promise<PanelApi> {
     rerun: () => invoke('panel.rerun'),
     enrich: () => invoke('panel.enrich'),
     explain: (reviewId, threatId) => invoke('threat.explain', { reviewId, threatId }),
+    createRequirements: (threatIds) => invoke('requirements.create', { threatIds }),
+    setStatus: (requirementId, status, evidence) => invoke('requirements.setStatus', { requirementId, status, ...(evidence ? { evidence } : {}) }),
+    triage: (input) => invoke('threats.triage', input),
+    confirm: (reviewId, kind) => invoke('review.confirm', { reviewId, kind }),
   };
 }
 
 export const isError = <T extends object>(r: T | ApiError): r is ApiError => 'error' in r;
+
+/** Plain words for an error, preferring the server's own message for validation/permission/conflict errors. */
+export function errorText(e: ApiError): string {
+  if (e.message) return e.message;
+  if (e.error === 'forbidden') return 'You do not have permission to do that.';
+  if (e.error === 'not_found') return 'That item is no longer available, or you cannot open it.';
+  if (e.error === 'rate_limited') return 'Too many requests. Try again later.';
+  return 'Redline could not save that. Try again.';
+}

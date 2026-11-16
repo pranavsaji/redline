@@ -42,6 +42,15 @@ modules:
         function: panelResolverFn
       title: Redline security review
       icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+  jira:entityProperty:
+    - key: redline-verdict-index
+      entityType: issue
+      propertyKey: redline.verdict
+      values:
+        - { path: state, type: string, searchAlias: redlineState }
+        - { path: blockingCount, type: number, searchAlias: redlineBlocking }
+        - { path: maxOpenSeverity, type: string, searchAlias: redlineMaxSeverity }
+        - { path: riskScore, type: number, searchAlias: redlineRisk }
   action:
     - key: get-review-context
       name: Get Redline review context

@@ -58,6 +58,7 @@ export function fakeJira(issues: JiraIssue[]): JiraClient & { props: Map<string,
       props.set(`${id}:${key}`, structuredClone(value));
       return ok(undefined);
     },
+    subtaskType: async () => ok('10003'),
     createSubtask: async () => ok({ id: '1', key: 'X-1' }),
     addLabel: async (_id, l) => {
       labels.push(`+${l}`);

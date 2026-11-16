@@ -5,14 +5,15 @@ import SectionMessage, { SectionMessageAction } from '@atlaskit/section-message'
 import Spinner from '@atlaskit/spinner';
 import Tabs, { Tab, TabList, TabPanel } from '@atlaskit/tabs';
 import { token } from '@atlaskit/tokens';
-import { isError, type PanelApi } from '../bridge.js';
-import { SeverityLozenge } from '../components/SeverityLozenge.js';
+import { errorText, isError, type PanelApi } from '../bridge.js';
 import type { PanelDto, Threat } from '../types.js';
 import { EmptyState } from './EmptyState.js';
 import { Header } from './Header.js';
 import { StatusSteps } from './StatusSteps.js';
 import { ThreatCard } from './ThreatCard.js';
 import { pollMs, viewOf } from './states.js';
+import { RequirementsTab } from './RequirementsTab.js';
+import { ThreatTriage } from './ThreatEditor.js';
 
 const DISCARD_REASON: Record<string, string> = {
   low_votes: 'Too few agent runs agreed',
@@ -65,6 +66,16 @@ export function IssuePanel({ api }: { api: PanelApi }) {
     }
   };
 
+  const confirm = async (kind: 'review' | 'budget') => {
+    if (!dto?.review) return;
+    const r = await api.confirm(dto.review.id, kind).catch(() => ({ error: 'unavailable' as const }));
+    if (isError(r)) setNotice(errorText(r));
+    else {
+      setNotice(kind === 'budget' ? 'Confirmed. The confirmation is in the ledger and the admin was alerted.' : 'Threats confirmed. Their requirements now decide the gate.');
+      void load();
+    }
+  };
+
   if (error) return <SectionMessage appearance="error" title="Redline">{error}</SectionMessage>;
   if (!dto || !view)
     return (
@@ -74,6 +85,9 @@ export function IssuePanel({ api }: { api: PanelApi }) {
     );
 
   const canRun = dto.roles.includes('developer');
+  const champion = dto.roles.includes('champion');
+  const settled = dto.review !== null && !['queued', 'gathering', 'awaiting_agent', 'modeling'].includes(dto.review.status);
+  const humanReason = dto.verdict?.reasons.find((r) => r.code === 'needs_human' || r.code === 'injection_unconfirmed');
   const facts = new Map(dto.facts.map((f) => [f.id, f]));
   const threats = [...dto.threats, ...(more?.threats ?? [])];
   const cursor = more ? more.cursor : dto.threatsCursor;
@@ -103,8 +117,21 @@ export function IssuePanel({ api }: { api: PanelApi }) {
             </SectionMessage>
           )}
           {view.state === 'budget' && (
-            <SectionMessage appearance="warning" title="Reviews are paused at the AI budget">
+            <SectionMessage
+              appearance="warning"
+              title="Reviews are paused at the AI budget"
+              actions={champion ? [<SectionMessageAction key="confirm" onClick={() => void confirm('budget')}>Confirm this work item</SectionMessageAction>] : []}
+            >
               The site reached its review budget or ran out of Rovo credits. A security champion can confirm this work item; the confirmation is recorded in the ledger.
+            </SectionMessage>
+          )}
+          {humanReason && (
+            <SectionMessage
+              appearance="warning"
+              title="Threats need a security champion"
+              actions={champion ? [<SectionMessageAction key="confirm" onClick={() => void confirm('review')}>Confirm threats</SectionMessageAction>] : []}
+            >
+              {humanReason.message}
             </SectionMessage>
           )}
           {view.stale && (
@@ -147,7 +174,19 @@ export function IssuePanel({ api }: { api: PanelApi }) {
                       const r = await api.explain(x.reviewId, x.id).catch(() => null);
                       return r && !isError(r) ? r : null;
                     }}
-                  />
+                  >
+                    {champion && settled && t.state !== 'dismissed' && (
+                      <ThreatTriage
+                        threat={t}
+                        others={threats.filter((o) => o.id !== t.id && o.state !== 'dismissed')}
+                        api={api}
+                        onDone={() => {
+                          setMore(null);
+                          void load();
+                        }}
+                      />
+                    )}
+                  </ThreatCard>
                 ))}
                 {dto.hiddenThreats > 0 && (
                   <p style={{ color: token('color.text.subtlest'), font: token('font.body.small') }}>{dto.hiddenThreats} threat(s) cite sources you cannot open and are not shown.</p>
@@ -184,26 +223,7 @@ export function IssuePanel({ api }: { api: PanelApi }) {
               </div>
             </TabPanel>
             <TabPanel>
-              <ul aria-label="Security requirements" style={{ listStyle: 'none', margin: 0, padding: '8px 0 0', display: 'grid', gap: 8, width: '100%' }}>
-                {dto.requirements.length === 0 && <li style={{ color: token('color.text.subtle') }}>No requirements yet.</li>}
-                {dto.hiddenRequirements > 0 && (
-                  <li style={{ color: token('color.text.subtlest'), font: token('font.body.small') }}>{dto.hiddenRequirements} requirement(s) come from sources you cannot open and are not shown.</li>
-                )}
-                {dto.requirements.map((r) => (
-                  <li key={r.id} style={{ border: `1px solid ${token('color.border')}`, borderRadius: 6, padding: 10, display: 'grid', gap: 4 }}>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <SeverityLozenge severity={r.severity} />
-                      <Lozenge appearance={r.status === 'Verified' || r.status === 'NotApplicable' ? 'success' : 'default'}>{r.status === 'NotApplicable' ? 'Not applicable' : r.status}</Lozenge>
-                      <strong>{r.title}</strong>
-                    </div>
-                    {r.criteria.slice(0, 1).map((c, i) => (
-                      <span key={i} style={{ color: token('color.text.subtle'), font: token('font.body.small') }}>
-                        Given {c.given}, when {c.when}, then {c.then}.
-                      </span>
-                    ))}
-                  </li>
-                ))}
-              </ul>
+              <RequirementsTab dto={dto} api={api} onChanged={() => void load()} />
             </TabPanel>
             <TabPanel>
               <table style={{ borderCollapse: 'collapse', marginTop: 8, width: '100%' }}>

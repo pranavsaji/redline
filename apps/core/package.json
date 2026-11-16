@@ -22,6 +22,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "yaml": "^2.9.1"
   }
 }

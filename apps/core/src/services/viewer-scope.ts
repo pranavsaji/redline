@@ -68,3 +68,19 @@ export async function scopeForViewer(
   }
   return { facts: kept, threats: scopedThreats, hiddenFacts: facts.length - kept.length, hiddenThreats: threats.length - scopedThreats.length };
 }
+
+/**
+ * True when every source a threat cites is readable by anyone who can see the work item itself: the item's own fields,
+ * its unrestricted comments, or Redline's earlier-review summary. Anything else (pages, linked issues, incidents, graph
+ * facts, or an unknown fact) may be restricted, so text derived from it must not be copied where the whole audience of
+ * the work item can read it (sub-tasks, comments).
+ */
+export function citesOnlyTheWorkItem(threat: Pick<Threat, 'citations'>, facts: readonly ContextFact[], issueId: string): boolean {
+  const byId = new Map(facts.map((f) => [f.id, f]));
+  return threat.citations.every((c) => {
+    const f = byId.get(c.factId);
+    if (!f) return false;
+    if (f.sourceType === 'review' || f.sourceType === 'jira_comment') return true;
+    return f.sourceType === 'jira_issue' && ISSUE.exec(f.sourceAri)?.[1] === issueId;
+  });
+}

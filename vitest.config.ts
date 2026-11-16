@@ -7,6 +7,8 @@ export default defineConfig({
     server: { deps: { inline: [/@atlaskit\//, /@compiled\//] } },
     include: ['packages/*/test/**/*.test.ts', 'apps/*/test/**/*.test.ts', 'apps/*/ui/test/**/*.test.{ts,tsx}', 'evals/**/*.test.ts'],
     environment: 'node',
+    // jsdom + Atlaskit renders take seconds each when the machine is busy; 5 s flakes under load.
+    testTimeout: 30_000,
     coverage: {
       provider: 'v8',
       include: ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts'],

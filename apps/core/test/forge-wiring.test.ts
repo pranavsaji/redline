@@ -38,3 +38,19 @@ describe('cloudIdOf', () => {
     expect(cloudIdOf(undefined)).toBe('');
   });
 });
+
+describe('manifest', () => {
+  it('indexes the redline.verdict property for JQL (state, blocking count, max severity, risk)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { parse } = await import('yaml');
+    const m = parse(readFileSync(new URL('../manifest.yml', import.meta.url), 'utf8')) as { modules: Record<string, Array<Record<string, unknown>>> };
+    const idx = m.modules['jira:entityProperty']?.find((e) => e.propertyKey === 'redline.verdict');
+    expect(idx?.entityType).toBe('issue');
+    expect(idx?.values).toEqual([
+      { path: 'state', type: 'string', searchAlias: 'redlineState' },
+      { path: 'blockingCount', type: 'number', searchAlias: 'redlineBlocking' },
+      { path: 'maxOpenSeverity', type: 'string', searchAlias: 'redlineMaxSeverity' },
+      { path: 'riskScore', type: 'number', searchAlias: 'redlineRisk' },
+    ]);
+  });
+});

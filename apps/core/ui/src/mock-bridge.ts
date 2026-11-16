@@ -9,6 +9,13 @@ export function mockApi(state = new URLSearchParams(window.location.search).get(
     threats: async () => ({ threats: [], cursor: null }),
     rerun: async () => ({ ok: true }),
     enrich: async () => ({ added: 0, partial: true, facts: [] }),
+    createRequirements: async (threatIds) => ({ created: threatIds.map((id, i) => ({ requirementId: `req_${id}`, subtaskKey: `PAY-${100 + i}` })), skipped: [] }),
+    setStatus: async (requirementId, status, evidence) => {
+      const r = dto.requirements.find((x) => x.id === requirementId)!;
+      return { ...r, status, ...(evidence ? { evidence: { ...evidence, attester: 'me' } } : {}) };
+    },
+    triage: async () => dto.threats,
+    confirm: async () => ({ seq: 1 }),
     explain: async (_r, threatId) => {
       const t = dto.threats.find((x) => x.id === threatId);
       return { story: `${t?.plainLanguage ?? ''} ${t?.scenario ?? ''}`.trim(), fixes: ['Expire sign-in links after 15 minutes and after first use.'], refs: [{ framework: 'CWE', id: 'CWE-640', title: 'Weak Password Recovery Mechanism', url: 'https://cwe.mitre.org/data/definitions/640.html' }] };

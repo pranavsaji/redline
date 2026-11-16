@@ -58,5 +58,5 @@ export const FIXTURES: Record<string, PanelDto> = {
   budget: withReview({ status: 'failed', failureReason: 'budget' }, { verdict: { ...base.verdict!, reasons: [{ code: 'budget_paused', message: 'Reviews are paused at the AI budget. A security champion can confirm this work item.' }] } }),
   injection: { ...base, facts: FACTS.map((f) => (f.id === 'fact_page' ? { ...f, injectionSuspected: true, injectionReasons: ['ai_directive'] } : f)) },
   stale: { ...base, verdict: { ...base.verdict!, reasons: [...base.verdict!.reasons, { code: 'review_stale', message: 'The design or linked work changed since the last review.', action: { label: 'Re-run review', href: '?rerun=1' } }] } },
-  pass: { ...base, verdict: { ...base.verdict!, state: 'pass', blockingCount: 0, maxOpenSeverity: null, reasons: [] }, requirements: base.requirements.map((r) => ({ ...r, status: 'Verified' as const })) },
+  pass: { ...base, verdict: { ...base.verdict!, state: 'pass', blockingCount: 0, maxOpenSeverity: null, reasons: [] }, requirements: base.requirements.map((r) => ({ ...r, status: 'Verified' as const, verifiedBy: 'acc-dev', evidence: { kind: 'pr' as const, ref: 'https://bitbucket.org/acme/payments/pull-requests/42', attester: 'acc-dev' } })) },
 };

@@ -226,6 +226,17 @@ describe('jira client: writes', () => {
     });
   });
 
+  it('subtaskType picks the project\'s sub-task issue type; none → not_found', async () => {
+    const { jira, calls } = client([
+      [/GET \/rest\/api\/3\/issuetype\/project\?projectId=10000$/, { status: 200, body: JSON.stringify([{ id: '10001', name: 'Story', subtask: false }, { id: '10003', name: 'Subtask', subtask: true }]) }],
+    ]);
+    expect(await jira.subtaskType('10000')).toEqual({ ok: true, value: '10003' });
+    expect(calls).toHaveLength(1);
+    const none = client([[/GET \/rest\/api\/3\/issuetype\/project/, { status: 200, body: JSON.stringify([{ id: '10001', name: 'Story', subtask: false }]) }]]);
+    expect(await none.jira.subtaskType('10000')).toMatchObject({ ok: false, error: { code: 'not_found' } });
+    expect(await none.jira.subtaskType('1 OR 1')).toMatchObject({ ok: false, error: { code: 'validation' } });
+  });
+
   it('addLabel / removeLabel use the update verbs', async () => {
     const { jira, calls } = client([[/PUT \/rest\/api\/3\/issue\/10042$/, { status: 204 }]]);
     await jira.addLabel('10042', 'redline-review');

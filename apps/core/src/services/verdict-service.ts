@@ -1,5 +1,5 @@
 import { combineVerdicts, computeVerdict, rebuildAcceptances, type LedgerRow } from '@redline/core';
-import { appError, err, ok, type Result, type SitePolicy, type Verdict } from '@redline/shared';
+import { appError, err, ok, type BlockReason, type Requirement, type Result, type SitePolicy, type Verdict } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
 import type { JiraIssue } from '../adapters/jira.js';
 import { isBudgetPaused } from './budget.js';
@@ -36,6 +36,42 @@ function fromLedger(rows: readonly LedgerRow[], now: Date): Ledgered {
   return { acceptances: rebuildAcceptances(rows, now), confirmations, breakGlass };
 }
 
+const MESSAGE_MAX = 1000;
+const KEYS_LISTED = 5;
+const day = (iso?: string) => (iso ? iso.slice(0, 10) : 'unknown');
+
+function reasonText(r: BlockReason, keys: ReadonlyMap<string, string>): string {
+  let text = r.message.trim().replace(/\.+$/, '');
+  const ids = r.requirementIds ?? [];
+  if (r.code === 'open_requirement' && ids.length > 0) {
+    const named = ids.map((id) => keys.get(id)).filter((k): k is string => typeof k === 'string');
+    if (named.length === 0) text += ' (create the subtasks in the Redline panel)';
+    else {
+      const shown = named.slice(0, KEYS_LISTED);
+      const more = ids.length - shown.length;
+      text += `: ${shown.join(', ')}${more > 0 ? ` and ${more} more` : ''}`;
+    }
+  }
+  if (r.action) text += ` (${r.action.label}: ${r.action.href})`;
+  return text;
+}
+
+/**
+ * The one-line explanation the Done validator shows (EN-3), at most 1,000 characters and always ending with the panel
+ * link. Requirements are named by their sub-task keys only: titles can come from sources some viewers cannot open.
+ */
+export function gateMessage(v: Verdict, keys: ReadonlyMap<string, string>, panelUrl: string, guarded: readonly string[]): string {
+  const tail = ` Open the Redline panel: ${panelUrl}`;
+  if (v.state === 'pass') {
+    const why = v.overridden ? ` (break-glass override until ${day(v.validUntil)})` : '';
+    return `Redline: no security requirements block this work item${why}.${tail}`;
+  }
+  const lead = v.state === 'warn' ? `Redline warns (warn-only until ${day(v.validUntil)}): ` : `Redline blocks ${guarded.length > 0 ? guarded.join(' and ') : 'Done'}: `;
+  let head = `${lead}${v.reasons.map((r) => reasonText(r, keys)).join('; ')}.`;
+  if (head.length + tail.length > MESSAGE_MAX) head = `${head.slice(0, MESSAGE_MAX - tail.length - 1)}…`;
+  return head + tail;
+}
+
 const notApplicable = (now: Date): Verdict => ({ state: 'pass', blockingCount: 0, maxOpenSeverity: null, reasons: [], inheritedFrom: [], updatedAt: now.toISOString() });
 
 async function ownVerdict(
@@ -45,8 +81,8 @@ async function ownVerdict(
   ledgered: Ledgered,
   panelUrl: string,
   now: Date,
-): Promise<Result<{ verdict: Verdict; reviewed: boolean; notApplicable: boolean }>> {
-  if (!policy.reviewIssueTypes.includes(issue.issueType.name)) return ok({ verdict: notApplicable(now), reviewed: false, notApplicable: true });
+): Promise<Result<{ verdict: Verdict; reviewed: boolean; notApplicable: boolean; requirements: Requirement[]; riskScore?: number }>> {
+  if (!policy.reviewIssueTypes.includes(issue.issueType.name)) return ok({ verdict: notApplicable(now), reviewed: false, notApplicable: true, requirements: [] });
   const latest = await deps.reviews.latest(issue.id);
   if (!latest.ok) return latest;
   const review = latest.value;
@@ -85,11 +121,12 @@ async function ownVerdict(
     now,
     panelUrl,
   });
-  return ok({ verdict, reviewed: review !== null, notApplicable: false });
+  return ok({ verdict, reviewed: review !== null, notApplicable: false, requirements: requirements.value, ...(review ? { riskScore: review.riskScore } : {}) });
 }
 
 /** Fail closed: when the verdict cannot be computed, the gates still read a block that says why and how to retry. */
 async function writeFailClosed(deps: CoreDeps, issueId: string, panelUrl: string, why: string): Promise<void> {
+  const policy = await deps.config.site().catch(() => null);
   const v: Verdict = {
     state: 'block',
     blockingCount: 0,
@@ -98,14 +135,35 @@ async function writeFailClosed(deps: CoreDeps, issueId: string, panelUrl: string
     inheritedFrom: [],
     updatedAt: deps.clock.now().toISOString(),
   };
-  await deps.verdicts.write(issueId, { ...v, panelUrl });
-  await mirror(deps, issueId, { ...v, panelUrl });
+  const value = { ...v, panelUrl, message: gateMessage(v, new Map(), panelUrl, policy?.ok ? policy.value.guardedTransitions : ['Done']) };
+  await deps.verdicts.write(issueId, value);
+  await mirror(deps, issueId, value);
+}
+
+/**
+ * A Redline requirement sub-task follows its own requirement rather than inheriting the whole story's block: it blocks
+ * only while the story's verdict lists that requirement as open (and is lenient when the story is).
+ */
+function requirementSubtaskVerdict(req: Requirement, story: Verdict, storyKey: string, now: Date): Verdict {
+  const open = story.reasons.some((r) => r.code === 'open_requirement' && (r.requirementIds ?? []).includes(req.id));
+  const base = { reviewId: story.reviewId, revision: story.revision, inheritedFrom: [], updatedAt: now.toISOString() };
+  if (!open || story.state === 'pass') return { state: 'pass', blockingCount: 0, maxOpenSeverity: null, reasons: [], ...base };
+  const reasons: BlockReason[] = [{ code: 'open_requirement', message: `This security requirement is not verified yet. Add evidence on ${storyKey} in the Redline panel.` }];
+  return { state: story.state, ...(story.validUntil ? { validUntil: story.validUntil } : {}), blockingCount: 1, maxOpenSeverity: req.severity, reasons, ...base };
+}
+
+async function write(deps: CoreDeps, issueId: string, value: Verdict & Record<string, unknown>): Promise<Result<void>> {
+  const written = await deps.verdicts.write(issueId, value);
+  if (!written.ok) return written;
+  await mirror(deps, issueId, value);
+  return ok(undefined);
 }
 
 /**
  * computeVerdict for the work item, combined with every reviewed ancestor (a subtask inherits its story's block),
  * written to the `redline.verdict` property the Done gate reads. Also keeps the `issues` row (key, project, parent)
- * current, so a moved issue keeps its requirements under the same id. T21 adds the gate message on top.
+ * current, so a moved issue keeps its requirements under the same id. The property carries `message` (what the
+ * validator shows), `panelUrl` and `riskScore` (indexed for JQL).
  */
 export async function refreshVerdict(deps: CoreDeps, issueId: string): Promise<Result<Verdict>> {
   const now = deps.clock.now();
@@ -130,8 +188,31 @@ export async function refreshVerdict(deps: CoreDeps, issueId: string): Promise<R
   if (!rows.ok) return fail(rows);
   const ledgered = fromLedger(rows.value, now);
 
+  const guarded = policy.value.guardedTransitions;
+
+  if (issue.parent) {
+    const siblings = await deps.requirements.forIssue(issue.parent.id);
+    if (!siblings.ok) return fail(siblings);
+    const mine = siblings.value.find((r) => r.subtaskKey === issue.key);
+    if (mine) {
+      const story = await deps.jira.issue(issue.parent.id);
+      if (!story.ok) return fail(story);
+      const storyUrl = `${site}/browse/${story.value.key}`;
+      const sv = await ownVerdict(deps, story.value, policy.value, ledgered, storyUrl, now);
+      if (!sv.ok) return fail(sv);
+      const v = requirementSubtaskVerdict(mine, sv.value.verdict, story.value.key, now);
+      const w = await write(deps, issue.id, { ...v, panelUrl: storyUrl, message: gateMessage(v, new Map(), storyUrl, guarded) });
+      return w.ok ? ok(v) : w;
+    }
+  }
+
   const own = await ownVerdict(deps, issue, policy.value, ledgered, panelUrl, now);
   if (!own.ok) return fail(own);
+  const keys = new Map<string, string>();
+  const addKeys = (reqs: readonly Requirement[]) => {
+    for (const r of reqs) if (r.subtaskKey) keys.set(r.id, r.subtaskKey);
+  };
+  addKeys(own.value.requirements);
 
   const ancestors: Array<{ issueKey: string; verdict: Verdict }> = [];
   let parentId = issue.parent?.id;
@@ -141,13 +222,18 @@ export async function refreshVerdict(deps: CoreDeps, issueId: string): Promise<R
     const pv = await ownVerdict(deps, p.value, policy.value, ledgered, `${site}/browse/${p.value.key}`, now);
     if (!pv.ok) return fail(pv);
     if (pv.value.reviewed) ancestors.push({ issueKey: p.value.key, verdict: pv.value.verdict });
+    addKeys(pv.value.requirements);
     parentId = p.value.parent?.id;
   }
 
   const final = combineVerdicts(own.value.verdict, ancestors);
-  const value = { ...final, panelUrl, ...(own.value.notApplicable && final.state === 'pass' ? { notApplicable: true } : {}) };
-  const written = await deps.verdicts.write(issue.id, value);
-  if (!written.ok) return written;
-  await mirror(deps, issue.id, value);
-  return ok(final);
+  const value = {
+    ...final,
+    panelUrl,
+    message: gateMessage(final, keys, panelUrl, guarded),
+    ...(own.value.riskScore !== undefined ? { riskScore: own.value.riskScore } : {}),
+    ...(own.value.notApplicable && final.state === 'pass' ? { notApplicable: true } : {}),
+  };
+  const w = await write(deps, issue.id, value);
+  return w.ok ? ok(final) : w;
 }
