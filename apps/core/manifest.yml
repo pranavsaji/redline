@@ -51,6 +51,22 @@ modules:
           type: string
           required: true
           description: The Redline agent's response
+    - key: submit-threat-model
+      name: Submit Redline threat model
+      function: submitThreatModelFn
+      actionVerb: CREATE
+      description: Saves the Redline agent's threat model JSON for a Jira work item. Call this once with the full JSON.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: true
+          description: The Jira work item key, e.g. PAY-1
+        threatModel:
+          title: Threat model JSON
+          type: string
+          required: true
+          description: The complete threat model as a JSON string
   automation:actionProvider:
     - key: redline-automation
       actions: [ save-threat-model ]
@@ -58,14 +74,17 @@ modules:
     - key: redline-reviewer
       name: Redline
       description: Security reviewer for Jira work items.
-      prompt: You are Redline Security Reviewer. Call ping with the issue key you are
-        given and reply with the result.
+      prompt: You are Redline Security Reviewer. First call ping with the issue key you
+        are given. Then call submit-threat-model with that issue key and threatModel set to
+        the JSON string {"spike":true,"threats":[]}. Reply with both results.
       conversationStarters:
         - Ping PROJ-1
-      actions: [ ping ]
+      actions: [ ping, submit-threat-model ]
   function:
     - key: onInstall
       handler: index.onInstall
+    - key: submitThreatModelFn
+      handler: index.submitThreatModelSpike
     - key: spikeResolver
       handler: index.spikeResolver
     - key: pingFn

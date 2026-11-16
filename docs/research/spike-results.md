@@ -20,8 +20,8 @@ Everything ran on the development environment and Forge CLI 14.2.0.
 | 2 | Forge SQL `migrationRunner` creates a table; KVS `setSecret`/`getSecret` round-trips | **PASS** | `migrations: [{name: spike_v001}]`, `row: "redline"`, secret `{k: "v"}` round-tripped (both sites) |
 | 3 | `PUT issue/{key}/properties/redline.verdict` as app, then the validator expression returns the property's message | **PASS** (after 2 fixes) | `putStatus 201/200`, `POST /rest/api/3/expression/evaluate` → `{"value":"Redline: spike verdict blocks Done"}`. Fixes: `requestJira` sends `text/plain` unless `Content-Type: application/json` is set (415), and `/expression/eval` is **removed (410)** → use `/expression/evaluate` |
 | 4a | Forge agent selectable in Automation "Use agent" | **PASS** | "Redline — By Redline" listed and selectable on the demo site (after "Connect Automation to Rovo") |
-| 4b | Agent can call the GET `ping` action from Automation | _pending — see below_ | |
-| 4c | Forge Automation action receives non-empty `agentResponse` | _pending — see below_ | |
+| 4b | Agent can call the GET `ping` action from Automation | **PASS** | Rule "Work item created → Use agent: Redline" on PAY-3 and PAY-4: log `{"event":"ping","issueKey":"PAY-3"}` |
+| 4c | The agent's output reaches Redline from Automation | **PASS via a better route** | With **"Let this agent take actions"** on, the agent called the CREATE action `submit-threat-model` with no human in the loop: log `{"event":"submit_spike","issueKey":"PAY-3","bytes":27}`. The `automation:actionProvider` + `{{agentResponse}}` route was **abandoned**: Automation kept serving the first-seen action list and config URL for over 40 minutes, even through a rename, a new resource key and a reinstall |
 | 5 | Assign a work item to the Redline agent | **PASS — assignment starts the agent automatically** | Redline appears in the Assignee picker (app user). Assigning PAY-2 set the assignee to "Redline with Pranav Saji" and started an agent session that called `ping` and replied with PAY-2's key. Also startable from the work item's "Agents" menu (PAY-1: "pong=true"). The reply is a session "waiting for review", **only visible to the assigner** until someone uses "Draft comment" |
 | 6 | Bitbucket: check appears, can be set Required, `requestBitbucket` reads PR / diffstat / policy file | **PARTIAL** | Check appears in repo settings → Custom merge checks after the workspace enables the feature, and was added on `main`. **"Required" (blocking) needs Bitbucket Premium** (tooltip: "Upgrade to premium to allow failed checks to prevent merges"), and so do workspace/project-level checks. The API reads are deployed but not yet exercised: they need a PR in the repo (waiting on Pranav) |
 
@@ -33,7 +33,18 @@ Everything ran on the development environment and Forge CLI 14.2.0.
 - `forge register` needs a Developer Space, and the first run prompts for its name (TTY).
 - Forge CLI 15.x needs Node ≥ 22.23.4. Version 14.2.0 works on Node 22.22.1.
 
+## Caller identity in actions
+
+Rovo action handlers get `payload.context = { agentId, accountId, cloudId, moduleKey, userAccess }` plus `payload.contextToken` and `payload.orgId`. The second argument is `{ principal, installContext, installation, workspaceId }`. **Authorise with `payload.context.accountId`**, never with inputs.
+
+## Interactive sessions (assignment, Agents menu, chat)
+
+A CREATE action shows a **confirmation card** ("Submit Redline threat model", with the inputs, Confirm/Cancel) and runs only after Confirm (seen on PAY-3, log at 00:45:42Z). GET actions run without a prompt.
+
 ## Decision gate (Step 5)
 
-- Assignment starts the agent (check 5), which settles the user's question "can assigning start the agent automatically": **yes**. The output, however, is a private session awaiting review, so the gate cannot read it unless the agent itself writes the result through an action.
-- Automation can select the agent (4a). Whether the agent's response reaches the Forge action (4c) is still being tested, because the Automation cache was blocking the new config page.
+**Gate passed, and the live path is simpler than planned:**
+1. **Automatic (primary):** an Automation rule (work item created / moved to "Security review" / label `redline-review`) runs "Use agent: Redline" with **Let this agent take actions** on. The agent calls GET `get-review-context`, then CREATE `submit-threat-model`. Each run is one sample, and the rule repeats the step N=3 times. This needs no `automation:actionProvider`, no config UI and no `{{agentResponse}}`.
+2. **Assignment (user's question answered: yes):** assigning the work item to Redline starts a session that does the same, with one Confirm click on the submit card.
+3. **Rovo chat:** the same actions, with the same confirmation.
+
