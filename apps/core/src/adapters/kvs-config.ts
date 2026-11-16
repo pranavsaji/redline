@@ -31,7 +31,8 @@ export interface ConfigStore {
 const SITE_KEY = 'config:site';
 const upstream = (e: unknown) => err(appError('upstream', `kvs: ${e instanceof Error ? e.message : String(e)}`));
 
-export function kvsConfigStore(store: KvsPort = forgeKvs()): ConfigStore {
+/** `defaults` apply only while no policy is stored (the admin page writes one). */
+export function kvsConfigStore(store: KvsPort = forgeKvs(), defaults: SitePolicy = DEFAULT_SITE_POLICY): ConfigStore {
   return {
     async site() {
       let raw: unknown;
@@ -40,7 +41,7 @@ export function kvsConfigStore(store: KvsPort = forgeKvs()): ConfigStore {
       } catch (e) {
         return upstream(e);
       }
-      if (raw === undefined) return ok(DEFAULT_SITE_POLICY);
+      if (raw === undefined) return ok(defaults);
       const p = SitePolicySchema.safeParse(raw);
       return p.success ? ok(p.data) : err(appError('schema', 'stored site policy is invalid', { issues: p.error.issues.slice(0, 5).map((i) => i.path.join('.')) }));
     },
@@ -64,4 +65,13 @@ export function kvsConfigStore(store: KvsPort = forgeKvs()): ConfigStore {
       }
     },
   };
+}
+
+/** Bootstrap before the admin page exists: `forge variables set REDLINE_ENABLED_PROJECTS PAY,SEC`. Keys are validated. */
+export function defaultsFromEnv(env: Record<string, string | undefined>): SitePolicy {
+  const projects = (env.REDLINE_ENABLED_PROJECTS ?? '')
+    .split(',')
+    .map((p) => p.trim().toUpperCase())
+    .filter((p) => /^[A-Z][A-Z0-9_]{0,254}$/.test(p));
+  return { ...DEFAULT_SITE_POLICY, enabledProjects: [...new Set(projects)] };
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SITE_POLICY } from '@redline/core';
 import { signB64, verifyB64 } from '@redline/crypto';
-import { kvsConfigStore } from '../../src/adapters/kvs-config.js';
+import { defaultsFromEnv, kvsConfigStore } from '../../src/adapters/kvs-config.js';
 import { memoryKvs } from '../support/memory-kvs.js';
 import { kvsSigningKeys } from '../../src/adapters/signing-keys.js';
 
@@ -9,6 +9,15 @@ describe('kvsConfigStore', () => {
   it('returns the default policy when nothing is stored', async () => {
     const store = kvsConfigStore(memoryKvs());
     expect(await store.site()).toEqual({ ok: true, value: DEFAULT_SITE_POLICY });
+  });
+
+  it('uses the given defaults (e.g. bootstrap projects from a Forge variable) only while nothing is stored', async () => {
+    const kv = memoryKvs();
+    const store = kvsConfigStore(kv, { ...DEFAULT_SITE_POLICY, enabledProjects: ['PAY'] });
+    expect((await store.site()).ok && ((await store.site()) as { value: { enabledProjects: string[] } }).value.enabledProjects).toEqual(['PAY']);
+    await store.setSite({ ...DEFAULT_SITE_POLICY, enabledProjects: ['SEC'] });
+    const r = await store.site();
+    expect(r.ok && r.value.enabledProjects).toEqual(['SEC']);
   });
 
   it('round-trips a valid policy under config:site', async () => {
@@ -50,6 +59,13 @@ describe('kvsConfigStore', () => {
     const kv = memoryKvs();
     const r = await kvsConfigStore({ ...kv, get: async () => Promise.reject(new Error('kvs down')) }).site();
     expect(!r.ok && r.error.code).toBe('upstream');
+  });
+});
+
+describe('defaultsFromEnv', () => {
+  it('parses REDLINE_ENABLED_PROJECTS and drops anything that is not a project key', () => {
+    expect(defaultsFromEnv({ REDLINE_ENABLED_PROJECTS: ' pay, SEC ,bad key,PAY,' }).enabledProjects).toEqual(['PAY', 'SEC']);
+    expect(defaultsFromEnv({}).enabledProjects).toEqual([]);
   });
 });
 

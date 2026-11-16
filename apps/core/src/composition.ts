@@ -7,7 +7,7 @@ import { forgeMigrate } from './adapters/forge-migrate.js';
 import { forgeQueue } from './adapters/forge-queue.js';
 import { forgeSqlExecutor } from './adapters/forge-sql.js';
 import { jiraClient } from './adapters/jira.js';
-import { forgeKvs, kvsConfigStore, type KvsPort } from './adapters/kvs-config.js';
+import { defaultsFromEnv, forgeKvs, kvsConfigStore, type KvsPort } from './adapters/kvs-config.js';
 import { restGatherer } from './adapters/rest-gatherer.js';
 import { sqlRetention } from './adapters/retention.js';
 import { jiraVerdictSink } from './adapters/verdict-sink.js';
@@ -61,7 +61,7 @@ export function composeCore(ctx?: ForgeContext): CoreDeps {
     confluence,
     gatherer: restGatherer({ jira, confluence, reviews, issues, clock: systemClock, cloudId: cloudIdOf(ctx) }),
     verdicts: jiraVerdictSink(jira),
-    config: kvsConfigStore(state),
+    config: kvsConfigStore(state, defaultsFromEnv(process.env)),
     state,
     retention: sqlRetention(x),
     queue: forgeQueue(),
