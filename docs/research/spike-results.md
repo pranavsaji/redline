@@ -71,3 +71,10 @@ The first automation run (before this fix) shows in the rule's "Debug agent resp
 - PAY-6, reviewed before the clustering fix, had all 9 agent threats discarded as "too few runs agreed". The runs had worded the same threats differently, which led to `sameThreat()` (shared evidence) in `packages/core/src/threats/cluster.ts`.
 - Panel load is about 1–2 s in the Jira iframe (resolver plus permission checks).
 - `forge deploy` lint scans `ui/node_modules` and takes about 10 minutes. Run `forge lint` only when the manifest changes, and otherwise deploy with `--no-verify` (about 40 s).
+
+## Live: Done gate (Task 22, 2026-11-16, demo site)
+
+- `redline-gate` (function validator) added to the PAY workflow's global "Any status → Done" transition through the new workflow editor (Add rule → Marketplace rules → Redline).
+- PAY-7 → Done: HTTP 400, "Redline blocks Done: 8 open security requirement(s) at High or above (create the subtasks in the Redline panel). Open the Redline panel: https://one-atlas-mefc.atlassian.net/browse/PAY-7". First call 3.4 s (recomputed a pre-message verdict, cold start), warm call 0.6 s.
+- Bypass check: a user `PUT {"state":"pass"}` into the `redline.verdict` issue property succeeds (200: anyone who can edit the item can write it) and the transition is still blocked, because the gate reads app storage. An expression validator over the property would have passed.
+- `apps/core` uses `bundler: manual` (`dist/`): run `node build.mjs` before `forge deploy`, or the old bundle ships ("i[Q.functionName] is not a function" for a new handler).
