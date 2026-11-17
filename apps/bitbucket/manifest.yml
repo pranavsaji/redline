@@ -31,4 +31,5 @@ permissions:
   scopes:
     - read:pullrequest:bitbucket
     - read:repository:bitbucket
+    - read:user:bitbucket
     - storage:app
