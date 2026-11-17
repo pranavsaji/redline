@@ -18,7 +18,11 @@ const OPEN = new Set(['Open', 'InProgress']);
 export const TREND_DAYS = 30;
 export const DRILL_MAX_ITEMS = 100;
 
-export type PostureDto = PostureSummaryResult & { trend: TrendPoint[]; inFlight: number };
+/**
+ * `trend` is site-wide (daily snapshots count every work item), so it is shown only to security champions and Jira
+ * admins; for everyone else it is empty and `trendShown` is false. Every other number is scoped to the viewer.
+ */
+export type PostureDto = PostureSummaryResult & { trend: TrendPoint[]; trendShown: boolean; inFlight: number };
 
 const asPayload = (v: PostureViewer, p: Record<string, unknown>) => ({ ...p, context: { accountId: v.accountId } });
 
@@ -27,10 +31,19 @@ export async function postureGet(deps: CoreDeps, v: PostureViewer, payload: { pr
   if (!v.accountId) return { error: 'not_found' };
   const summary = await getPostureSummary(asPayload(v, { project: payload.project ?? '', team: payload.team ?? '' }), deps);
   if ('error' in summary) return summary;
+  const [trend, inFlight] = await Promise.all([trendFor(deps, v.accountId), inFlightFor(deps, v.accountId)]);
+  return { ...summary, trend: trend ?? [], trendShown: trend !== null, inFlight };
+}
+
+/** The site-wide trend, or null when this viewer may not see it (lookup failures count as not allowed). */
+async function trendFor(deps: CoreDeps, accountId: string): Promise<TrendPoint[] | null> {
+  const [policy, groups, admin] = await Promise.all([deps.config.site(), deps.jira.groupsOf(accountId), deps.jira.isAdmin(accountId)]);
+  const champion = policy.ok && groups.ok && groups.value.includes(policy.value.championGroup);
+  if (!champion && !(admin.ok && admin.value)) return null;
   const from = new Date(deps.clock.now().getTime() - TREND_DAYS * 86_400_000).toISOString().slice(0, 10);
-  const [trend, inFlight] = await Promise.all([deps.retention.postureTrend(from), inFlightFor(deps, v.accountId)]);
+  const trend = await deps.retention.postureTrend(from);
   if (!trend.ok) log('posture.trend_failed', { code: trend.error.code });
-  return { ...summary, trend: trend.ok ? trend.value : [], inFlight };
+  return trend.ok ? trend.value : [];
 }
 
 async function inFlightFor(deps: CoreDeps, accountId: string): Promise<number> {

@@ -5,7 +5,7 @@ import { handleJob } from '../../src/consumers/review-consumer.js';
 import { setRequirementStatus } from '../../src/services/requirements-service.js';
 import { jiraIssue } from '../support/core-deps.js';
 import type { DrillDto } from '../../src/resolvers/posture.js';
-import { ISSUE, reviewed } from '../support/reviewed.js';
+import { ADMIN, CHAMP, ISSUE, reviewed } from '../support/reviewed.js';
 
 const ME = { accountId: 'acc-plain' };
 const PAY7 = jiraIssue({ id: ISSUE, key: 'PAY-7', fixVersions: ['4.2'] });
@@ -56,22 +56,36 @@ describe('posture.get (PR-1)', () => {
     expect('inFlight' in hidden && hidden.inFlight).toBe(0);
   });
 
-  it('the 30-day trend comes from the daily snapshots', async () => {
+  it('the 30-day trend comes from the daily snapshots, for a security champion or Jira admin', async () => {
     const { t } = await dashboard();
     const asked: string[] = [];
     t.deps.retention.postureTrend = async (from) => {
       asked.push(from);
       return ok([{ day: '2026-11-14', openCritical: 1, openHigh: 2 }]);
     };
+    for (const who of [CHAMP, ADMIN]) {
+      const p = await postureGet(t.deps, { accountId: who }, {});
+      expect('trend' in p && p).toMatchObject({ trend: [{ day: '2026-11-14', openCritical: 1, openHigh: 2 }], trendShown: true });
+    }
+    expect(asked).toEqual(['2026-10-16', '2026-10-16']);
+  });
+
+  it('security: the site-wide trend is not shown to other viewers (it counts work items they may not see)', async () => {
+    const { t } = await dashboard();
+    let read = 0;
+    t.deps.retention.postureTrend = async () => ((read += 1), ok([{ day: '2026-11-14', openCritical: 9, openHigh: 9 }]));
     const p = await postureGet(t.deps, ME, {});
-    expect('trend' in p && p.trend).toEqual([{ day: '2026-11-14', openCritical: 1, openHigh: 2 }]);
-    expect(asked).toEqual(['2026-10-16']);
+    expect('trend' in p && p).toMatchObject({ trend: [], trendShown: false });
+    expect(read).toBe(0);
+    t.jira.groupsOf = async () => ({ ok: false, error: { code: 'internal', message: 'down' } });
+    t.jira.isAdmin = async () => ({ ok: false, error: { code: 'internal', message: 'down' } });
+    expect(await postureGet(t.deps, { accountId: CHAMP }, {})).toMatchObject({ trend: [], trendShown: false });
   });
 
   it('a failed trend read still returns the dashboard, with an empty trend', async () => {
     const { t } = await dashboard();
     t.deps.retention.postureTrend = async () => ({ ok: false, error: { code: 'internal', message: 'sql down' } });
-    const p = await postureGet(t.deps, ME, {});
+    const p = await postureGet(t.deps, { accountId: CHAMP }, {});
     expect('trend' in p && p.trend).toEqual([]);
   });
 
