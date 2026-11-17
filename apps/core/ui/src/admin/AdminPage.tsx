@@ -7,7 +7,6 @@ import { SetupChecklist } from './SetupChecklist.js';
 export function AdminPage({ api }: { api: AdminApi }) {
   return (
     <main style={{ display: 'grid', gap: 24, padding: 16, maxWidth: 760, color: token('color.text') }}>
-      <h1 style={{ font: token('font.heading.medium'), margin: 0 }}>Redline</h1>
       <SetupChecklist api={api} />
       <DemoData api={api} />
     </main>

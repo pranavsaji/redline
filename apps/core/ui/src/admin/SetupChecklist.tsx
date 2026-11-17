@@ -7,7 +7,7 @@ import type { ApiError } from '../types.js';
 type Item = { done: boolean | null; text: string };
 
 const itemsOf = (s: SetupStatus): Item[] => [
-  { done: s.keys, text: s.keys ? 'Signing keys created' : 'Signing keys not created yet (they are made on install)' },
+  { done: s.keys, text: s.keys ? 'Signing keys created' : 'Signing keys not created yet (Redline creates them with the first merge-gate attestation)' },
   { done: s.sqlVersion > 0, text: s.sqlVersion > 0 ? `Database ready (schema version ${s.sqlVersion})` : 'Database not migrated yet' },
   {
     done: s.validatorSeenOn.length > 0,
@@ -44,7 +44,9 @@ export function SetupChecklist({ api }: { api: AdminApi }) {
         <ul aria-label="Setup checklist" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
           {itemsOf(status).map((item) => (
             <li key={item.text} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {item.done === null ? <Lozenge>Info</Lozenge> : <Lozenge appearance={item.done ? 'success' : 'moved'}>{item.done ? 'Done' : 'To do'}</Lozenge>}
+              <span style={{ flexShrink: 0 }}>
+                {item.done === null ? <Lozenge>Info</Lozenge> : <Lozenge appearance={item.done ? 'success' : 'moved'}>{item.done ? 'Done' : 'To do'}</Lozenge>}
+              </span>
               <span>{item.text}</span>
             </li>
           ))}
