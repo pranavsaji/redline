@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ok, type Requirement } from '@redline/shared';
-import { postureDrill, postureGet, releaseReport } from '../../src/resolvers/posture.js';
+import { postureDrill, postureDrill as drill, postureGet, releaseReport } from '../../src/resolvers/posture.js';
 import { handleJob } from '../../src/consumers/review-consumer.js';
 import { setRequirementStatus } from '../../src/services/requirements-service.js';
 import { jiraIssue } from '../support/core-deps.js';
+import type { DrillDto } from '../../src/resolvers/posture.js';
 import { ISSUE, reviewed } from '../support/reviewed.js';
 
 const ME = { accountId: 'acc-plain' };
@@ -109,6 +110,7 @@ describe('posture.drill (PR-2)', () => {
 
   it('heatmap cells drill by project and component; "None" means no component', async () => {
     const { t } = await dashboard();
+    const postureDrill = async (...a: Parameters<typeof drill>) => (await drill(...a)) as DrillDto;
     expect((await postureDrill(t.deps, ME, { team: 'PAY', component: 'payments' })).issues).toHaveLength(1);
     expect((await postureDrill(t.deps, ME, { team: 'OPS', component: 'payments' })).issues).toHaveLength(0);
     expect((await postureDrill(t.deps, ME, { component: 'None' })).issues).toHaveLength(0);

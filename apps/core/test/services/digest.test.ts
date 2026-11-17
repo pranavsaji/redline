@@ -16,7 +16,7 @@ async function setup(o: { configured?: boolean } = {}) {
   t.deps.confluence = {
     spaceByKey: async () => ok({ id: 'sp1', homepageId: 'home1' }),
     findPage: async () => ok(null),
-    createPage: async (i) => {
+    createPage: async (i: { spaceId: string; parentId?: string; title: string; storage: string }) => {
       created.push(i);
       return ok({ id: 'pg1', url: 'https://one-atlas-mefc.atlassian.net/wiki/pages/pg1' });
     },
