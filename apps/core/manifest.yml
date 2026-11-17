@@ -53,6 +53,20 @@ modules:
       resolver:
         function: panelResolverFn
       title: Redline
+  jira:globalPage:
+    - key: redline-posture
+      resource: panel
+      resolver:
+        function: panelResolverFn
+      title: Redline security posture
+  jira:dashboardGadget:
+    - key: redline-posture-gadget
+      title: Redline security posture
+      description: Open security requirements by severity, expiring risk acceptances, mean time to verify and reviews in flight, for the work items you can see.
+      thumbnail: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+      resource: panel
+      resolver:
+        function: panelResolverFn
   jira:workflowValidator:
     - key: redline-gate
       name: Redline security gate

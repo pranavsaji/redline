@@ -1,4 +1,5 @@
-import type { AdminApi, PanelApi } from './bridge.js';
+import type { AdminApi, PanelApi, PostureApi } from './bridge.js';
+import { DRILL_FIXTURE, POSTURE_FIXTURE, RELEASE_FIXTURE } from './posture/fixtures.js';
 import { FIXTURES } from './fixtures.js';
 
 /** Local preview: `pnpm --filter @redline/core-ui dev`, then ?state=ready|in_progress|failed|… and ?theme=dark. */
@@ -42,5 +43,14 @@ export function mockAdminApi(): AdminApi {
     verifyLedger: async () => ({ ok: true, length: 12 }),
     exportLedger: async (projectKey, from, to) => ({ csv: 'seq,created_at\n', json: JSON.stringify({ projectKey, from, to, entries: [] }) }),
     setupStatus: async () => ({ keys: true, sqlVersion: 3, validatorSeenOn: ['PAY'], automationRuleSeen: true, mcpEnabledHint: 'Rovo MCP: allow the clients your team uses in Atlassian Administration.', bitbucketKeyCopied: false }),
+  };
+}
+
+export function mockPostureApi(state = new URLSearchParams(window.location.search).get('state') ?? 'ready'): PostureApi {
+  const empty = state === 'empty';
+  return {
+    get: async () => (empty ? { ...structuredClone(POSTURE_FIXTURE), projects: [], issuesCounted: 0, byTeamComponent: [], openBySeverity: { Low: 0, Medium: 0, High: 0, Critical: 0 } } : structuredClone(POSTURE_FIXTURE)),
+    drill: async () => structuredClone(DRILL_FIXTURE),
+    release: async (fixVersion) => RELEASE_FIXTURE(fixVersion),
   };
 }

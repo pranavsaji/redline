@@ -1,4 +1,4 @@
-import type { AcceptanceState, ApiError, Evidence, FactDto, PanelDto, Requirement, RequirementStatus, Threat, ThreatExplanation } from './types.js';
+import type { AcceptanceState, ApiError, DrillDto, Evidence, FactDto, PanelDto, PostureDto, ReleaseReadinessResult, Requirement, RequirementStatus, Severity, Threat, ThreatExplanation } from './types.js';
 
 export interface AcceptanceInput {
   requirementId: string;
@@ -101,6 +101,29 @@ export async function forgeAdminApi(): Promise<AdminApi> {
     publicKeys: () => invoke('keys.public'),
     rotateKey: () => invoke('keys.rotate'),
     keyCopied: () => invoke('keys.copied'),
+  };
+}
+
+/** What a dashboard number filters on: a severity (KPI), or a heatmap cell (team = project, component). */
+export interface DrillQuery {
+  severity?: Severity;
+  team?: string;
+  component?: string;
+}
+
+/** The posture page's backend calls; the server scopes every number to work items the viewer can browse. */
+export interface PostureApi {
+  get(project?: string): Promise<PostureDto | ApiError>;
+  drill(q: DrillQuery): Promise<DrillDto | ApiError>;
+  release(fixVersion: string): Promise<ReleaseReadinessResult | ApiError>;
+}
+
+export async function forgePostureApi(): Promise<PostureApi> {
+  const { invoke } = await import('@forge/bridge');
+  return {
+    get: (project) => invoke('posture.get', project ? { project } : {}),
+    drill: (q) => invoke('posture.drill', { ...q }),
+    release: (fixVersion) => invoke('release.report', { fixVersion }),
   };
 }
 

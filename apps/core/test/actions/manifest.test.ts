@@ -82,3 +82,14 @@ describe('manifest: Rovo actions, skill and MCP (Task 28)', () => {
     expect(md).toMatch(/https:\/\/mcp\.atlassian\.com\/forge\//);
   });
 });
+
+describe('manifest: posture surfaces (Task 29)', () => {
+  it('a global page and a dashboard gadget serve the posture view through the shared resolver', () => {
+    const page = (m.modules['jira:globalPage'] ?? []).find((x) => x.key === 'redline-posture');
+    expect(page).toMatchObject({ resource: 'panel', resolver: { function: 'panelResolverFn' }, title: 'Redline security posture' });
+    const gadget = (m.modules['jira:dashboardGadget'] ?? []).find((x) => x.key === 'redline-posture-gadget');
+    expect(gadget).toMatchObject({ resource: 'panel', resolver: { function: 'panelResolverFn' } });
+    expect(gadget!.description).toBeTruthy();
+    expect(gadget!.thumbnail).toMatch(/^https:\/\//);
+  });
+});
