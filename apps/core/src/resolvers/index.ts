@@ -6,6 +6,9 @@ import { panelEnrich, panelGet, panelRerun, panelThreats, threatExplain, type Vi
 import { requirementsCreate, requirementsSetStatus } from './requirements.js';
 import { reviewConfirm, threatsTriage } from './threats.js';
 import { confluencePublish } from './confluence.js';
+import { adminSeed, adminSetupStatus } from './admin.js';
+import { kvsSigningKeys } from '../adapters/signing-keys.js';
+import { systemClock } from '../adapters/clock.js';
 
 type Ctx = { accountId?: unknown; cloudId?: unknown; extension?: { issue?: { id?: unknown } } };
 
@@ -56,6 +59,19 @@ resolver.define('review.confirm', async ({ payload, context }) => {
 resolver.define('confluence.publish', async ({ payload, context }) => {
   const v = viewerOf(context as Ctx);
   return confluencePublish(composeCore({ cloudId: v.cloudId }), v, payload ?? {});
+});
+resolver.define('admin.seed', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return adminSeed(composeCore({ cloudId: v.cloudId }), { accountId: v.accountId }, payload ?? {});
+});
+resolver.define('admin.setupStatus', async ({ context }) => {
+  const v = viewerOf(context as Ctx);
+  return adminSetupStatus(composeCore({ cloudId: v.cloudId }), { accountId: v.accountId }, {
+    signingKeys: async () => {
+      const keys = await kvsSigningKeys(systemClock).publicKeys();
+      return keys.ok && Object.keys(keys.value).length > 0;
+    },
+  });
 });
 
 export const panelResolver = resolver.getDefinitions();

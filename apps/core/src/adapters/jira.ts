@@ -62,6 +62,9 @@ export interface JiraClient {
   setProperty(issueId: string, key: string, value: unknown): Promise<Result<void>>;
   /** The property's value, or null when the work item has no such property. */
   getProperty(issueIdOrKey: string, key: string): Promise<Result<unknown>>;
+  projectInfo(projectKey: string): Promise<Result<{ id: string; key: string; issueTypes: Array<{ id: string; name: string; subtask: boolean }> }>>;
+  ensureComponent(projectKey: string, name: string): Promise<Result<void>>;
+  createIssue(f: { projectId: string; issueTypeId: string; summary: string; description: AdfDoc; labels: string[]; components?: string[]; parentId?: string }): Promise<Result<{ id: string; key: string }>>;
   /** The project's sub-task issue type id (Redline requirements are created as sub-tasks). */
   subtaskType(projectId: string): Promise<Result<string>>;
   createSubtask(parentId: string, fields: { summary: string; description: AdfDoc; labels: string[]; issueTypeId: string }): Promise<Result<{ id: string; key: string }>>;
@@ -90,6 +93,7 @@ export const ISSUE_FIELDS = [
 
 const ISSUE_REF = /^(\d{1,18}|[A-Z][A-Z0-9_]{0,254}-\d{1,18})$/i;
 const NUMERIC_ID = /^\d{1,18}$/;
+const PROJECT_KEY = /^[A-Z][A-Z0-9_]{0,254}$/;
 const PROPERTY_KEY = /^[A-Za-z0-9._-]{1,255}$/;
 const MAX_DEPTH = 64;
 
@@ -405,6 +409,36 @@ export function createJiraClient(request: FetchLike, opts: JiraClientOptions = {
       if (!r.ok) return r.error.code === 'not_found' ? ok(null) : r;
       const v = (r.value as { value?: unknown } | undefined)?.value;
       return ok(v === undefined ? null : v);
+    },
+
+    async projectInfo(projectKey) {
+      if (!PROJECT_KEY.test(projectKey)) return badRef('project key');
+      const r = await call(`/rest/api/3/project/${seg(projectKey)}`);
+      if (!r.ok) return r;
+      const p = parse(z.object({ id: z.string(), key: z.string(), issueTypes: z.array(z.object({ id: z.string(), name: z.string(), subtask: z.boolean().nullish() })).nullish() }), r.value, 'project');
+      if (!p.ok) return p;
+      return ok({ id: p.value.id, key: p.value.key, issueTypes: (p.value.issueTypes ?? []).map((t) => ({ id: t.id, name: t.name, subtask: t.subtask === true })) });
+    },
+
+    async ensureComponent(projectKey, name) {
+      if (!PROJECT_KEY.test(projectKey)) return badRef('project key');
+      const r = await call(`/rest/api/3/project/${seg(projectKey)}/components`);
+      if (!r.ok) return r;
+      const p = parse(z.array(z.object({ name: z.string() })), r.value, 'components');
+      if (!p.ok) return p;
+      if (p.value.some((c) => c.name === name)) return ok(undefined);
+      return voidOf(await call('/rest/api/3/component', json('POST', { name, project: projectKey })));
+    },
+
+    async createIssue(f) {
+      if (!NUMERIC_ID.test(f.projectId) || !NUMERIC_ID.test(f.issueTypeId) || (f.parentId !== undefined && !NUMERIC_ID.test(f.parentId))) return badRef('project, type or parent id');
+      const fields: Record<string, unknown> = { project: { id: f.projectId }, issuetype: { id: f.issueTypeId }, summary: f.summary, description: f.description, labels: f.labels };
+      if (f.components?.length) fields.components = f.components.map((name) => ({ name }));
+      if (f.parentId) fields.parent = { id: f.parentId };
+      const r = await call('/rest/api/3/issue', json('POST', { fields }));
+      if (!r.ok) return r;
+      const p = parse(z.object({ id: z.string(), key: z.string() }), r.value, 'create issue');
+      return p.ok ? ok({ id: p.value.id, key: p.value.key }) : p;
     },
 
     async subtaskType(projectId) {

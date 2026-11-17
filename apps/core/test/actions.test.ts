@@ -122,6 +122,15 @@ describe('submit-threat-model (CREATE action) and ingestSample', () => {
     expect(t.kv.data.get('ingest:recent')).toEqual([false]);
   });
 
+  it('a non-empty submission records when the Automation agent last delivered (setup checklist)', async () => {
+    const t = setup();
+    await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
+    await submit(t.deps, KEY, '  ');
+    expect(t.kv.data.has('ingest:lastAt')).toBe(false);
+    await submit(t.deps, KEY, '{"schema":"redline.threatmodel.v1","issueKey":"PAY-7","threats":[]}');
+    expect(t.kv.data.get('ingest:lastAt')).toBe('2026-11-15T12:00:00.000Z');
+  });
+
   it('the 3rd sample sets status ready after the consumer runs', async () => {
     const t = setup();
     await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });

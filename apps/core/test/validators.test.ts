@@ -17,6 +17,13 @@ describe('Done gate (jira:workflowValidator, EN-2)', () => {
     expect(out).toEqual({ result: false, errorMessage: expect.stringMatching(/^Redline blocks Done: .*Open the Redline panel: https:\/\/one-atlas-mefc\.atlassian\.net\/browse\/PAY-7$/) });
   });
 
+  it('records the project it ran on, for the setup checklist', async () => {
+    const t = coreDeps();
+    t.kv.data.set(verdictKey(ISSUE), { state: 'pass' });
+    await validateTransition(t.deps, args());
+    expect(t.kv.data.get('validator:seen')).toEqual({ PAY: '2026-11-15T12:00:00.000Z' });
+  });
+
   it('pass and warn let the transition through', async () => {
     const t = coreDeps();
     t.kv.data.set(verdictKey(ISSUE), { state: 'pass', message: 'ok' });

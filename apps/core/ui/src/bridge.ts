@@ -42,6 +42,35 @@ export async function forgeApi(): Promise<PanelApi> {
   };
 }
 
+export interface SeedResult {
+  epicKey: string;
+  storyKeys: string[];
+  designPageUrl: string;
+  incidentKeys: string[];
+}
+export interface SetupStatus {
+  keys: boolean;
+  sqlVersion: number;
+  validatorSeenOn: string[];
+  automationRuleSeen: boolean;
+  mcpEnabledHint: string;
+  bitbucketKeyCopied: boolean;
+}
+
+/** The admin page's backend calls (Jira administrators only; the server checks). */
+export interface AdminApi {
+  seed(projectKey: string, spaceKey: string): Promise<SeedResult | ApiError>;
+  setupStatus(): Promise<SetupStatus | ApiError>;
+}
+
+export async function forgeAdminApi(): Promise<AdminApi> {
+  const { invoke } = await import('@forge/bridge');
+  return {
+    seed: (projectKey, spaceKey) => invoke('admin.seed', { projectKey, spaceKey }),
+    setupStatus: () => invoke('admin.setupStatus'),
+  };
+}
+
 export const isError = <T extends object>(r: T | ApiError): r is ApiError => 'error' in r;
 
 /** Plain words for an error, preferring the server's own message for validation/permission/conflict errors. */

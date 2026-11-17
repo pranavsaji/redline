@@ -96,4 +96,24 @@ describe('confluence client: canRead', () => {
     expect(await c.canRead('2', 'a')).toEqual({ ok: true, value: false });
     expect(await c.canRead('3', 'a')).toEqual({ ok: true, value: false });
   });
+
+  it('spaceByKey returns the space id and home page; unknown key → not_found', async () => {
+    const { c } = client([[/GET \/wiki\/api\/v2\/spaces\?keys=PAY$/, { status: 200, body: JSON.stringify({ results: [{ id: '4456', key: 'PAY', homepageId: '98000' }] }) }]]);
+    expect(await c.spaceByKey('PAY')).toEqual({ ok: true, value: { id: '4456', homepageId: '98000' } });
+    const none = client([[/spaces\?keys=NOPE/, { status: 200, body: JSON.stringify({ results: [] }) }]]);
+    expect(await none.c.spaceByKey('NOPE')).toMatchObject({ ok: false, error: { code: 'not_found' } });
+    expect(await none.c.spaceByKey('a b')).toMatchObject({ ok: false, error: { code: 'validation' } });
+  });
+
+  it('findPage looks a page up by exact title in a space', async () => {
+    const { c, calls } = client([[/GET \/wiki\/api\/v2\/pages\?space-id=4456&title=Design%3A%20AI%20support%20agent&status=current$/, { status: 200, body: JSON.stringify({ results: [{ id: '98400', _links: { webui: '/spaces/PAY/pages/98400' } }], _links: { base: 'https://x.atlassian.net/wiki' } }) }]]);
+    expect(await c.findPage('4456', 'Design: AI support agent')).toEqual({ ok: true, value: { id: '98400', url: '/wiki/spaces/PAY/pages/98400' } });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('createPage without a parent puts the page at the space root', async () => {
+    const { c, calls } = client([[/POST \/wiki\/api\/v2\/pages$/, { status: 200, body: JSON.stringify({ id: '98401', _links: { webui: '/spaces/PAY/pages/98401', base: 'https://x.atlassian.net/wiki' } }) }]]);
+    expect(await c.createPage({ spaceId: '4456', title: 'T', storage: '<p>x</p>' })).toEqual({ ok: true, value: { id: '98401', url: 'https://x.atlassian.net/wiki/spaces/PAY/pages/98401' } });
+    expect(JSON.parse(calls[0]!.init!.body!)).not.toHaveProperty('parentId');
+  });
 });

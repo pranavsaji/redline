@@ -253,6 +253,31 @@ describe('jira client: writes', () => {
     expect(JSON.parse(calls[0]!.init!.body!)).toEqual({ globalId: 'redline-threat-model-10042', object: { url: 'https://x/wiki/pages/9', title: 'Threat model' } });
   });
 
+  it('projectInfo returns the project id and its issue types', async () => {
+    const { jira } = client([[/GET \/rest\/api\/3\/project\/PAY$/, { status: 200, body: JSON.stringify({ id: '10000', key: 'PAY', issueTypes: [{ id: '1', name: 'Epic', subtask: false }, { id: '4', name: 'Subtask', subtask: true }] }) }]]);
+    expect(await jira.projectInfo('PAY')).toEqual({ ok: true, value: { id: '10000', key: 'PAY', issueTypes: [{ id: '1', name: 'Epic', subtask: false }, { id: '4', name: 'Subtask', subtask: true }] } });
+    expect(await jira.projectInfo('pay; x')).toMatchObject({ ok: false, error: { code: 'validation' } });
+  });
+
+  it('ensureComponent creates the component only when the project lacks it', async () => {
+    const has = client([[/GET \/rest\/api\/3\/project\/PAY\/components$/, { status: 200, body: JSON.stringify([{ id: '1', name: 'support-agent' }]) }]]);
+    expect(await has.jira.ensureComponent('PAY', 'support-agent')).toEqual({ ok: true, value: undefined });
+    expect(has.calls).toHaveLength(1);
+    const lacks = client([
+      [/GET \/rest\/api\/3\/project\/PAY\/components$/, { status: 200, body: '[]' }],
+      [/POST \/rest\/api\/3\/component$/, { status: 201, body: JSON.stringify({ id: '2' }) }],
+    ]);
+    await lacks.jira.ensureComponent('PAY', 'support-agent');
+    expect(JSON.parse(lacks.calls[1]!.init!.body!)).toEqual({ name: 'support-agent', project: 'PAY' });
+  });
+
+  it('createIssue posts project, type, summary, ADF, labels, components and parent', async () => {
+    const doc: AdfDoc = { type: 'doc', version: 1, content: [] };
+    const { jira, calls } = client([[/POST \/rest\/api\/3\/issue$/, { status: 201, body: fixture('jira', 'created') }]]);
+    expect(await jira.createIssue({ projectId: '10000', issueTypeId: '2', summary: 'S', description: doc, labels: ['redline-demo'], components: ['support-agent'], parentId: '10042' })).toEqual({ ok: true, value: { id: '10070', key: 'PAY-13' } });
+    expect(JSON.parse(calls[0]!.init!.body!)).toEqual({ fields: { project: { id: '10000' }, issuetype: { id: '2' }, summary: 'S', description: doc, labels: ['redline-demo'], components: [{ name: 'support-agent' }], parent: { id: '10042' } } });
+  });
+
   it('addLabel / removeLabel use the update verbs', async () => {
     const { jira, calls } = client([[/PUT \/rest\/api\/3\/issue\/10042$/, { status: 204 }]]);
     await jira.addLabel('10042', 'redline-review');

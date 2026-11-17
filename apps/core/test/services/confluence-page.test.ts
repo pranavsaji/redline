@@ -34,6 +34,8 @@ function fakeConfluence() {
       return ok(undefined);
     },
     canRead: async (id, _acc) => ok(readable.has(id)),
+    spaceByKey: async () => err(appError('not_found', 'nf')),
+    findPage: async () => ok(null),
   };
   return c;
 }

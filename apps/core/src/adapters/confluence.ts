@@ -15,7 +15,11 @@ export interface ConfluencePage {
 
 export interface ConfluenceClient {
   page(id: string): Promise<Result<ConfluencePage>>;
-  createPage(i: { spaceId: string; parentId: string; title: string; storage: string }): Promise<Result<{ id: string; url: string }>>;
+  /** Without `parentId` the page goes at the root of the space. */
+  createPage(i: { spaceId: string; parentId?: string; title: string; storage: string }): Promise<Result<{ id: string; url: string }>>;
+  spaceByKey(key: string): Promise<Result<{ id: string; homepageId: string | null }>>;
+  /** A current page with exactly this title in the space, or null. */
+  findPage(spaceId: string, title: string): Promise<Result<{ id: string; url: string } | null>>;
   /** `version` is the version you read; the update is sent as version + 1, so a concurrent edit returns `conflict`. */
   updatePage(i: { id: string; title: string; version: number; storage: string }): Promise<Result<void>>;
   /** Whether `accountId` may read the page. No account, a denied/missing page or an unexpected answer is false. */
@@ -61,14 +65,34 @@ export function createConfluenceClient(request: FetchLike, opts: HttpOptions = {
     },
 
     async createPage(i) {
-      if (!NUMERIC_ID.test(i.spaceId) || !NUMERIC_ID.test(i.parentId)) return err(appError('validation', 'invalid space or parent id'));
+      if (!NUMERIC_ID.test(i.spaceId) || (i.parentId !== undefined && !NUMERIC_ID.test(i.parentId))) return err(appError('validation', 'invalid space or parent id'));
       const r = await call('/wiki/api/v2/pages', {
         method: 'POST',
-        body: JSON.stringify({ spaceId: i.spaceId, parentId: i.parentId, status: 'current', title: i.title, body: storageBody(i.storage) }),
+        body: JSON.stringify({ spaceId: i.spaceId, ...(i.parentId ? { parentId: i.parentId } : {}), status: 'current', title: i.title, body: storageBody(i.storage) }),
       });
       if (!r.ok) return r;
       const p = parse(z.object({ id: z.string(), _links: Links }), r.value, 'create page');
       return p.ok ? ok({ id: p.value.id, url: pageUrl(p.value._links) }) : p;
+    },
+
+    async spaceByKey(key) {
+      if (!/^[A-Za-z0-9~_-]{1,255}$/.test(key)) return err(appError('validation', 'invalid space key'));
+      const r = await call(`/wiki/api/v2/spaces?keys=${encodeURIComponent(key)}`);
+      if (!r.ok) return r;
+      const p = parse(z.object({ results: z.array(z.object({ id: z.string(), homepageId: z.string().nullish() })) }), r.value, 'spaces');
+      if (!p.ok) return p;
+      const s0 = p.value.results[0];
+      return s0 ? ok({ id: s0.id, homepageId: s0.homepageId ?? null }) : err(appError('not_found', `space ${key} not found`));
+    },
+
+    async findPage(spaceId, title) {
+      if (!NUMERIC_ID.test(spaceId)) return err(appError('validation', 'invalid space id'));
+      const r = await call(`/wiki/api/v2/pages?space-id=${seg(spaceId)}&title=${encodeURIComponent(title)}&status=current`);
+      if (!r.ok) return r;
+      const p = parse(z.object({ results: z.array(z.object({ id: z.string(), _links: Links })) }), r.value, 'pages');
+      if (!p.ok) return p;
+      const hit = p.value.results[0];
+      return ok(hit ? { id: hit.id, url: pageUrl(hit._links) } : null);
     },
 
     async updatePage(i) {

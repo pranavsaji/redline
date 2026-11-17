@@ -1,0 +1,15 @@
+import { token } from '@atlaskit/tokens';
+import type { AdminApi } from '../bridge.js';
+import { DemoData } from './DemoData.js';
+import { SetupChecklist } from './SetupChecklist.js';
+
+/** Redline's Jira admin page. Task 30 adds policy, roles, budgets, runs and warn-only sections. */
+export function AdminPage({ api }: { api: AdminApi }) {
+  return (
+    <main style={{ display: 'grid', gap: 24, padding: 16, maxWidth: 760, color: token('color.text') }}>
+      <h1 style={{ font: token('font.heading.medium'), margin: 0 }}>Redline</h1>
+      <SetupChecklist api={api} />
+      <DemoData api={api} />
+    </main>
+  );
+}

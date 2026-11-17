@@ -4,6 +4,7 @@ import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { handleJob } from '../consumers/review-consumer.js';
 import { RECENT_INGESTS_KEY } from '../services/budget.js';
+import { INGEST_LAST_AT_KEY } from '../resolvers/admin.js';
 import { checkRerunLimit } from '../services/rate-limit.js';
 import { consumeSubmissionToken } from '../services/submission-token.js';
 import { callerOf, ISSUE_KEY, type ActionPayload } from './common.js';
@@ -20,6 +21,7 @@ async function recordIngest(deps: CoreDeps, nonEmpty: boolean): Promise<void> {
     const prev = await deps.state.get<unknown>(RECENT_INGESTS_KEY);
     const list = Array.isArray(prev) ? prev.filter((x): x is boolean => typeof x === 'boolean') : [];
     await deps.state.set(RECENT_INGESTS_KEY, [...list, nonEmpty].slice(-10));
+    if (nonEmpty) await deps.state.set(INGEST_LAST_AT_KEY, deps.clock.now().toISOString());
   } catch {
     // the budget signal is best-effort
   }

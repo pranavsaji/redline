@@ -1,6 +1,21 @@
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { refreshVerdict, verdictKey } from '../services/verdict-service.js';
+import { VALIDATOR_SEEN_KEY } from '../resolvers/admin.js';
+
+/** Remembers (once a day per project) that the gate ran, for the admin setup checklist. Best effort. */
+async function markSeen(deps: CoreDeps, issueKey: string | undefined): Promise<void> {
+  const project = issueKey?.split('-')[0];
+  if (!project || !/^[A-Z][A-Z0-9_]{0,254}$/.test(project)) return;
+  try {
+    const now = deps.clock.now().toISOString();
+    const seen = ((await deps.state.get<Record<string, string>>(VALIDATOR_SEEN_KEY)) ?? {}) as Record<string, string>;
+    if (seen[project]?.slice(0, 10) === now.slice(0, 10)) return;
+    await deps.state.set(VALIDATOR_SEEN_KEY, { ...seen, [project]: now });
+  } catch {
+    // the checklist is informational
+  }
+}
 
 /** Shown when a work item still has no Redline verdict after computing one (EN-2: missing reviews block). */
 export const NOT_REVIEWED_MESSAGE = 'Redline has not reviewed this work item yet. Open the Redline panel and click Run review.';
@@ -17,6 +32,7 @@ const blocked = (errorMessage: string): Outcome => ({ result: false, errorMessag
  */
 export async function validateTransition(deps: CoreDeps, args: { issue?: { key?: string; id?: string } }): Promise<Outcome> {
   let id = args.issue?.id;
+  await markSeen(deps, args.issue?.key);
   if (!id && args.issue?.key) {
     const issue = await deps.jira.issue(args.issue.key);
     if (!issue.ok) return blocked(UNREADABLE);

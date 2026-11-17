@@ -42,6 +42,12 @@ modules:
         function: panelResolverFn
       title: Redline security review
       icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+  jira:adminPage:
+    - key: redline-admin
+      resource: panel
+      resolver:
+        function: panelResolverFn
+      title: Redline
   jira:workflowValidator:
     - key: redline-gate
       name: Redline security gate
@@ -141,3 +147,5 @@ permissions:
     read:confluence-content.permission: {}
     read:page:confluence: {}
     write:page:confluence: {}
+    read:space:confluence: {}
+    manage:jira-project: {}
