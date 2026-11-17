@@ -28,8 +28,26 @@ describe('Done gate (jira:workflowValidator, EN-2)', () => {
     const t = coreDeps();
     t.kv.data.set(verdictKey(ISSUE), { state: 'pass', message: 'ok' });
     expect(await validateTransition(t.deps, args())).toEqual({ result: true });
-    t.kv.data.set(verdictKey(ISSUE), { state: 'warn', message: 'ok' });
+    t.kv.data.set(verdictKey(ISSUE), { state: 'warn', validUntil: '2026-11-20T00:00:00Z', message: 'ok' });
     expect(await validateTransition(t.deps, args())).toEqual({ result: true });
+  });
+
+  it.each([
+    ['break-glass override', { state: 'pass', overridden: true, validUntil: '2026-11-15T11:00:00Z', message: 'Redline: no security requirements block this work item (break-glass override until 2026-11-15).' }],
+    ['warn-only window', { state: 'warn', validUntil: '2026-11-15T11:00:00Z', message: 'warn' }],
+  ])('security: a %s that has ended is recomputed and blocks (it does not stay open)', async (_name, stored) => {
+    const t = coreDeps();
+    await handleJob(t.deps, { kind: 'gather', issueId: ISSUE, reason: 'created' });
+    t.kv.data.set(verdictKey(ISSUE), { blockingCount: 1, maxOpenSeverity: 'High', reasons: [], inheritedFrom: [], updatedAt: '2026-11-15T00:00:00Z', ...stored });
+    expect(await validateTransition(t.deps, args())).toEqual({ result: false, errorMessage: expect.stringMatching(/^Redline blocks Done: /) });
+    expect((t.kv.data.get(verdictKey(ISSUE)) as { state: string }).state).toBe('block');
+  });
+
+  it('fails closed: a lapsed verdict that cannot be recomputed blocks', async () => {
+    const t = coreDeps();
+    t.kv.data.set(verdictKey(ISSUE), { state: 'pass', overridden: true, validUntil: '2026-11-15T11:00:00Z', blockingCount: 1, maxOpenSeverity: 'High', reasons: [], inheritedFrom: [], updatedAt: '2026-11-15T00:00:00Z' });
+    t.deps.state.set = async () => Promise.reject(new Error('kvs down'));
+    expect(await validateTransition(t.deps, args())).toMatchObject({ result: false });
   });
 
   it('security: a "pass" written into the user-editable issue property does not open the gate (it reads app storage)', async () => {

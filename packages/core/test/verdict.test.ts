@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SITE_POLICY, combineVerdicts, computeVerdict } from '../src/index.js';
+import { DEFAULT_SITE_POLICY, combineVerdicts, computeVerdict, verdictLapsed } from '../src/index.js';
 import { acceptance, input, NOW, requirement, review, threat } from './fixtures/verdict.js';
 
 const codes = (v: ReturnType<typeof computeVerdict>) => v.reasons.map((r) => r.code);
@@ -132,5 +132,24 @@ describe('combineVerdicts', () => {
     const own = computeVerdict(input({ threats: [], requirements: [] }));
     const ancestor = { ...computeVerdict(input()), state: 'warn' as const };
     expect(combineVerdicts(own, [{ issueKey: 'PROJ-1', verdict: ancestor }]).state).toBe('block');
+  });
+});
+
+describe('verdictLapsed: a lenient verdict stops counting once its window ends', () => {
+  const at = new Date('2026-11-15T12:00:00Z');
+  const base = { blockingCount: 1, maxOpenSeverity: 'High' as const, reasons: [], inheritedFrom: [], updatedAt: '2026-11-15T00:00:00Z' };
+  it('plain pass and block never lapse', () => {
+    expect(verdictLapsed({ state: 'pass', ...base }, at)).toBe(false);
+    expect(verdictLapsed({ state: 'block', ...base }, at)).toBe(false);
+  });
+  it('warn-only and break-glass hold until validUntil, then lapse', () => {
+    expect(verdictLapsed({ state: 'warn', validUntil: '2026-11-15T12:00:01Z', ...base }, at)).toBe(false);
+    expect(verdictLapsed({ state: 'warn', validUntil: '2026-11-15T12:00:00Z', ...base }, at)).toBe(true);
+    expect(verdictLapsed({ state: 'pass', overridden: true, validUntil: '2026-11-15T11:00:00Z', ...base }, at)).toBe(true);
+    expect(verdictLapsed({ state: 'pass', overridden: true, validUntil: '2026-11-16T00:00:00Z', ...base }, at)).toBe(false);
+  });
+  it('fails closed: a lenient verdict with no readable end time counts as lapsed', () => {
+    expect(verdictLapsed({ state: 'warn', ...base }, at)).toBe(true);
+    expect(verdictLapsed({ state: 'pass', overridden: true, validUntil: 'soon', ...base }, at)).toBe(true);
   });
 });

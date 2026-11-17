@@ -25,7 +25,7 @@ export interface GetReviewResult {
   revision: number | null;
   riskScore: number | null;
   partial: boolean;
-  verdict: { state: Verdict['state']; blockingCount: number; maxOpenSeverity: Severity | null; reasons: string[]; validUntil?: string } | null;
+  verdict: { state: Verdict['state']; blockingCount: number; maxOpenSeverity: Severity | null; reasons: string[]; overridden?: true; validUntil?: string } | null;
   threats: ReviewThreatDto[];
   threatsTotal: number;
   hiddenThreats: number;
@@ -63,7 +63,7 @@ export async function getReview(payload: ActionPayload & Record<string, unknown>
       riskScore: panel.review?.riskScore ?? null,
       partial: panel.review?.partial ?? false,
       verdict: v
-        ? { state: v.state, blockingCount: v.blockingCount, maxOpenSeverity: v.maxOpenSeverity, reasons: v.reasons.map((r) => r.message), ...(v.validUntil ? { validUntil: v.validUntil } : {}) }
+        ? { state: v.state, blockingCount: v.blockingCount, maxOpenSeverity: v.maxOpenSeverity, reasons: v.reasons.map((r) => r.message), ...(v.overridden ? { overridden: true as const } : {}), ...(v.validUntil ? { validUntil: v.validUntil } : {}) }
         : null,
       threats,
       threatsTotal: panel.threatsTotal,

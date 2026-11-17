@@ -117,6 +117,16 @@ export function computeVerdict(i: VerdictInput): Verdict {
   return warnEnd ? { state: 'warn', validUntil: warnEnd.toISOString(), ...base } : { state: 'block', ...base };
 }
 
+/**
+ * A warn-only or break-glass verdict is lenient only until `validUntil`. Once that has passed (or when it cannot be
+ * read) the stored verdict no longer holds and must be recomputed before anyone relies on it.
+ */
+export function verdictLapsed(v: Pick<Verdict, 'state' | 'overridden' | 'validUntil'>, now: Date): boolean {
+  if (v.state !== 'warn' && !v.overridden) return false;
+  const end = v.validUntil ? Date.parse(v.validUntil) : Number.NaN;
+  return Number.isNaN(end) || now.getTime() >= end;
+}
+
 /** A child inherits blocks (and warnings) from reviewed ancestors; reasons are prefixed with the ancestor key. */
 export function combineVerdicts(own: Verdict, ancestors: Array<{ issueKey: string; verdict: Verdict }>): Verdict {
   const relevant = ancestors.filter((a) => a.verdict.state !== 'pass');

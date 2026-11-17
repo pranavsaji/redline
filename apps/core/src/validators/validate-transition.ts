@@ -1,6 +1,6 @@
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
-import { refreshVerdict, verdictKey } from '../services/verdict-service.js';
+import { readVerdict, refreshVerdict } from '../services/verdict-service.js';
 import { VALIDATOR_SEEN_KEY } from '../resolvers/admin.js';
 
 /** Remembers (once a day per project) that the gate ran, for the admin setup checklist. Best effort. */
@@ -40,12 +40,10 @@ export async function validateTransition(deps: CoreDeps, args: { issue?: { key?:
   }
   if (!id || !/^\d{1,18}$/.test(id)) return blocked(UNREADABLE);
 
+  // readVerdict recomputes a warn-only or break-glass verdict whose window has ended, so neither stays open.
   const read = async (): Promise<{ ok: true; value: unknown } | { ok: false }> => {
-    try {
-      return { ok: true, value: await deps.state.get<unknown>(verdictKey(id)) };
-    } catch {
-      return { ok: false };
-    }
+    const r = await readVerdict(deps, id);
+    return r.ok ? { ok: true, value: r.value } : { ok: false };
   };
   let v = await read();
   if (!v.ok) return blocked(UNREADABLE);

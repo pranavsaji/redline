@@ -1,4 +1,4 @@
-import { combineVerdicts, computeVerdict, rebuildAcceptances, type LedgerRow } from '@redline/core';
+import { combineVerdicts, computeVerdict, rebuildAcceptances, verdictLapsed, type LedgerRow } from '@redline/core';
 import { appError, err, ok, type BlockReason, type Requirement, type Result, type SitePolicy, type Verdict } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
 import type { JiraIssue } from '../adapters/jira.js';
@@ -13,6 +13,42 @@ export const contextKey = (issueId: string) => `ctx:${issueId}`;
 export const verdictKey = (issueId: string) => `verdict:${issueId}`;
 
 const MAX_ANCESTORS = 5;
+
+export type StoredVerdict = Verdict & { panelUrl?: string; message?: string; riskScore?: number; notApplicable?: boolean };
+
+export const LAPSED_MESSAGE =
+  'Redline blocks Done: the break-glass override or warn-only window for this work item has ended, and its verdict could not be recomputed. Open the Redline panel to retry.';
+
+const lenient = (v: unknown): v is StoredVerdict =>
+  typeof v === 'object' && v !== null && ((v as { state?: unknown }).state === 'warn' || (v as { overridden?: unknown }).overridden === true);
+
+/**
+ * Every reader of the stored verdict goes through here. A warn-only or break-glass verdict whose window has ended is
+ * recomputed first; if that fails it is reported as a block, never as the pass or warn it used to be. A missing or
+ * malformed value is returned as is for the caller's own fail-closed handling; a storage error is an error.
+ */
+export async function readVerdict(deps: CoreDeps, issueId: string): Promise<Result<StoredVerdict | undefined>> {
+  const get = async (): Promise<Result<unknown>> => {
+    try {
+      return ok(await deps.state.get<unknown>(verdictKey(issueId)));
+    } catch {
+      return err(appError('internal', 'could not read the stored verdict'));
+    }
+  };
+  const first = await get();
+  if (!first.ok) return first;
+  const now = deps.clock.now();
+  if (!lenient(first.value) || !verdictLapsed(first.value, now)) return ok((first.value ?? undefined) as StoredVerdict | undefined);
+  log('verdict.lapsed', { issueId });
+  const fresh = await refreshVerdict(deps, issueId);
+  if (fresh.ok) {
+    const again = await get();
+    if (again.ok && typeof again.value === 'object' && again.value !== null && !(lenient(again.value) && verdictLapsed(again.value, now)))
+      return ok(again.value as StoredVerdict);
+  }
+  const { overridden: _o, validUntil: _u, ...rest } = first.value;
+  return ok({ ...rest, state: 'block', message: LAPSED_MESSAGE });
+}
 
 type Ledgered = {
   acceptances: ReturnType<typeof rebuildAcceptances>;

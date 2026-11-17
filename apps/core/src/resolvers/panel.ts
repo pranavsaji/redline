@@ -7,7 +7,7 @@ import { log } from '../adapters/log.js';
 import { RERUN_LABEL } from '../triggers/on-issue-change.js';
 import { checkRerunLimit } from '../services/rate-limit.js';
 import { rolesOf } from '../services/roles.js';
-import { refreshVerdict, verdictKey } from '../services/verdict-service.js';
+import { readVerdict, refreshVerdict, verdictKey } from '../services/verdict-service.js';
 import { newScopeCache, scopeForViewer, type ScopeCache } from '../services/viewer-scope.js';
 import { PAGE_KEY } from '../services/confluence-page.js';
 
@@ -101,7 +101,7 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
     deps.requirements.forIssue(v.issueId),
     deps.ledger.all(),
     deps.config.site(),
-    deps.state.get<Verdict & { panelUrl?: string }>(verdictKey(v.issueId)).catch(() => undefined),
+    readVerdict(deps, v.issueId).then((r) => (r.ok ? r.value : undefined)),
   ]);
   const page = await deps.state.get<{ url?: unknown }>(PAGE_KEY(v.issueId)).catch(() => undefined);
   if (!latest.ok || !history.ok || !requirements.ok || !ledger.ok || !policy.ok) return { error: 'unavailable' };

@@ -2,7 +2,7 @@ import { rebuildAcceptances, releaseReadiness, type ReleaseCall } from '@redline
 import type { Severity, Verdict } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
-import { verdictKey } from '../services/verdict-service.js';
+import { readVerdict } from '../services/verdict-service.js';
 import { callerOf, type ActionPayload } from './common.js';
 import { fitJson, jqlString, parseInput, SCHEMAS, type ActionError } from './schemas.js';
 import { splitVisibleAcceptances } from './visibility.js';
@@ -52,7 +52,8 @@ export async function getReleaseReadiness(payload: ActionPayload & Record<string
   const now = deps.clock.now();
   const items = await Promise.all(
     inScope.map(async (i) => {
-      const stored = await deps.state.get<Verdict>(verdictKey(i.id)).catch(() => undefined);
+      const read = await readVerdict(deps, i.id);
+      const stored = read.ok ? read.value : undefined;
       const verdict: Verdict = stored ?? {
         state: 'block',
         blockingCount: 0,

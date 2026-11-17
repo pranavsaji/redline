@@ -12,6 +12,7 @@ import { fitJson, MAX_ACTION_BYTES } from '../../src/actions/schemas.js';
 import { callerOf, withCaller } from '../../src/actions/common.js';
 import { jiraIssue } from '../support/core-deps.js';
 import { appendLedger } from '@redline/core';
+import { verdictKey } from '../../src/services/verdict-service.js';
 import { CHAMP, DEV, ISSUE, reviewed } from '../support/reviewed.js';
 
 const ctx = (accountId?: string) => ({ context: accountId ? { accountId, agentId: 'agent-1', cloudId: 'c' } : {} });
@@ -328,5 +329,34 @@ describe('caller identity for MCP calls', () => {
     expect(callerOf(withCaller({ context: { accountId: 'acc-rovo' } }, {}))).toBe('acc-rovo');
     expect(callerOf(withCaller({ context: {} }, {}))).toBe('');
     expect(callerOf(withCaller({}, { principal: { accountId: 42 } }))).toBe('');
+  });
+});
+
+describe('a break-glass or warn-only window that has ended is not reported as passing', () => {
+  const lapsed = { state: 'pass', overridden: true, validUntil: '2026-11-15T11:00:00Z', blockingCount: 8, maxOpenSeverity: 'Critical', reasons: [{ code: 'open_requirement', message: '8 open security requirement(s) at High or above.' }], inheritedFrom: [], updatedAt: '2026-11-15T00:00:00Z' };
+  it('get-review recomputes it: block, matching what the attestation says', async () => {
+    const { t } = await reviewed();
+    t.kv.data.set(verdictKey(ISSUE), lapsed);
+    const r = await getReview({ issueKey: 'PAY-7', ...ctx(ME) }, t.deps);
+    expect('verdict' in r && r.verdict?.state).toBe('block');
+  });
+  it('an active break-glass is labelled, so "pass" next to blocking reasons is explained', async () => {
+    const { t } = await reviewed();
+    t.kv.data.set(verdictKey(ISSUE), { ...lapsed, validUntil: '2026-11-16T00:00:00Z' });
+    const r = await getReview({ issueKey: 'PAY-7', ...ctx(ME) }, t.deps);
+    expect('verdict' in r && r.verdict).toMatchObject({ state: 'pass', overridden: true, validUntil: '2026-11-16T00:00:00Z' });
+  });
+  it('check-change-risk says the change would not pass', async () => {
+    const { t } = await reviewed();
+    t.kv.data.set(verdictKey(ISSUE), lapsed);
+    const r = await checkChangeRisk({ issueKey: 'PAY-7', changedPaths: 'src/auth/session.ts', ...ctx(ME) }, t.deps);
+    expect('wouldPass' in r && r.wouldPass).toBe(false);
+  });
+  it('release-readiness answers No-go', async () => {
+    const { t } = await reviewed();
+    t.jira.search = async () => ok([jiraIssue({ id: ISSUE, key: 'PAY-7', fixVersions: ['4.2'] })]);
+    t.kv.data.set(verdictKey(ISSUE), lapsed);
+    const r = await getReleaseReadiness({ fixVersion: '4.2', ...ctx(ME) }, t.deps);
+    expect('answer' in r && r.answer).toBe('No-go');
   });
 });

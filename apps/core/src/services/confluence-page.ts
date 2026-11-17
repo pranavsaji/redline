@@ -1,8 +1,8 @@
 import { DEFAULT_OWNER_NOTES, extractOwnerNotes, rebuildAcceptances, renderThreatModel } from '@redline/core';
-import { appError, err, ok, type Result, type Verdict } from '@redline/shared';
+import { appError, err, ok, type Result } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
-import { verdictKey } from './verdict-service.js';
+import { readVerdict } from './verdict-service.js';
 import { citesOnlyTheWorkItem } from './viewer-scope.js';
 
 /** KVS record of a work item's published threat-model page. Its presence turns on re-publishing (RQ-6). */
@@ -74,7 +74,8 @@ export async function publishThreatModel(deps: CoreDeps, issueId: string): Promi
   if (!threats.ok) return threats;
   if (!requirements.ok) return requirements;
   if (!ledger.ok) return ledger;
-  const verdict = await deps.state.get<Verdict & { message?: string }>(verdictKey(issueId)).catch(() => undefined);
+  const read = await readVerdict(deps, issueId);
+  const verdict = read.ok ? read.value : undefined;
   const threatIds = new Set(threats.value.map((t) => t.id));
   const reqIds = new Set(requirements.value.map((r) => r.id));
   const site = await deps.siteUrl();
