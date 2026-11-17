@@ -1,6 +1,7 @@
 import { InvocationError, InvocationErrorCode } from '@forge/events';
 import { getReviewContext } from './actions/get-review-context.js';
 import { submitThreatModel } from './actions/submit-threat-model.js';
+import { withCaller } from './actions/common.js';
 import { getMergeAttestation } from './actions/get-merge-attestation.js';
 import { getReview } from './actions/get-review.js';
 import { getSecurityRequirements } from './actions/get-security-requirements.js';
@@ -47,21 +48,23 @@ export const sweeperHandler = async (_e: unknown, ctx: ForgeContext) => sweep(co
 export const hourlyHandler = async (_e: unknown, ctx: ForgeContext) => hourly(composeCore(ctx));
 export const dailyHandler = async (_e: unknown, ctx: ForgeContext) => daily(composeCore(ctx));
 
-type ActionPayload = { context?: { cloudId?: unknown } } & Record<string, unknown>;
+type ActionPayload = { context?: { cloudId?: unknown; accountId?: unknown } } & Record<string, unknown>;
+/** Forge's invocation context names the calling user; MCP calls carry the caller only here. */
+type Principal = { principal?: { accountId?: unknown } };
 const actionCtx = (payload: ActionPayload, ctx?: ForgeContext): ForgeContext => ({
   ...(ctx ?? {}),
   ...(typeof payload.context?.cloudId === 'string' ? { cloudId: payload.context.cloudId } : {}),
 });
 
 /** Rovo actions (agent-invoked). Identity comes only from payload.context.accountId. */
-export const getReviewContextHandler = async (payload: ActionPayload, ctx?: ForgeContext) => getReviewContext(payload, composeCore(actionCtx(payload, ctx)));
-export const submitThreatModelHandler = async (payload: ActionPayload, ctx?: ForgeContext) => submitThreatModel(payload, composeCore(actionCtx(payload, ctx)));
-export const getMergeAttestationHandler = async (payload: ActionPayload, ctx?: ForgeContext) => getMergeAttestation(payload, composeCore(actionCtx(payload, ctx)));
-export const getReviewHandler = async (payload: ActionPayload, ctx?: ForgeContext) => getReview(payload, composeCore(actionCtx(payload, ctx)));
-export const getSecurityRequirementsHandler = async (payload: ActionPayload, ctx?: ForgeContext) => getSecurityRequirements(payload, composeCore(actionCtx(payload, ctx)));
-export const checkChangeRiskHandler = async (payload: ActionPayload, ctx?: ForgeContext) => checkChangeRisk(payload, composeCore(actionCtx(payload, ctx)));
-export const requestRiskAcceptanceHandler = async (payload: ActionPayload, ctx?: ForgeContext) => requestRiskAcceptance(payload, composeCore(actionCtx(payload, ctx)));
-export const explainThreatHandler = async (payload: ActionPayload, ctx?: ForgeContext) => explainThreat(payload, composeCore(actionCtx(payload, ctx)));
-export const releaseReadinessHandler = async (payload: ActionPayload, ctx?: ForgeContext) => getReleaseReadiness(payload, composeCore(actionCtx(payload, ctx)));
-export const startReviewHandler = async (payload: ActionPayload, ctx?: ForgeContext) => startReview(payload, composeCore(actionCtx(payload, ctx)));
-export const postureSummaryHandler = async (payload: ActionPayload, ctx?: ForgeContext) => getPostureSummary(payload, composeCore(actionCtx(payload, ctx)));
+export const getReviewContextHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => getReviewContext(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));
+export const submitThreatModelHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => submitThreatModel(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));
+export const getMergeAttestationHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => getMergeAttestation(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));
+export const getReviewHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => getReview(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));
+export const getSecurityRequirementsHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => getSecurityRequirements(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));
+export const checkChangeRiskHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => checkChangeRisk(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));
+export const requestRiskAcceptanceHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => requestRiskAcceptance(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));
+export const explainThreatHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => explainThreat(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));
+export const releaseReadinessHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => getReleaseReadiness(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));
+export const startReviewHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => startReview(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));
+export const postureSummaryHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => getPostureSummary(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));

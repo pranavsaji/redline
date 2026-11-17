@@ -9,6 +9,7 @@ import { getReleaseReadiness } from '../../src/actions/release-readiness.js';
 import { startReview } from '../../src/actions/start-review.js';
 import { getPostureSummary } from '../../src/actions/posture-summary.js';
 import { fitJson, MAX_ACTION_BYTES } from '../../src/actions/schemas.js';
+import { callerOf, withCaller } from '../../src/actions/common.js';
 import { jiraIssue } from '../support/core-deps.js';
 import { appendLedger } from '@redline/core';
 import { CHAMP, DEV, ISSUE, reviewed } from '../support/reviewed.js';
@@ -313,5 +314,16 @@ describe('posture-summary', () => {
     if ('error' in r) throw new Error(r.error);
     expect(r.expiring.map((a) => a.acceptanceId)).toEqual(['acc_b', 'acc_a']);
     expect(r.expiring[0]).toMatchObject({ issueKey: 'PAY-7', requirementId: req.id, severity: 'High', expiresAt: expiresAt(5) });
+  });
+});
+
+describe('caller identity for MCP calls', () => {
+  it('MCP invocations carry the user in the Forge context principal, not payload.context (seen live); Rovo keeps payload.context', () => {
+    const mcp = withCaller({ project: 'PAY', context: { cloudId: 'c', moduleKey: 'posture-summary' } }, { principal: { accountId: 'acc-mcp' } });
+    expect(callerOf(mcp)).toBe('acc-mcp');
+    const rovo = withCaller({ context: { accountId: 'acc-rovo', cloudId: 'c' } }, { principal: { accountId: 'acc-other' } });
+    expect(callerOf(rovo)).toBe('acc-rovo');
+    expect(callerOf(withCaller({ context: {} }, {}))).toBe('');
+    expect(callerOf(withCaller({}, { principal: { accountId: 42 } }))).toBe('');
   });
 });
