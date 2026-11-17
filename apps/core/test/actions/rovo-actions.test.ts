@@ -321,8 +321,11 @@ describe('caller identity for MCP calls', () => {
   it('MCP invocations carry the user in the Forge context principal, not payload.context (seen live); Rovo keeps payload.context', () => {
     const mcp = withCaller({ project: 'PAY', context: { cloudId: 'c', moduleKey: 'posture-summary' } }, { principal: { accountId: 'acc-mcp' } });
     expect(callerOf(mcp)).toBe('acc-mcp');
-    const rovo = withCaller({ context: { accountId: 'acc-rovo', cloudId: 'c' } }, { principal: { accountId: 'acc-other' } });
-    expect(callerOf(rovo)).toBe('acc-rovo');
+    // Forge's principal is authoritative: a payload accountId (which an MCP client might try to pass) never overrides it.
+    const spoofed = withCaller({ context: { accountId: 'acc-victim', cloudId: 'c' } }, { principal: { accountId: 'acc-real' } });
+    expect(callerOf(spoofed)).toBe('acc-real');
+    // Rovo invocations without a principal keep the payload's accountId (the verified Automation path).
+    expect(callerOf(withCaller({ context: { accountId: 'acc-rovo' } }, {}))).toBe('acc-rovo');
     expect(callerOf(withCaller({ context: {} }, {}))).toBe('');
     expect(callerOf(withCaller({}, { principal: { accountId: 42 } }))).toBe('');
   });
