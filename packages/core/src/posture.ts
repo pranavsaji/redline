@@ -14,6 +14,13 @@ export interface PostureRow {
   verifiedDurationsHours: number[];
 }
 
+/** Hours from creation to verification, for a Verified requirement that carries both times; otherwise null. */
+export function verifiedHours(r: Requirement): number | null {
+  if (r.status !== 'Verified' || !r.createdAt || !r.verifiedAt) return null;
+  const h = (Date.parse(r.verifiedAt) - Date.parse(r.createdAt)) / 3_600_000;
+  return Number.isFinite(h) && h >= 0 ? h : null;
+}
+
 export function postureSummary(rows: PostureRow[], now: Date) {
   const openBySeverity = Object.fromEntries(SEVERITIES.map((s) => [s, 0])) as Record<Severity, number>;
   const groups = new Map<string, { team: string; component: string; open: number; maxSeverity: Severity | null }>();

@@ -105,6 +105,18 @@ describe('daily', () => {
   });
 });
 
+describe('posture trend (daily snapshots)', () => {
+  it('reads open Critical and High per day from the snapshots since a day, oldest first, skipping unreadable rows', async () => {
+    const x = sqliteExecutor();
+    expect((await migrate(x, MIGRATIONS)).ok).toBe(true);
+    await x.exec("INSERT INTO requirements (id, issue_id, status, severity, requirement_json) VALUES ('r1', '1', 'Open', 'Critical', '{}'), ('r2', '1', 'InProgress', 'High', '{}'), ('r3', '1', 'Verified', 'High', '{}'), ('r4', '1', 'Open', 'High', '{}')", []);
+    const store = sqlRetention(x);
+    expect((await store.snapshotPosture('2026-11-14')).ok).toBe(true);
+    await x.exec("INSERT INTO posture_snapshots (day, snapshot_json) VALUES ('2026-11-13', 'not json'), ('2026-10-01', '{}')", []);
+    expect(await store.postureTrend('2026-10-16')).toEqual({ ok: true, value: [{ day: '2026-11-14', openCritical: 1, openHigh: 2 }] });
+  });
+});
+
 describe('rerun rate limit', () => {
   it('allows 10 reruns per account per hour, then refuses', async () => {
     const t = coreDeps();

@@ -86,7 +86,7 @@ export async function createRequirementSubtasks(
     }
     let req = reqs.value.find((r) => r.threatId === t.id);
     if (!req) {
-      req = requirementsFor([t], { issueId: issue.id, issueKey: issue.key })[0]!;
+      req = { ...requirementsFor([t], { issueId: issue.id, issueKey: issue.key })[0]!, createdAt: deps.clock.now().toISOString() };
       const u = await deps.requirements.upsert(req);
       if (!u.ok) return u;
     }
@@ -184,13 +184,13 @@ export async function setRequirementStatus(
     const roles = await rolesOf(deps, v.accountId, v.issueId, policy.value);
     if (!roles.includes('champion')) return err(appError('forbidden', 'Only a security champion can mark a requirement Not applicable.'));
   }
-  const { evidence: _e, verifiedBy: _v, ...rest } = req;
+  const { evidence: _e, verifiedBy: _v, verifiedAt: _t, ...rest } = req;
   let next: Requirement = { ...rest, status: input.status };
   if (input.status === 'Verified') {
     const e = input.evidence;
     if (!e) return err(appError('validation', 'Verified needs evidence: a PR link, a test file path, a Confluence section, or a note.'));
     if ((e.kind === 'pr' || e.kind === 'confluence') && !HTTPS(e.ref)) return err(appError('validation', 'A PR or Confluence link must start with https://.'));
-    next = { ...next, verifiedBy: v.accountId, evidence: { kind: e.kind, ref: e.ref, attester: v.accountId } };
+    next = { ...next, verifiedBy: v.accountId, verifiedAt: deps.clock.now().toISOString(), evidence: { kind: e.kind, ref: e.ref, attester: v.accountId } };
   }
   const u = await deps.requirements.upsert(next);
   if (!u.ok) return u;

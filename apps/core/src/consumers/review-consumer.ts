@@ -38,7 +38,7 @@ async function applyAssembly(deps: CoreDeps, review: Review, bundle: ContextBund
   for (const req of requirementsFor(forRequirements, { issueId: review.issueId, issueKey: review.issueKey })) {
     const existing = await deps.requirements.get(req.id);
     if (!existing.ok) return existing;
-    const row = existing.value ? { ...existing.value, threatId: req.threatId, severity: req.severity, issueKey: req.issueKey } : req;
+    const row = existing.value ? { ...existing.value, threatId: req.threatId, severity: req.severity, issueKey: req.issueKey } : { ...req, createdAt: deps.clock.now().toISOString() };
     const u = await deps.requirements.upsert(row);
     if (!u.ok) return u;
   }

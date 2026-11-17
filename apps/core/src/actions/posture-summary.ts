@@ -1,12 +1,13 @@
-import { postureSummary, rebuildAcceptances, type PostureRow } from '@redline/core';
+import { postureSummary } from '@redline/core';
 import type { Severity } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { callerOf, type ActionPayload } from './common.js';
 import { splitVisibleAcceptances } from './visibility.js';
-import { jqlString, parseInput, SCHEMAS, type ActionError } from './schemas.js';
+import { parseInput, SCHEMAS, type ActionError } from './schemas.js';
+import { postureRows, postureScope } from '../services/posture-service.js';
 
-export const POSTURE_MAX_ITEMS = 200;
+export { POSTURE_MAX_ITEMS } from '../services/posture-service.js';
 
 export const EXPIRING_WITHIN_DAYS = 31;
 
@@ -49,33 +50,12 @@ export async function getPostureSummary(payload: ActionPayload & Record<string, 
   const empty = { ...postureSummary([], deps.clock.now()), projects, ...(team ? { team } : {}), issuesCounted: 0, expiring: [], hiddenExpiring: 0, truncated: false };
   if (projects.length === 0) return empty;
 
-  const jql = `project in (${projects.map(jqlString).join(', ')}) AND issuetype in (${p.reviewIssueTypes.map(jqlString).join(', ')}) ORDER BY updated DESC`;
-  const [found, ledger] = await Promise.all([deps.jira.search(jql, ['summary', 'issuetype', 'project', 'components'], POSTURE_MAX_ITEMS + 1), deps.ledger.all()]);
-  if (!found.ok || !ledger.ok) return { error: 'unavailable' };
-  const listed = found.value.slice(0, POSTURE_MAX_ITEMS);
-  const visible = await deps.jira.browsable(caller, listed.map((i) => i.id));
-  if (!visible.ok) return { error: 'unavailable' };
-  const allowed = new Set(visible.value);
-  const issues = listed.filter((i) => allowed.has(i.id) && (!team || i.components.some((c) => c.toLowerCase() === team.toLowerCase())));
-
+  const scope = await postureScope(deps, { caller }, { projects, reviewIssueTypes: p.reviewIssueTypes, ...(team ? { component: team } : {}) });
+  if (!scope.ok) return { error: 'unavailable' };
   const now = deps.clock.now();
-  const acceptances = rebuildAcceptances(ledger.value, now);
-  const rows: PostureRow[] = [];
-  for (let i = 0; i < issues.length; i += 20) {
-    const chunk = issues.slice(i, i + 20);
-    const reqs = await Promise.all(chunk.map((x) => deps.requirements.forIssue(x.id)));
-    if (reqs.some((r) => !r.ok)) return { error: 'unavailable' };
-    chunk.forEach((x, n) =>
-      rows.push({
-        issueKey: x.key,
-        project: x.project.key,
-        ...(x.components[0] ? { component: x.components[0] } : {}),
-        requirements: (reqs[n] as { ok: true; value: PostureRow['requirements'] }).value,
-        acceptances: acceptances.filter((a) => a.issueId === x.id),
-        verifiedDurationsHours: [],
-      }),
-    );
-  }
+  const { acceptances } = scope.value;
+  const issues = scope.value.items.map((x) => x.issue);
+  const rows = postureRows(scope.value.items);
   const keyOf = new Map(issues.map((x) => [x.id, x.key]));
   const horizon = now.getTime() + EXPIRING_WITHIN_DAYS * 86_400_000;
   const due = acceptances.filter((a) => a.state === 'active' && a.issueId !== undefined && keyOf.has(a.issueId) && new Date(a.expiresAt).getTime() <= horizon);
@@ -86,5 +66,5 @@ export async function getPostureSummary(payload: ActionPayload & Record<string, 
     .slice(0, 100)
     .map((a) => ({ acceptanceId: a.id, issueKey: keyOf.get(a.issueId!)!, requirementId: a.requirementId, severity: a.severity, expiresAt: a.expiresAt }));
   log('action.posture', { projects: projects.length, issues: rows.length, expiring: expiring.length });
-  return { ...postureSummary(rows, now), projects, ...(team ? { team } : {}), issuesCounted: rows.length, expiring, hiddenExpiring: hidden, truncated: found.value.length > POSTURE_MAX_ITEMS };
+  return { ...postureSummary(rows, now), projects, ...(team ? { team } : {}), issuesCounted: rows.length, expiring, hiddenExpiring: hidden, truncated: scope.value.truncated };
 }

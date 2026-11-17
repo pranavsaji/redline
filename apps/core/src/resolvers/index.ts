@@ -9,6 +9,7 @@ import { confluencePublish } from './confluence.js';
 import { adminSeed, adminSetupStatus } from './admin.js';
 import { acceptanceDecide, acceptanceRequest, acceptanceRevoke, breakGlassOverride } from './acceptances.js';
 import { ledgerExport, ledgerVerify } from './ledger.js';
+import { postureDrill, postureGet, releaseReport } from './posture.js';
 import { attestationCopy, keysCopied, keysPublic, keysRotate } from './attestations.js';
 import { kvsSigningKeys } from '../adapters/signing-keys.js';
 import { systemClock } from '../adapters/clock.js';
@@ -75,6 +76,19 @@ resolver.define('admin.setupStatus', async ({ context }) => {
       return keys.ok && Object.keys(keys.value).length > 0;
     },
   });
+});
+
+resolver.define('posture.get', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return postureGet(composeCore({ cloudId: v.cloudId }), { accountId: v.accountId }, (payload ?? {}) as { project?: unknown; team?: unknown });
+});
+resolver.define('posture.drill', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return postureDrill(composeCore({ cloudId: v.cloudId }), { accountId: v.accountId }, (payload ?? {}) as Record<string, unknown>);
+});
+resolver.define('release.report', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return releaseReport(composeCore({ cloudId: v.cloudId }), { accountId: v.accountId }, (payload ?? {}) as { fixVersion?: unknown });
 });
 
 resolver.define('acceptance.request', async ({ payload, context }) => {

@@ -5,6 +5,34 @@ export interface RetentionStore {
   /** Deletes reviews (and their facts, threats, samples, stages) last updated before `iso`. Never the ledger, never an issue's latest revision. */
   purgeBefore(iso: string): Promise<Result<{ reviews: number }>>;
   snapshotPosture(day: string): Promise<Result<void>>;
+  /** Open Critical and High requirements per snapshot day from `fromDay` (YYYY-MM-DD) on, oldest first. */
+  postureTrend(fromDay: string): Promise<Result<TrendPoint[]>>;
+}
+
+export interface TrendPoint {
+  day: string;
+  openCritical: number;
+  openHigh: number;
+}
+
+const OPEN_STATUSES = new Set(['Open', 'InProgress']);
+
+function trendPoint(day: string, json: string): TrendPoint | null {
+  try {
+    const s = JSON.parse(json) as { requirements?: Array<{ status?: unknown; severity?: unknown; n?: unknown }> };
+    if (!Array.isArray(s.requirements)) return null;
+    let openCritical = 0;
+    let openHigh = 0;
+    for (const r of s.requirements) {
+      if (!OPEN_STATUSES.has(String(r.status))) continue;
+      const n = Number(r.n) || 0;
+      if (r.severity === 'Critical') openCritical += n;
+      if (r.severity === 'High') openHigh += n;
+    }
+    return { day, openCritical, openHigh };
+  } catch {
+    return null;
+  }
 }
 
 const CHILD_TABLES = ['context_facts', 'threats', 'review_discarded', 'agent_samples', 'review_stages'] as const;
@@ -33,6 +61,12 @@ export function sqlRetention(x: SqlExecutor): RetentionStore {
         if (list.length < BATCH) break;
       }
       return ok({ reviews: total });
+    },
+
+    async postureTrend(fromDay) {
+      const rows = await x.query<{ day: string; snapshot_json: string }>('SELECT day, snapshot_json FROM posture_snapshots WHERE day >= ? ORDER BY day ASC', [fromDay]);
+      if (!rows.ok) return rows;
+      return ok(rows.value.map((r) => trendPoint(r.day, r.snapshot_json)).filter((p): p is TrendPoint => p !== null));
     },
 
     async snapshotPosture(day) {

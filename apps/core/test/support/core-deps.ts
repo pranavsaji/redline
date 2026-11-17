@@ -138,6 +138,7 @@ export function coreDeps(o: { issues?: JiraIssue[]; policy?: SitePolicy; now?: s
         return ok({ reviews: 0 });
       },
       snapshotPosture: async () => ok(undefined),
+      postureTrend: async () => ok([]),
     },
     queue: { push: async (jobs) => (pushed.push(...jobs), ok(undefined)) },
     clock,

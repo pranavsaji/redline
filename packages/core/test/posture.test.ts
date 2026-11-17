@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { postureSummary } from '../src/index.js';
+import { postureSummary, verifiedHours } from '../src/index.js';
 import { acceptance, NOW, requirement } from './fixtures/verdict.js';
 
 describe('postureSummary', () => {
@@ -20,5 +20,16 @@ describe('postureSummary', () => {
   });
   it('handles an empty org', () => {
     expect(postureSummary([], NOW)).toMatchObject({ expiringIn14d: 0, meanTimeToVerifyHours: null, byTeamComponent: [], topRiskyComponents: [] });
+  });
+});
+
+describe('verifiedHours (mean time to verify, PR-1)', () => {
+  it('is the hours from creation to verification for a Verified requirement with both times', () => {
+    expect(verifiedHours(requirement({ status: 'Verified', createdAt: '2026-11-10T00:00:00Z', verifiedAt: '2026-11-11T06:00:00Z' }))).toBe(30);
+  });
+  it('is null when it is not verified, a time is missing, or the times are backwards', () => {
+    expect(verifiedHours(requirement({ createdAt: '2026-11-10T00:00:00Z', verifiedAt: '2026-11-11T00:00:00Z' }))).toBeNull();
+    expect(verifiedHours(requirement({ status: 'Verified', verifiedAt: '2026-11-11T00:00:00Z' }))).toBeNull();
+    expect(verifiedHours(requirement({ status: 'Verified', createdAt: '2026-11-12T00:00:00Z', verifiedAt: '2026-11-11T00:00:00Z' }))).toBeNull();
   });
 });
