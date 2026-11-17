@@ -37,6 +37,11 @@ describe('Repository settings (Task 27)', () => {
     expect(await screen.findByText('Saved.')).toBeTruthy();
   });
 
+  it('a failed load says so (not "could not save")', async () => {
+    render(<RepoSettings api={api({ get: async () => ({ error: 'unavailable' }) })} />);
+    expect(await screen.findByText('Redline could not load this repository’s settings. Reload the page to try again.')).toBeTruthy();
+  });
+
   it('a non-admin sees the server’s refusal', async () => {
     render(<RepoSettings api={api({ save: async () => ({ error: 'forbidden', message: 'Only a repository admin can change Redline settings.' }) })} />);
     const form = await screen.findByRole('form', { name: 'Redline settings' });

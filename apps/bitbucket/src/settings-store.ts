@@ -45,7 +45,8 @@ export function parseSettingsInput(input: { publicKeys?: unknown; sensitivePaths
 
 /** Per-repository settings in Forge KVS (`settings:<repoUuid>`). A stored value that no longer parses reads as defaults. */
 export function kvsSettingsStore(kv: SettingsKvs): SettingsStore {
-  const key = (uuid: string) => `settings:${uuid.toLowerCase()}`;
+  // Forge KVS keys allow only [a-zA-Z0-9:._ #-], so the UUID's braces are dropped.
+  const key = (uuid: string) => `settings:${uuid.toLowerCase().replace(/[{}]/g, '')}`;
   return {
     async get(uuid) {
       if (!REPO_UUID.test(uuid)) return null;

@@ -24,7 +24,7 @@ export function RepoSettings({ api }: { api: SettingsApi }) {
       .get()
       .catch((): ApiError => ({ error: 'unavailable' }))
       .then((r) => {
-        if (isError(r)) return setError(errorText(r));
+        if (isError(r)) return setError(r.message ?? 'Redline could not load this repository’s settings. Reload the page to try again.');
         setKeys(Object.values(r.publicKeys).join('\n'));
         setPaths(r.sensitivePaths.join('\n'));
         setMode(r.mode);

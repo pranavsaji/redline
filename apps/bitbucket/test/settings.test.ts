@@ -46,6 +46,13 @@ describe('settings resolvers', () => {
     expect(await store.get(REPO)).toMatchObject({ sensitivePaths: ['billing/**'] });
   });
 
+  it('storage keys are legal Forge KVS keys (no braces from the repository UUID)', async () => {
+    const kv = memory();
+    await kvsSettingsStore(kv).set(REPO, { publicKeys: {}, sensitivePaths: [], mode: 'block', diffScoreThreshold: 40 });
+    for (const k of kv.data.keys()) expect(k).toMatch(/^(?!\s+$)[a-zA-Z0-9:._\s#-]+$/);
+    expect(await kvsSettingsStore(kv).get(REPO.toUpperCase())).toMatchObject({ mode: 'block' });
+  });
+
   it('a malformed repository id is refused', async () => {
     const store = kvsSettingsStore(memory());
     expect(await settingsSave({ store, isRepoAdmin: async () => true }, { accountId: 'acc', repoUuid: 'x/../y' }, input)).toMatchObject({ error: 'validation' });
