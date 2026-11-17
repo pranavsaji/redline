@@ -24,9 +24,12 @@ async function openRequirements(a: PanelApi) {
   await waitFor(() => expect(screen.queryByText(/Loading the security review/)).toBeNull());
   await userEvent.click(screen.getByRole('tab', { name: /Requirements/ }));
 }
+// paste, not type: one input event instead of forty keystrokes keeps the test fast on a loaded machine
 async function fill(form: HTMLElement, repo: string, sha: string) {
-  await userEvent.type(within(form).getByRole('textbox', { name: 'Repository' }), repo);
-  await userEvent.type(within(form).getByRole('textbox', { name: 'Commit hash' }), sha);
+  await userEvent.click(within(form).getByRole('textbox', { name: 'Repository' }));
+  await userEvent.paste(repo);
+  await userEvent.click(within(form).getByRole('textbox', { name: 'Commit hash' }));
+  await userEvent.paste(sha);
   await userEvent.click(within(form).getByRole('button', { name: 'Get attestation' }));
 }
 
