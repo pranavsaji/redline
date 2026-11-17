@@ -5,6 +5,7 @@ import { log } from '../adapters/log.js';
 import { verdictKey } from '../services/verdict-service.js';
 import { callerOf, type ActionPayload } from './common.js';
 import { fitJson, jqlString, parseInput, SCHEMAS, type ActionError } from './schemas.js';
+import { splitVisibleAcceptances } from './visibility.js';
 
 /** Work items read per release; more than this is reported as truncated (and the call is never better than Conditional). */
 export const RELEASE_MAX_ITEMS = 100;
@@ -63,7 +64,14 @@ export async function getReleaseReadiness(payload: ActionPayload & Record<string
       return { issueKey: i.key, issueId: i.id, verdict };
     }),
   );
-  const r = releaseReadiness(items, rebuildAcceptances(ledger.value, now), now);
+  // Only acceptances whose requirement this caller can see are named; the others still make the call Conditional.
+  const ids = new Set(items.map((i) => i.issueId));
+  const relevant = rebuildAcceptances(ledger.value, now).filter((a) => a.state === 'active' && a.issueId !== undefined && ids.has(a.issueId) && new Date(a.expiresAt) > now);
+  const shown = await splitVisibleAcceptances(deps, caller, relevant);
+  const hidden = shown.hidden;
+  const base = releaseReadiness(items, shown.visible, now);
+  const hiddenNote = hidden > 0 ? [`${hidden} accepted risk${hidden === 1 ? '' : 's'} on a requirement you cannot see`] : [];
+  const r = { ...base, conditions: [...base.conditions, ...hiddenNote], call: base.call === 'Go' && hidden > 0 ? ('Conditional' as const) : base.call };
   const keyOf = new Map(items.map((i) => [i.issueId, i.issueKey]));
   const truncated = listed.length > RELEASE_MAX_ITEMS;
   const call: ReleaseCall = truncated && r.call === 'Go' ? 'Conditional' : r.call;

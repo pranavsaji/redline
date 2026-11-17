@@ -3,6 +3,7 @@ import type { Severity } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { callerOf, type ActionPayload } from './common.js';
+import { splitVisibleAcceptances } from './visibility.js';
 import { jqlString, parseInput, SCHEMAS, type ActionError } from './schemas.js';
 
 export const POSTURE_MAX_ITEMS = 200;
@@ -21,8 +22,10 @@ export type PostureSummaryResult = ReturnType<typeof postureSummary> & {
   projects: string[];
   team?: string;
   issuesCounted: number;
-  /** Active risk acceptances on the counted work items that expire within 31 days, soonest first. */
+  /** Active risk acceptances on the counted work items that expire within 31 days, soonest first (only those whose requirement the caller can see). */
   expiring: ExpiringAcceptance[];
+  /** Expiring acceptances on requirements the caller cannot see: counted, never listed. */
+  hiddenExpiring: number;
   truncated: boolean;
 };
 
@@ -43,7 +46,7 @@ export async function getPostureSummary(payload: ActionPayload & Record<string, 
   if (project && !p.enabledProjects.includes(project))
     return { error: 'invalid_input', message: `project ${project} is not enabled for Redline (enabled: ${p.enabledProjects.join(', ') || 'none'})` };
   const projects = project ? [project] : p.enabledProjects;
-  const empty = { ...postureSummary([], deps.clock.now()), projects, ...(team ? { team } : {}), issuesCounted: 0, expiring: [], truncated: false };
+  const empty = { ...postureSummary([], deps.clock.now()), projects, ...(team ? { team } : {}), issuesCounted: 0, expiring: [], hiddenExpiring: 0, truncated: false };
   if (projects.length === 0) return empty;
 
   const jql = `project in (${projects.map(jqlString).join(', ')}) AND issuetype in (${p.reviewIssueTypes.map(jqlString).join(', ')}) ORDER BY updated DESC`;
@@ -75,11 +78,13 @@ export async function getPostureSummary(payload: ActionPayload & Record<string, 
   }
   const keyOf = new Map(issues.map((x) => [x.id, x.key]));
   const horizon = now.getTime() + EXPIRING_WITHIN_DAYS * 86_400_000;
-  const expiring = acceptances
-    .filter((a) => a.state === 'active' && a.issueId !== undefined && keyOf.has(a.issueId) && new Date(a.expiresAt).getTime() <= horizon)
+  const due = acceptances.filter((a) => a.state === 'active' && a.issueId !== undefined && keyOf.has(a.issueId) && new Date(a.expiresAt).getTime() <= horizon);
+  const shown = await splitVisibleAcceptances(deps, caller, due);
+  const hidden = shown.hidden;
+  const expiring = shown.visible
     .sort((a, b) => a.expiresAt.localeCompare(b.expiresAt))
     .slice(0, 100)
     .map((a) => ({ acceptanceId: a.id, issueKey: keyOf.get(a.issueId!)!, requirementId: a.requirementId, severity: a.severity, expiresAt: a.expiresAt }));
   log('action.posture', { projects: projects.length, issues: rows.length, expiring: expiring.length });
-  return { ...postureSummary(rows, now), projects, ...(team ? { team } : {}), issuesCounted: rows.length, expiring, truncated: found.value.length > POSTURE_MAX_ITEMS };
+  return { ...postureSummary(rows, now), projects, ...(team ? { team } : {}), issuesCounted: rows.length, expiring, hiddenExpiring: hidden, truncated: found.value.length > POSTURE_MAX_ITEMS };
 }

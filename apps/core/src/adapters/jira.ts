@@ -384,6 +384,18 @@ export function createJiraClient(request: FetchLike, opts: JiraClientOptions = {
     async browsable(accountId, issueIds) {
       const ids = [...new Set(issueIds.filter((id) => NUMERIC_ID.test(id)))];
       if (!accountId || ids.length === 0) return ok([]);
+      if (opts.asUser) {
+        // Apps get 403 asking permissions/check about other users; a search as the user returns only what they can see.
+        const seen = new Set<string>();
+        for (let i = 0; i < ids.length; i += 100) {
+          const r = await userCall(accountId)('/rest/api/3/search/jql', json('POST', { jql: `id in (${ids.slice(i, i + 100).join(',')})`, fields: ['id'], maxResults: 100 }));
+          if (!r.ok) return r;
+          const p = parse(z.object({ issues: z.array(z.object({ id: z.string() })) }), r.value, 'search');
+          if (!p.ok) return p;
+          for (const x of p.value.issues) seen.add(x.id);
+        }
+        return ok(ids.filter((id) => seen.has(id)));
+      }
       const allowed = new Set<number>();
       for (let i = 0; i < ids.length; i += 100) {
         const chunk = ids.slice(i, i + 100).map(Number);

@@ -80,6 +80,36 @@ describe('permission: the caller must be able to see (or edit) the work item', (
   });
 });
 
+describe('acceptances on requirements the caller cannot see (same rule as the panel)', () => {
+  async function withHiddenAcceptance(o: { allVerified?: boolean } = {}) {
+    const s = await reviewed(o);
+    // A requirement whose threat is in no review this caller can see (e.g. it cites a restricted page).
+    await s.t.deps.requirements.upsert({ ...s.req, id: 'req_hidden', threatId: 'thr_0000000000000000', status: 'AcceptedRisk' });
+    const expiresAt = new Date(s.t.clock.now().getTime() + 5 * 86_400_000).toISOString();
+    await appendLedger(s.t.deps.ledger, s.t.deps.clock, 'acceptance.requested', { acceptanceId: 'acc_hidden', requirementId: 'req_hidden', issueId: ISSUE, severity: 'High', reason: 'secret', controls: '', expiresAt, needsApprover: 'none' }, CHAMP);
+    s.t.jira.search = async () => ok([jiraIssue({ id: ISSUE, key: 'PAY-7', fixVersions: ['4.2'] })]);
+    return s;
+  }
+
+  it('posture-summary does not list them, only counts them', async () => {
+    const { t } = await withHiddenAcceptance();
+    const r = await getPostureSummary({ project: 'PAY', ...ctx(ME) }, t.deps);
+    if ('error' in r) throw new Error(r.error);
+    expect(JSON.stringify(r)).not.toContain('req_hidden');
+    expect(r.expiring).toEqual([]);
+    expect(r.hiddenExpiring).toBe(1);
+  });
+
+  it('release-readiness does not name them, but the call still accounts for them', async () => {
+    const { t } = await withHiddenAcceptance({ allVerified: true });
+    const r = await getReleaseReadiness({ fixVersion: '4.2', ...ctx(ME) }, t.deps);
+    if ('error' in r) throw new Error(r.error);
+    expect(JSON.stringify(r)).not.toContain('req_hidden');
+    expect(r.call).toBe('Conditional');
+    expect(r.conditions.join(' ')).toMatch(/1 accepted risk on a requirement you cannot see/);
+  });
+});
+
 describe('get-review', () => {
   it('returns the verdict, risk score, partial flag and threats with short refs and quoted citations', async () => {
     const { t } = await reviewed();

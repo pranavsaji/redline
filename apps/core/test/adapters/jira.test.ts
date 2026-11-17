@@ -370,6 +370,20 @@ describe('jira client: permission checks as the user (impersonation)', () => {
     expect(app.calls.some((c) => c.path.includes('permissions/check'))).toBe(false);
   });
 
+  it('browsable searches as the user (id in (…)), so Jira returns only what they can see; no app-level permissions/check', async () => {
+    const app = fakeHttp([]);
+    const bodies: string[] = [];
+    const user = () => (path: string, init?: { body?: string }) => {
+      bodies.push(`${path} ${init?.body ?? ''}`);
+      return fakeHttp([[/POST \/rest\/api\/3\/search\/jql/, { status: 200, body: JSON.stringify({ issues: [{ id: '20001', key: 'PAY-1', fields: {} }] }) }]]).request(path, init as never);
+    };
+    const jira = createJiraClient(app.request, { sleep: noSleep().sleep, asUser: user as never });
+    expect(await jira.browsable('acc-1', ['20001', '20002', 'x"; drop'])).toEqual({ ok: true, value: ['20001'] });
+    expect(bodies).toHaveLength(1);
+    expect(JSON.parse(bodies[0]!.split(' ').slice(1).join(' '))).toMatchObject({ jql: 'id in (20001,20002)', maxResults: 100 });
+    expect(app.calls).toHaveLength(0);
+  });
+
   it('a 404/403 for the user means no permission', async () => {
     const user = () => fakeHttp([[/mypermissions/, { status: 404, body: '{}' }]]).request;
     const jira = createJiraClient(fakeHttp([]).request, { sleep: noSleep().sleep, asUser: user });
