@@ -37,12 +37,13 @@ describe('settings resolvers', () => {
     expect(await settingsGet({ store: kvsSettingsStore(kv) }, { repoUuid: REPO })).toEqual({ publicKeys: {}, sensitivePaths: [], mode: 'block', diffScoreThreshold: 40 });
   });
 
-  it('only a repository admin can save; the saved settings are what the merge check reads', async () => {
+  it('saving is allowed only from the repository settings page (which Bitbucket shows to repository admins only)', async () => {
     const kv = memory();
     const store = kvsSettingsStore(kv);
-    expect(await settingsSave({ store, isRepoAdmin: async () => false }, { accountId: 'acc', repoUuid: REPO }, input)).toMatchObject({ error: 'forbidden' });
-    expect(await settingsSave({ store, isRepoAdmin: async () => { throw new Error('down'); } }, { accountId: 'acc', repoUuid: REPO }, input)).toMatchObject({ error: 'forbidden' });
-    expect(await settingsSave({ store, isRepoAdmin: async () => true }, { accountId: 'acc', repoUuid: REPO }, input)).toMatchObject({ publicKeys: { [a.kid]: a.publicKey } });
+    const page = { accountId: 'acc', repoUuid: REPO, moduleKey: 'redline-repo-settings' };
+    expect(await settingsSave({ store }, { ...page, moduleKey: 'something-else' }, input)).toMatchObject({ error: 'forbidden' });
+    expect(await settingsSave({ store }, { ...page, accountId: '' }, input)).toMatchObject({ error: 'forbidden' });
+    expect(await settingsSave({ store }, page, input)).toMatchObject({ publicKeys: { [a.kid]: a.publicKey } });
     expect(await store.get(REPO)).toMatchObject({ sensitivePaths: ['billing/**'] });
   });
 
@@ -55,6 +56,6 @@ describe('settings resolvers', () => {
 
   it('a malformed repository id is refused', async () => {
     const store = kvsSettingsStore(memory());
-    expect(await settingsSave({ store, isRepoAdmin: async () => true }, { accountId: 'acc', repoUuid: 'x/../y' }, input)).toMatchObject({ error: 'validation' });
+    expect(await settingsSave({ store }, { accountId: 'acc', repoUuid: 'x/../y', moduleKey: 'redline-repo-settings' }, input)).toMatchObject({ error: 'validation' });
   });
 });
