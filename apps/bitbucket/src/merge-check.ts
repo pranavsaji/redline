@@ -12,7 +12,16 @@ export interface RepoSettings {
 }
 export const DEFAULT_REPO_SETTINGS: RepoSettings = { publicKeys: {}, sensitivePaths: [], mode: 'block', diffScoreThreshold: 40 };
 
-export type Outcome = 'pass_attested' | 'pass_not_sensitive' | 'fail_missing' | 'fail_signature' | 'fail_stale_commit' | 'fail_expired' | 'fail_other_repo' | 'warn';
+export type Outcome =
+  | 'pass_attested'
+  | 'pass_not_sensitive'
+  | 'fail_missing'
+  | 'fail_signature'
+  | 'fail_stale_commit'
+  | 'fail_expired'
+  | 'fail_other_repo'
+  | 'fail_other_issue'
+  | 'warn';
 export interface CheckResult {
   success: boolean;
   message: string;
@@ -28,6 +37,7 @@ export interface PrFacts {
 }
 
 const ISSUE_KEY = /\b([A-Z][A-Z0-9]+-\d+)\b/;
+const ISSUE_KEYS = /\b([A-Z][A-Z0-9]+-\d+)\b/g;
 const MSG_SIGNATURE = 'Redline: attestation signature invalid. Copy a fresh attestation from the Jira issue panel.';
 const utcMinute = (sec: number) => `${new Date(sec * 1000).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 
@@ -117,6 +127,12 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
   // Bitbucket's pull request API reports 12-character hashes; the attestation carries all 40.
   if (head.length < 7 || !p.commitSha.startsWith(head))
     return { success: false, outcome: 'fail_stale_commit', message: `Redline: attestation is for commit ${p.commitSha.slice(0, 7)} but the PR head is ${head.slice(0, 7)}. Request a new attestation for the latest commit.` };
+  // The attestation must be for a work item this PR names: otherwise any passing item's token could carry a blocked change.
+  const named = [...new Set([...(i.pr.title ?? '').matchAll(ISSUE_KEYS), ...(i.pr.branch ?? '').matchAll(ISSUE_KEYS)].map((m) => m[1]!))];
+  if (named.length === 0)
+    return { success: false, outcome: 'fail_other_issue', message: `Redline: this pull request names no Jira work item. Put the work item key (${p.issueKey}) in the pull request title or branch name, then re-run the check.` };
+  if (!named.includes(p.issueKey))
+    return { success: false, outcome: 'fail_other_issue', message: `Redline: the attestation is for ${p.issueKey}, but this pull request is for ${named.join(', ')}. Request an attestation from ${named[0]}.` };
   const verified = p.requirements.filter((r) => r.status === 'Verified').length;
   const pass = `Redline: attested by ${p.issueKey}, ${verified} requirements verified.`;
   const lenient = p.override === 'break_glass' ? 'Warning: attested under a break-glass override. ' : p.override === 'warn_only' ? 'Warning: attested under warn-only mode. ' : '';

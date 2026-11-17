@@ -105,6 +105,20 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
     expect(await run(token({ iat: NOW - 90_000, exp: NOW - 3600 }))).toEqual({ success: false, outcome: 'fail_expired', message: 'Redline: attestation expired at 2025-11-15 11:00 UTC. Request a new one.' });
   });
 
+  it('security: an attestation for a different work item than the PR names fails (no borrowing a passing item’s token)', async () => {
+    const r = await run(token({ issueKey: 'PAY-99' }));
+    expect(r).toEqual({
+      success: false,
+      outcome: 'fail_other_issue',
+      message: 'Redline: the attestation is for PAY-99, but this pull request is for PAY-7. Request an attestation from PAY-7.',
+    });
+  });
+
+  it('security: a PR that names no work item cannot pass on an attestation', async () => {
+    const r = await evaluateMergeCheck({ pr: { ...pr(token()), title: 'Tidy', branch: 'tidy' }, files: AUTH, repoPolicyYaml: null, settings: settings(), nowSec: NOW });
+    expect(r).toMatchObject({ success: false, outcome: 'fail_other_issue', message: expect.stringMatching(/Put the work item key \(PAY-7\) in the pull request title or branch name/) });
+  });
+
   it('warn mode turns a failure into success with a Warning: prefix', async () => {
     const r = await run('', { s: settings({ mode: 'warn' }) });
     expect(r).toMatchObject({ success: true, outcome: 'warn' });
