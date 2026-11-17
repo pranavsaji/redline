@@ -11,6 +11,8 @@ const tile = {
   border: `1px solid ${token('color.border')}`,
   background: token('elevation.surface'),
   textAlign: 'left' as const,
+  boxSizing: 'border-box' as const,
+  margin: 0,
   color: token('color.text'),
   font: 'inherit',
 };
@@ -22,7 +24,7 @@ const hours = (h: number | null) => (h === null ? 'No data yet' : h < 48 ? `${Ma
 /** PR-1's KPI row. Severity counts are buttons that drill down; the rest are plain figures. */
 export function KpiRow({ dto, onDrill, onExpiring }: { dto: PostureDto; onDrill: (q: DrillQuery, title: string) => void; onExpiring: () => void }) {
   const sev = (s: Severity) => (
-    <li key={s}>
+    <li key={s} style={{ display: 'flex', margin: 0 }}>
       <button type="button" style={{ ...tile, cursor: 'pointer' }} aria-label={`Open ${s}: ${dto.openBySeverity[s]}. Show the work items`} onClick={() => onDrill({ severity: s }, `open ${s}`)}>
         <span style={label}>Open {s}</span>
         <span style={value}>{dto.openBySeverity[s]}</span>
@@ -31,20 +33,20 @@ export function KpiRow({ dto, onDrill, onExpiring }: { dto: PostureDto; onDrill:
   );
   return (
     <div style={{ display: 'grid', gap: 8 }}>
-      <ul aria-label="Key numbers" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      <ul aria-label="Key numbers" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', gap: 8 }}>
         {sev('Critical')}
         {sev('High')}
-        <li>
+        <li style={{ display: 'flex', margin: 0 }}>
           <button type="button" style={{ ...tile, cursor: 'pointer' }} aria-label={`Expiring in 14 days: ${dto.expiringIn14d}. Show the acceptances`} onClick={onExpiring}>
             <span style={label}>Expiring in 14 days</span>
             <span style={value}>{dto.expiringIn14d}</span>
           </button>
         </li>
-        <li style={tile}>
+        <li style={{ ...tile, margin: 0 }}>
           <span style={label}>Mean time to verify</span>
           <span style={value}>{hours(dto.meanTimeToVerifyHours)}</span>
         </li>
-        <li style={tile}>
+        <li style={{ ...tile, margin: 0 }}>
           <span style={label}>Reviews in flight</span>
           <span style={value}>{dto.inFlight}</span>
         </li>

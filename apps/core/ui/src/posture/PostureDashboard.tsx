@@ -60,7 +60,7 @@ export function PostureDashboard({ api, compact = false }: { api: PostureApi; co
   );
 
   return (
-    <main aria-labelledby={`${id}-h`} style={{ display: 'grid', gap: 20, padding: 16, maxWidth: 1040, color: token('color.text'), background: token('elevation.surface') }}>
+    <main aria-labelledby={`${id}-h`} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 20, padding: 16, maxWidth: 1040, color: token('color.text'), background: token('elevation.surface') }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
         {heading}
         {!compact && projects.length > 1 && (
@@ -104,7 +104,7 @@ export function PostureDashboard({ api, compact = false }: { api: PostureApi; co
                 </h2>
                 <Heatmap dto={dto} onDrill={openDrill} />
               </section>
-              <section aria-labelledby={`${id}-trend`} style={{ display: 'grid', gap: 8 }}>
+              <section aria-labelledby={`${id}-trend`} style={{ display: 'grid', gap: 8, minWidth: 0 }}>
                 <h2 id={`${id}-trend`} style={{ margin: 0, font: token('font.heading.small') }}>
                   Trend
                 </h2>

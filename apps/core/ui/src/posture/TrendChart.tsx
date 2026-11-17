@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { token } from '@atlaskit/tokens';
 import type { PostureDto } from '../types.js';
 
@@ -8,7 +8,7 @@ const PALETTE_CSS = `
 html[data-color-mode="dark"] .rl-trend { --rl-crit: #E2483D; --rl-high: #8F7EE7; }
 @media (forced-colors: active) { .rl-trend { --rl-crit: CanvasText; --rl-high: CanvasText; } }
 `;
-const W = 640;
+const DEFAULT_W = 640;
 const H = 220;
 const PAD = { top: 16, right: 72, bottom: 28, left: 36 };
 
@@ -22,6 +22,16 @@ const SERIES = [
 export function TrendChart({ trend, shown }: { trend: Point[]; shown: boolean }) {
   const id = useId();
   const [hover, setHover] = useState<number | null>(null);
+  // Draw at the real width so 11px text stays 11px on a phone and on a wide screen.
+  const box = useRef<HTMLDivElement>(null);
+  const [W, setW] = useState(DEFAULT_W);
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(([e]) => e && e.contentRect.width > 0 && setW(Math.max(280, Math.round(e.contentRect.width))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [shown, trend.length]);
   const title = 'Open Critical and High requirements, last 30 days';
   if (!shown) return <p style={{ margin: 0 }}>The 30-day trend counts every Redline work item on the site, so it is shown to security champions and Jira admins only.</p>;
   if (trend.length < 2) return <p style={{ margin: 0 }}>The trend appears once Redline has taken two daily snapshots.</p>;
@@ -36,7 +46,7 @@ export function TrendChart({ trend, shown }: { trend: Point[]; shown: boolean })
   const h = hover === null ? null : trend[hover]!;
 
   return (
-    <figure aria-labelledby={`${id}-t`} className="rl-trend" style={{ margin: 0, display: 'grid', gap: 8 }}>
+    <figure aria-labelledby={`${id}-t`} className="rl-trend" style={{ margin: 0, display: 'grid', gap: 8, minWidth: 0 }}>
       <style>{PALETTE_CSS}</style>
       <figcaption id={`${id}-t`} style={{ font: token('font.body'), color: token('color.text') }}>
         {title}
@@ -51,8 +61,8 @@ export function TrendChart({ trend, shown }: { trend: Point[]; shown: boolean })
           </li>
         ))}
       </ul>
-      <div style={{ position: 'relative' }}>
-        <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`${title}. Today: ${last.openCritical} Critical, ${last.openHigh} High. The table below has every day.`} onMouseLeave={() => setHover(null)}>
+      <div ref={box} style={{ position: 'relative', width: '100%', minWidth: 0 }}>
+        <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} style={{ display: 'block', maxWidth: '100%', height: 'auto' }} role="img" aria-label={`${title}. Today: ${last.openCritical} Critical, ${last.openHigh} High. The table below has every day.`} onMouseLeave={() => setHover(null)}>
           {ticks.map((t) => (
             <g key={t}>
               <line x1={PAD.left} x2={W - PAD.right} y1={y(t)} y2={y(t)} stroke={token('color.border')} strokeWidth="1" />

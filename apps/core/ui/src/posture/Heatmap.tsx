@@ -19,7 +19,7 @@ export function Heatmap({ dto, onDrill }: { dto: PostureDto; onDrill: (q: DrillQ
   if (teams.length === 0) return <p style={{ margin: 0 }}>No open requirements in the work items you can see.</p>;
   return (
     <div style={{ overflowX: 'auto' }}>
-      <table aria-label="Open requirements by project and component" style={{ borderCollapse: 'separate', borderSpacing: 2, font: token('font.body') }}>
+      <table aria-label="Open requirements by project and component" style={{ width: 'auto', borderCollapse: 'separate', borderSpacing: 2, font: token('font.body') }}>
         <thead>
           <tr>
             <th scope="col" style={{ textAlign: 'left', padding: '4px 8px', color: token('color.text.subtle'), font: token('font.body.small') }}>
