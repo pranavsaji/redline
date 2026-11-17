@@ -7,7 +7,7 @@ import { StrideSchema } from '@redline/shared';
 
 type Mod = Record<string, unknown>;
 const root = join(import.meta.dirname, '..', '..');
-const m = parse(readFileSync(join(root, 'manifest.yml'), 'utf8')) as { modules: Record<string, Mod[]>; resources: Mod[] };
+const m = parse(readFileSync(join(root, 'manifest.yml'), 'utf8')) as { app: Mod; modules: Record<string, Mod[]>; resources: Mod[] };
 const actions = new Map(m.modules.action!.map((a) => [a.key as string, a]));
 
 const VERBS: Record<string, string> = {
@@ -24,6 +24,10 @@ const VERBS: Record<string, string> = {
 const MCP_TOOLS = ['get-review', 'get-security-requirements', 'check-change-risk', 'get-merge-attestation', 'request-risk-acceptance', 'explain-threat', 'posture-summary'];
 
 describe('manifest: Rovo actions, skill and MCP (Task 28)', () => {
+  it('shares one installation across Jira and Confluence, so MCP, page events and the agent see Jira data', () => {
+    expect(m.app.compatibility).toEqual({ jira: { required: true }, confluence: { required: false } });
+  });
+
   it('declares every spec action with its verb, a handler, and primitive inputs only', () => {
     const fns = new Set(m.modules.function!.map((f) => f.key));
     for (const [key, verb] of Object.entries(VERBS)) {

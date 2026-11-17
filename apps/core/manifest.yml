@@ -5,6 +5,11 @@ app:
   package:
     bundler: manual@2026
     path: dist
+  compatibility:
+    jira:
+      required: true
+    confluence:
+      required: false
 modules:
   sql:
     - key: main
