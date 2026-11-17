@@ -9,6 +9,8 @@ const VERDICT: Record<'pass' | 'block' | 'warn', { label: string; icon: string; 
   warn: { label: 'Warn only', icon: '!', appearance: 'moved' },
 };
 
+const OVERRIDDEN = { label: 'Gate overridden (break-glass)', icon: '!', appearance: 'moved' as const };
+
 function relative(iso: string, now = Date.now()): string {
   const m = Math.round((now - Date.parse(iso)) / 60_000);
   if (!Number.isFinite(m)) return '';
@@ -21,7 +23,9 @@ function relative(iso: string, now = Date.now()): string {
 /** Risk ring, verdict (icon + words, never colour alone), last reviewed time, then the top three actions. */
 export function Header({ dto }: { dto: PanelDto }) {
   const v = dto.verdict;
-  const meta = v ? VERDICT[v.state] : null;
+  const overridden = v?.state === 'pass' && v.overridden === true;
+  const meta = overridden ? OVERRIDDEN : v ? VERDICT[v.state] : null;
+  const utc = (iso: string) => `${iso.slice(0, 16).replace('T', ' ')} UTC`;
   const actions = (v?.reasons ?? []).slice(0, 3);
   return (
     <header style={{ display: 'grid', gap: 10 }}>
@@ -35,6 +39,7 @@ export function Header({ dto }: { dto: PanelDto }) {
                 {meta.label}
               </Lozenge>
               {v?.state === 'warn' && v.validUntil && <span style={{ marginLeft: 8, color: token('color.text.subtle') }}>until {new Date(v.validUntil).toLocaleDateString()}</span>}
+              {overridden && v?.validUntil && <span style={{ marginLeft: 8, color: token('color.text.subtle') }}>until {utc(v.validUntil)}</span>}
             </span>
           ) : (
             <Lozenge>Not reviewed</Lozenge>
@@ -44,7 +49,7 @@ export function Header({ dto }: { dto: PanelDto }) {
           </span>
         </div>
       </div>
-      {actions.length > 0 && v?.state !== 'pass' && (
+      {actions.length > 0 && (v?.state !== 'pass' || overridden) && (
         <ul aria-label="What to do next" style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 4 }}>
           {actions.map((a, i) => (
             <li key={`${a.code}-${i}`}>

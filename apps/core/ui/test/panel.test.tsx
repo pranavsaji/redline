@@ -51,6 +51,20 @@ describe('IssuePanel states render their key text', () => {
   });
 });
 
+describe('break-glass override in the header', () => {
+  it('says the gate is overridden and until when, and keeps the reasons visible', async () => {
+    const base = mockApi('ready');
+    const dto = await base.get();
+    if ('error' in dto) throw new Error('fixture');
+    const api: PanelApi = { ...base, get: async () => ({ ...dto, verdict: { ...dto.verdict!, state: 'pass', overridden: true, validUntil: '2026-11-17T10:57:00.000Z' } }) };
+    await renderState('ready', api);
+    expect(screen.getByText(/Gate overridden/)).toBeTruthy();
+    expect(screen.getByText(/until 2026-11-17 10:57 UTC/)).toBeTruthy();
+    expect(screen.queryByText('Ready for Done')).toBeNull();
+    expect(screen.getByRole('list', { name: 'What to do next' })).toBeTruthy();
+  });
+});
+
 describe('ready state', () => {
   it('shows the risk score as text, plain-language titles first, and verdict with an icon and words', async () => {
     await renderState('ready');
