@@ -116,6 +116,154 @@ modules:
           type: string
           required: true
           description: The full 40-character hash of the pull request's head commit
+    - key: get-review
+      name: Get Redline review
+      function: getReviewFn
+      actionVerb: GET
+      description: Returns Redline's latest security review of a Jira work item - the verdict and why, risk score, whether the context was partial, and the threats with short refs (T-1, T-2...) and quoted citations.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: true
+          description: The Jira work item key, for example PAY-7
+    - key: get-security-requirements
+      name: Get security requirements
+      function: getRequirementsFn
+      actionVerb: GET
+      description: Returns the security requirements for a Jira work item with their acceptance criteria, OWASP ASVS ids, status and the file paths they usually concern. Call this before editing code for the work item.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: true
+          description: The Jira work item key, for example PAY-7
+        status:
+          title: Status
+          type: string
+          required: false
+          description: Only requirements with this status - Open, InProgress, Verified, AcceptedRisk or NotApplicable. Leave empty for all.
+    - key: check-change-risk
+      name: Check change risk
+      function: checkChangeRiskFn
+      actionVerb: GET
+      description: Previews Redline's Bitbucket merge check for a change - whether the changed files are security-sensitive, which requirements they touch, and whether the merge would pass. Call this before opening a pull request.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: true
+          description: The Jira work item key, for example PAY-7
+        changedPaths:
+          title: Changed paths
+          type: string
+          required: true
+          description: The changed file paths, comma-separated, for example src/auth/session.ts,src/app.ts
+        summary:
+          title: Change summary
+          type: string
+          required: false
+          description: One line on what the change does (optional)
+    - key: request-risk-acceptance
+      name: Request risk acceptance
+      function: requestAcceptanceFn
+      actionVerb: CREATE
+      description: Requests a time-boxed risk acceptance for one Redline security requirement. It is recorded in Redline's ledger and stays pending until a tech lead or security champion approves it in the Redline panel. It never takes effect on its own.
+      inputs:
+        requirementId:
+          title: Requirement id
+          type: string
+          required: true
+          description: The Redline requirement id (req_...) from get-security-requirements
+        reason:
+          title: Reason
+          type: string
+          required: true
+          description: Why the risk is acceptable for now, at least 10 characters
+        controls:
+          title: Compensating controls
+          type: string
+          required: false
+          description: What reduces the risk meanwhile, for example a WAF rule
+        expiryDays:
+          title: Expiry in days
+          type: integer
+          required: true
+          description: How many days the acceptance lasts (Critical at most 30, others at most 90 by default)
+    - key: explain-threat
+      name: Explain threat
+      function: explainThreatFn
+      actionVerb: GET
+      description: Explains one threat from a Redline review in plain language - how the attack works, how to fix it, and OWASP and CWE references.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: true
+          description: The Jira work item key, for example PAY-7
+        threatId:
+          title: Threat
+          type: string
+          required: true
+          description: The threat's ref from get-review (for example T-3) or its id (thr_...)
+    - key: release-readiness
+      name: Check release readiness
+      function: releaseReadinessFn
+      actionVerb: GET
+      description: Says whether a Jira fix version is safe to ship - Go, Go with conditions, or No-go - with the blocking work items and the risk acceptances that expire soon.
+      inputs:
+        fixVersion:
+          title: Fix version
+          type: string
+          required: true
+          description: The Jira fix version name, for example 4.2
+    - key: start-review
+      name: Start Redline review
+      function: startReviewFn
+      actionVerb: TRIGGER
+      description: Queues a fresh Redline security review of a Jira work item. The result appears in the Redline panel in a minute or two.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: true
+          description: The Jira work item key, for example PAY-7
+    - key: posture-summary
+      name: Get security posture
+      function: postureSummaryFn
+      actionVerb: GET
+      description: Summarises security posture across Redline-enabled projects - open requirements by severity, the riskiest components, and the risk acceptances that expire in the next 31 days (soonest first).
+      inputs:
+        project:
+          title: Project key
+          type: string
+          required: false
+          description: Only this Jira project, for example PAY. Leave empty for all Redline-enabled projects.
+        team:
+          title: Team or component
+          type: string
+          required: false
+          description: Only work items in this Jira component (optional)
+  rovo:skill:
+    - key: threat-model-review
+      source:
+        dir: skills/threat-model-review
+      dependencies:
+        tools:
+          - get-security-requirements
+          - check-change-risk
+          - get-merge-attestation
+  rovo:mcp:
+    - key: redline-mcp
+      name: Redline
+      tools:
+        - get-review
+        - get-security-requirements
+        - check-change-risk
+        - get-merge-attestation
+        - request-risk-acceptance
+        - explain-threat
+        - posture-summary
   rovo:agent:
     - key: redline-reviewer
       name: Redline
@@ -126,7 +274,8 @@ modules:
         - Is release 4.2 safe to ship?
         - Which acceptances expire this month?
         - Explain threat T-7 like I'm new to security
-      actions: [ get-review-context, submit-threat-model, get-merge-attestation ]
+      actions: [ get-review-context, submit-threat-model, get-review, get-security-requirements, check-change-risk, get-merge-attestation, request-risk-acceptance, explain-threat, release-readiness, start-review, posture-summary ]
+      skills: [ threat-model-review ]
   function:
     - key: lifecycleFn
       handler: index.lifecycleHandler
@@ -151,6 +300,22 @@ modules:
       handler: index.submitThreatModelHandler
     - key: getMergeAttestationFn
       handler: index.getMergeAttestationHandler
+    - key: getReviewFn
+      handler: index.getReviewHandler
+    - key: getRequirementsFn
+      handler: index.getSecurityRequirementsHandler
+    - key: checkChangeRiskFn
+      handler: index.checkChangeRiskHandler
+    - key: requestAcceptanceFn
+      handler: index.requestRiskAcceptanceHandler
+    - key: explainThreatFn
+      handler: index.explainThreatHandler
+    - key: releaseReadinessFn
+      handler: index.releaseReadinessHandler
+    - key: startReviewFn
+      handler: index.startReviewHandler
+    - key: postureSummaryFn
+      handler: index.postureSummaryHandler
     - key: validateTransitionFn
       handler: index.validateTransitionHandler
 resources:

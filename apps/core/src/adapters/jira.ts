@@ -57,6 +57,8 @@ export interface JiraClient {
   remoteLinks(issueId: string): Promise<Result<Array<{ url: string; title: string }>>>;
   canBrowse(accountId: string, issueId: string): Promise<Result<boolean>>;
   canEdit(accountId: string, issueId: string): Promise<Result<boolean>>;
+  /** Of these numeric issue ids, the ones the user may browse (one permission check per 100 ids). */
+  browsable(accountId: string, issueIds: readonly string[]): Promise<Result<string[]>>;
   groupsOf(accountId: string): Promise<Result<string[]>>;
   isAdmin(accountId: string): Promise<Result<boolean>>;
   setProperty(issueId: string, key: string, value: unknown): Promise<Result<void>>;
@@ -378,6 +380,25 @@ export function createJiraClient(request: FetchLike, opts: JiraClientOptions = {
 
     canBrowse: (accountId, issueId) => hasIssuePermission(accountId, issueId, 'BROWSE_PROJECTS'),
     canEdit: (accountId, issueId) => hasIssuePermission(accountId, issueId, 'EDIT_ISSUES'),
+
+    async browsable(accountId, issueIds) {
+      const ids = [...new Set(issueIds.filter((id) => NUMERIC_ID.test(id)))];
+      if (!accountId || ids.length === 0) return ok([]);
+      const allowed = new Set<number>();
+      for (let i = 0; i < ids.length; i += 100) {
+        const chunk = ids.slice(i, i + 100).map(Number);
+        const r = await call('/rest/api/3/permissions/check', json('POST', { accountId, projectPermissions: [{ permissions: ['BROWSE_PROJECTS'], issues: chunk }] }));
+        if (!r.ok) return r;
+        const p = parse(
+          z.object({ projectPermissions: z.array(z.object({ permission: z.string(), issues: z.array(z.number()).nullish() })).nullish() }),
+          r.value,
+          'permissions check',
+        );
+        if (!p.ok) return p;
+        for (const pp of p.value.projectPermissions ?? []) if (pp.permission === 'BROWSE_PROJECTS') for (const n of pp.issues ?? []) if (chunk.includes(n)) allowed.add(n);
+      }
+      return ok(ids.filter((id) => allowed.has(Number(id))));
+    },
 
     async groupsOf(accountId) {
       if (!accountId) return ok([]);

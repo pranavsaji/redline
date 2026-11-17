@@ -132,6 +132,19 @@ describe('jira client: permissions', () => {
     expect(calls).toHaveLength(0);
   });
 
+  it('browsable checks many work items in one request per 100 and returns the allowed ids', async () => {
+    const ids = Array.from({ length: 101 }, (_, i) => String(20000 + i));
+    const { jira, calls } = client([
+      [/permissions\/check/, { status: 200, body: JSON.stringify({ projectPermissions: [{ permission: 'BROWSE_PROJECTS', issues: [20000, 20100] }] }) }],
+    ]);
+    const r = await jira.browsable('acc-1', [...ids, 'not-an-id']);
+    expect(r).toEqual({ ok: true, value: ['20000', '20100'] });
+    expect(calls).toHaveLength(2);
+    expect(JSON.parse(calls[0]!.init!.body!).projectPermissions[0].issues).toHaveLength(100);
+    expect(await jira.browsable('', ids)).toEqual({ ok: true, value: [] });
+    expect(calls).toHaveLength(2);
+  });
+
   it('canEdit asks for EDIT_ISSUES', async () => {
     const { jira, calls } = client([
       [/permissions\/check/, { status: 200, body: '{"projectPermissions":[{"permission":"EDIT_ISSUES","issues":[10042]}]}' }],

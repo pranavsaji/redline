@@ -54,6 +54,15 @@ export function fakeJira(issues: JiraIssue[]): JiraClient & { props: Map<string,
     remoteLinks: async () => ok([]),
     canBrowse: async () => ok(true),
     canEdit: async () => ok(true),
+    async browsable(accountId, ids) {
+      const out: string[] = [];
+      for (const id of ids) {
+        const r = await this.canBrowse(accountId, id);
+        if (!r.ok) return r;
+        if (r.value) out.push(id);
+      }
+      return ok(out);
+    },
     groupsOf: async () => ok([]),
     isAdmin: async () => ok(false),
     setProperty: async (id, key, value) => {

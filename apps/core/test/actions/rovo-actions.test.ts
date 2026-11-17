@@ -1,0 +1,277 @@
+import { describe, expect, it } from 'vitest';
+import { ok, type Requirement } from '@redline/shared';
+import { getReview } from '../../src/actions/get-review.js';
+import { getSecurityRequirements } from '../../src/actions/get-security-requirements.js';
+import { checkChangeRisk } from '../../src/actions/check-change-risk.js';
+import { requestRiskAcceptance } from '../../src/actions/request-risk-acceptance.js';
+import { explainThreat } from '../../src/actions/explain-threat.js';
+import { getReleaseReadiness } from '../../src/actions/release-readiness.js';
+import { startReview } from '../../src/actions/start-review.js';
+import { getPostureSummary } from '../../src/actions/posture-summary.js';
+import { fitJson, MAX_ACTION_BYTES } from '../../src/actions/schemas.js';
+import { jiraIssue } from '../support/core-deps.js';
+import { appendLedger } from '@redline/core';
+import { CHAMP, DEV, ISSUE, reviewed } from '../support/reviewed.js';
+
+const ctx = (accountId?: string) => ({ context: accountId ? { accountId, agentId: 'agent-1', cloudId: 'c' } : {} });
+const ME = 'acc-plain';
+const bytes = (v: unknown) => Buffer.byteLength(JSON.stringify(v), 'utf8');
+
+describe('every action validates its inputs with a schema message', () => {
+  it.each([
+    ['get-review', { issueKey: 'not a key' }, /issueKey/],
+    ['get-security-requirements', { issueKey: 'PAY-7', status: 'Done' }, /status/],
+    ['check-change-risk', { issueKey: 'PAY-7', changedPaths: ' , ' }, /changedPaths/],
+    ['request-risk-acceptance', { requirementId: 'req_1', reason: 'r', controls: '', expiryDays: 0 }, /expiryDays/],
+    ['explain-threat', { issueKey: 'PAY-7', threatId: '<script>' }, /threatId/],
+    ['release-readiness', { fixVersion: '' }, /fixVersion/],
+    ['start-review', { issueKey: 7 }, /issueKey/],
+    ['posture-summary', { project: 'not a project!' }, /project/],
+  ] as const)('%s', async (name, input, message) => {
+    const { t } = await reviewed();
+    const fns = {
+      'get-review': getReview,
+      'get-security-requirements': getSecurityRequirements,
+      'check-change-risk': checkChangeRisk,
+      'request-risk-acceptance': requestRiskAcceptance,
+      'explain-threat': explainThreat,
+      'release-readiness': getReleaseReadiness,
+      'start-review': startReview,
+      'posture-summary': getPostureSummary,
+    } as const;
+    const r = (await fns[name]({ ...(input as object), ...ctx(ME) } as never, t.deps)) as { error?: string; message?: string };
+    expect(r.error).toBe('invalid_input');
+    expect(r.message).toMatch(message);
+  });
+});
+
+describe('permission: the caller must be able to see (or edit) the work item', () => {
+  it('a caller who cannot browse gets not_found from every read action, and no caller is not_found too', async () => {
+    const { t, req } = await reviewed();
+    t.jira.canBrowse = async () => ok(false);
+    for (const caller of [ME, undefined]) {
+      expect(await getReview({ issueKey: 'PAY-7', ...ctx(caller) }, t.deps)).toEqual({ error: 'not_found' });
+      expect(await getSecurityRequirements({ issueKey: 'PAY-7', ...ctx(caller) }, t.deps)).toEqual({ error: 'not_found' });
+      expect(await checkChangeRisk({ issueKey: 'PAY-7', changedPaths: 'src/auth/session.ts', ...ctx(caller) }, t.deps)).toEqual({ error: 'not_found' });
+      expect(await explainThreat({ issueKey: 'PAY-7', threatId: 'T-1', ...ctx(caller) }, t.deps)).toEqual({ error: 'not_found' });
+    }
+    expect(await getReview({ issueKey: 'PAY-404', ...ctx(ME) }, t.deps)).toEqual({ error: 'not_found' });
+    void req;
+  });
+
+  it('writes need edit permission: request-risk-acceptance and start-review refuse a browse-only caller', async () => {
+    const { t, req } = await reviewed();
+    t.jira.canEdit = async () => ok(false);
+    expect(await requestRiskAcceptance({ requirementId: req.id, reason: 'Compensating control in place until Q1', controls: 'WAF rule', expiryDays: 14, ...ctx(ME) }, t.deps)).toEqual({ error: 'not_found' });
+    expect(await startReview({ issueKey: 'PAY-7', ...ctx(ME) }, t.deps)).toEqual({ error: 'not_found' });
+    expect(t.pushed).toHaveLength(0);
+  });
+
+  it('release-readiness and posture-summary leave out work items the caller cannot browse', async () => {
+    const { t } = await reviewed();
+    const hidden = jiraIssue({ id: '10099', key: 'PAY-99', fixVersions: ['4.2'] });
+    t.jira.search = async () => ok([jiraIssue({ id: ISSUE, key: 'PAY-7', fixVersions: ['4.2'] }), hidden]);
+    t.jira.browsable = async (_a, ids) => ok(ids.filter((id) => id !== '10099'));
+    const r = await getReleaseReadiness({ fixVersion: '4.2', ...ctx(ME) }, t.deps);
+    expect('items' in r && r.items).toBe(1);
+    expect(JSON.stringify(r)).not.toContain('PAY-99');
+    const p = await getPostureSummary({ project: 'PAY', ...ctx(ME) }, t.deps);
+    expect('issuesCounted' in p && p.issuesCounted).toBe(1);
+  });
+});
+
+describe('get-review', () => {
+  it('returns the verdict, risk score, partial flag and threats with short refs and quoted citations', async () => {
+    const { t } = await reviewed();
+    const r = await getReview({ issueKey: 'pay-7', ...ctx(ME) }, t.deps);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.issueKey).toBe('PAY-7');
+    expect(r.verdict?.state).toBe('block');
+    expect(r.partial).toBe(false);
+    expect(r.threats[0]!.ref).toBe('T-1');
+    expect(r.threats.some((x) => /forged refund webhooks/i.test(x.title))).toBe(true);
+    expect(r.threats[0]!.citations[0]!.quote.length).toBeGreaterThan(0);
+    expect(r.panelUrl).toMatch(/^https:\/\/one-atlas-mefc\.atlassian\.net\/browse\/PAY-7/);
+  });
+});
+
+describe('get-security-requirements', () => {
+  it('filters by status and returns acceptance criteria, ASVS ids and file hints', async () => {
+    const { t, req } = await reviewed();
+    const r = await getSecurityRequirements({ issueKey: 'PAY-7', status: 'Open', ...ctx(ME) }, t.deps);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.requirements.map((x) => x.id)).toEqual([req.id]);
+    expect(r.requirements[0]!.acceptanceCriteria[0]).toMatch(/^Given .+, when .+, then .+/);
+    expect(Array.isArray(r.requirements[0]!.asvsIds)).toBe(true);
+    expect(Array.isArray(r.requirements[0]!.fileHints)).toBe(true);
+  });
+
+  it(`never returns more than ${MAX_ACTION_BYTES} bytes: a huge list is cut and marked truncated`, async () => {
+    const { t, req } = await reviewed();
+    const long = 'x'.repeat(1000);
+    for (let i = 0; i < 400; i++)
+      await t.deps.requirements.upsert({ ...req, id: `req_big_${i}`, status: 'Verified', title: `Requirement ${i} ${'y'.repeat(200)}`, criteria: [{ given: long, when: long, then: long }] } as Requirement);
+    const r = await getSecurityRequirements({ issueKey: 'PAY-7', ...ctx(ME) }, t.deps);
+    if ('error' in r) throw new Error(r.error);
+    expect(bytes(r)).toBeLessThanOrEqual(MAX_ACTION_BYTES);
+    expect(r.truncated).toBe(true);
+    expect(r.requirements.length).toBeGreaterThan(0);
+  });
+});
+
+describe('fitJson', () => {
+  it('halves the named arrays until the value fits, and says so', () => {
+    const v = { items: Array.from({ length: 1000 }, (_, i) => ({ i, pad: 'z'.repeat(500) })), keep: 'me' };
+    const out = fitJson(v, ['items'], 50_000);
+    expect(bytes(out)).toBeLessThanOrEqual(50_000);
+    expect(out.truncated).toBe(true);
+    expect(out.keep).toBe('me');
+    expect(fitJson({ items: [1] }, ['items'])).toEqual({ items: [1], truncated: false });
+  });
+});
+
+describe('check-change-risk', () => {
+  async function withSessionRequirement() {
+    const s = await reviewed();
+    const all = await s.reqs();
+    const session = all.find((r) => r.id !== s.req.id)!;
+    await s.t.deps.requirements.upsert({ ...session, title: 'Sessions expire after logout', status: 'Open', fileHints: ['**/auth/**', '**/session*'] });
+    return { ...s, session };
+  }
+
+  it('src/auth/session.ts → wouldPass false, listing the session requirement and why', async () => {
+    const { t, session } = await withSessionRequirement();
+    const r = await checkChangeRisk({ issueKey: 'PAY-7', changedPaths: 'src/auth/session.ts, README.md', summary: 'rotate session ids', ...ctx(ME) }, t.deps);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.wouldPass).toBe(false);
+    expect(r.needsAttestation).toBe(true);
+    expect(r.touchedRequirements.map((x) => x.id)).toContain(session.id);
+    expect(r.touchedRequirements.find((x) => x.id === session.id)?.paths).toEqual(['src/auth/session.ts']);
+    expect(r.reasons.join(' ')).toMatch(/src\/auth\/session\.ts/);
+  });
+
+  it('a change that touches no sensitive path still passes (it merges freely)', async () => {
+    const { t } = await withSessionRequirement();
+    const r = await checkChangeRisk({ issueKey: 'PAY-7', changedPaths: 'README.md,docs/intro.md', ...ctx(ME) }, t.deps);
+    if ('error' in r) throw new Error(r.error);
+    expect(r).toMatchObject({ wouldPass: true, needsAttestation: false, touchedRequirements: [] });
+  });
+
+  it('a sensitive change on a work item whose verdict passes would pass', async () => {
+    const { t } = await reviewed({ allVerified: true });
+    const r = await checkChangeRisk({ issueKey: 'PAY-7', changedPaths: 'src/payments/refund.ts', ...ctx(ME) }, t.deps);
+    if ('error' in r) throw new Error(r.error);
+    expect(r).toMatchObject({ wouldPass: true, needsAttestation: true });
+  });
+});
+
+describe('request-risk-acceptance', () => {
+  it('creates a pending acceptance in the ledger and names the approver', async () => {
+    const { t, req } = await reviewed();
+    const r = await requestRiskAcceptance({ requirementId: req.id, reason: 'Provider signs payloads; we verify next sprint', controls: 'IP allow-list', expiryDays: 14, ...ctx(ME) }, t.deps);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.acceptanceId).toMatch(/^acc_/);
+    expect(r.state).toBe('pending');
+    expect(r.message).toMatch(/approve/i);
+    const rows = await t.deps.ledger.all();
+    expect(rows.ok && rows.value.map((x) => x.eventType)).toContain('acceptance.requested');
+  });
+
+  it('an agent never grants risk: a tech lead asking through Rovo or MCP still needs a second person', async () => {
+    const { t, req, reqs } = await reviewed();
+    const medium = (await reqs()).find((r) => r.id !== req.id)!;
+    await t.deps.requirements.upsert({ ...medium, severity: 'Medium', status: 'Open' });
+    const r = await requestRiskAcceptance({ requirementId: medium.id, reason: 'Low exposure behind the VPN until Q1', controls: 'VPN only', expiryDays: 14, ...ctx(DEV) }, t.deps);
+    if ('error' in r) throw new Error(r.error);
+    expect(r).toMatchObject({ state: 'pending', needsApprover: 'tech_lead' });
+    expect((await t.deps.requirements.get(medium.id)).ok && ((await t.deps.requirements.get(medium.id)) as { value: Requirement }).value.status).toBe('Open');
+  });
+
+  it('a refused request says why (e.g. expiry above the cap)', async () => {
+    const { t, req } = await reviewed();
+    const r = await requestRiskAcceptance({ requirementId: req.id, reason: 'Provider signs payloads; we verify next sprint', controls: '', expiryDays: 200, ...ctx(ME) }, t.deps);
+    expect(r).toMatchObject({ error: 'refused', message: expect.stringMatching(/at most \d+ days/) });
+  });
+
+  it('an unknown requirement is not_found', async () => {
+    const { t } = await reviewed();
+    expect(await requestRiskAcceptance({ requirementId: 'req_nope', reason: 'Provider signs payloads; we verify next sprint', controls: '', expiryDays: 14, ...ctx(ME) }, t.deps)).toEqual({ error: 'not_found' });
+  });
+});
+
+describe('explain-threat', () => {
+  it('accepts the T-n ref from get-review or the threat id, and answers without a model call', async () => {
+    const { t } = await reviewed();
+    const review = await getReview({ issueKey: 'PAY-7', ...ctx(ME) }, t.deps);
+    if ('error' in review) throw new Error(review.error);
+    const byRef = await explainThreat({ issueKey: 'PAY-7', threatId: 'T-1', ...ctx(ME) }, t.deps);
+    const byId = await explainThreat({ issueKey: 'PAY-7', threatId: review.threats[0]!.id, ...ctx(ME) }, t.deps);
+    if ('error' in byRef) throw new Error(byRef.error);
+    expect(byRef.story.length).toBeGreaterThan(0);
+    expect(byId).toEqual(byRef);
+    expect(await explainThreat({ issueKey: 'PAY-7', threatId: 'T-99', ...ctx(ME) }, t.deps)).toEqual({ error: 'not_found' });
+  });
+});
+
+describe('release-readiness', () => {
+  it('No-go when a work item in the release is blocked; the JQL quotes the version', async () => {
+    const { t } = await reviewed();
+    const jql: string[] = [];
+    t.jira.search = async (q) => (jql.push(q), ok([jiraIssue({ id: ISSUE, key: 'PAY-7', fixVersions: ['4.2'] })]));
+    const r = await getReleaseReadiness({ fixVersion: '4.2 "beta"', ...ctx(ME) }, t.deps);
+    if ('error' in r) throw new Error(r.error);
+    expect(jql[0]).toBe('fixVersion = "4.2 \\"beta\\"" ORDER BY key ASC');
+    expect(r.call).toBe('No-go');
+    expect(r.blockers[0]!.issueKey).toBe('PAY-7');
+    expect(r.blockers[0]!.reasons.join(' ')).toMatch(/open security requirement/);
+  });
+
+  it('Go when everything passes; an enabled-project item with no review blocks (fail closed)', async () => {
+    const { t } = await reviewed({ allVerified: true });
+    t.jira.search = async () => ok([jiraIssue({ id: ISSUE, key: 'PAY-7', fixVersions: ['4.2'] })]);
+    const go = await getReleaseReadiness({ fixVersion: '4.2', ...ctx(ME) }, t.deps);
+    expect('call' in go && go.call).toBe('Go');
+    t.jira.search = async () => ok([jiraIssue({ id: ISSUE, key: 'PAY-7' }), jiraIssue({ id: '10050', key: 'PAY-50' }), jiraIssue({ id: '20001', key: 'OPS-1', project: { id: '2', key: 'OPS' } })]);
+    const r = await getReleaseReadiness({ fixVersion: '4.2', ...ctx(ME) }, t.deps);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.call).toBe('No-go');
+    expect(r.blockers.map((b) => b.issueKey)).toEqual(['PAY-50']);
+    expect(r.outOfScope).toBe(1);
+  });
+});
+
+describe('start-review', () => {
+  it('adds the re-run label and queues a gather as the caller', async () => {
+    const { t } = await reviewed();
+    const r = await startReview({ issueKey: 'PAY-7', ...ctx(ME) }, t.deps);
+    expect(r).toMatchObject({ queued: true, issueKey: 'PAY-7' });
+    expect(t.jira.labels).toContain('+redline-review');
+    expect(t.pushed).toContainEqual({ kind: 'gather', issueId: ISSUE, reason: 'rerun', actorAccountId: ME });
+  });
+});
+
+describe('posture-summary', () => {
+  it('counts open requirements by severity for the enabled projects; a project that is not enabled is refused', async () => {
+    const { t } = await reviewed();
+    t.jira.search = async () => ok([jiraIssue({ id: ISSUE, key: 'PAY-7' })]);
+    const r = await getPostureSummary({ ...ctx(ME) }, t.deps);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.projects).toEqual(['PAY']);
+    expect(r.openBySeverity.High).toBeGreaterThanOrEqual(1);
+    expect(r.topRiskyComponents[0]?.component).toBe('payments');
+    const off = await getPostureSummary({ project: 'OPS', ...ctx(ME) }, t.deps);
+    expect(off).toMatchObject({ error: 'invalid_input' });
+  });
+
+  it('lists active risk acceptances that expire within 31 days, soonest first ("which acceptances expire this month?")', async () => {
+    const { t, req } = await reviewed();
+    t.jira.search = async () => ok([jiraIssue({ id: ISSUE, key: 'PAY-7' })]);
+    const expiresAt = (days: number) => new Date(t.clock.now().getTime() + days * 86_400_000).toISOString();
+    for (const [id, days] of [['acc_a', 20], ['acc_b', 5], ['acc_c', 60]] as const)
+      await appendLedger(t.deps.ledger, t.deps.clock, 'acceptance.requested', { acceptanceId: id, requirementId: req.id, issueId: ISSUE, severity: 'High', reason: 'r', controls: '', expiresAt: expiresAt(days), needsApprover: 'none' }, CHAMP);
+    const r = await getPostureSummary({ project: 'PAY', ...ctx(ME) }, t.deps);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.expiring.map((a) => a.acceptanceId)).toEqual(['acc_b', 'acc_a']);
+    expect(r.expiring[0]).toMatchObject({ issueKey: 'PAY-7', requirementId: req.id, severity: 'High', expiresAt: expiresAt(5) });
+  });
+});

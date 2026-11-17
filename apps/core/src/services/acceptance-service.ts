@@ -59,6 +59,7 @@ export async function requestAcceptance(
   v: Viewer,
   issue: JiraIssue,
   input: { requirementId: string; reason: string; controls: string; expiryDays: number },
+  opts: { viaAgent?: boolean } = {},
 ): Promise<Result<{ acceptanceId: string; needsApprover: ApproverNeeded; entryHash: string }>> {
   const now = deps.clock.now();
   const req = await visibleRequirement(deps, v, input.requirementId);
@@ -71,6 +72,8 @@ export async function requestAcceptance(
   const roles = await rolesOf(deps, v.accountId, v.issueId, policy.value);
   const valid = validateAcceptanceRequest({ requirement: req.value, reason: input.reason, controls: input.controls, expiryDays: input.expiryDays, requester: v.accountId, requesterRoles: roles }, policy.value, now);
   if (!valid.ok) return valid;
+  // Requests made through Rovo or MCP never take effect on the requester's own authority: an agent can ask, a second person grants.
+  if (opts.viaAgent && valid.value.needsApprover === 'none') valid.value.needsApprover = 'tech_lead';
 
   const acceptanceId = `acc_${globalThis.crypto.randomUUID()}`;
   const row = await appendLedger(
