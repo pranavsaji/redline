@@ -14,6 +14,7 @@ import { StatusSteps } from './StatusSteps.js';
 import { ThreatCard } from './ThreatCard.js';
 import { pollMs, viewOf } from './states.js';
 import { RequirementsTab } from './RequirementsTab.js';
+import { AcceptancesTab } from './AcceptancesTab.js';
 import { ThreatTriage } from './ThreatEditor.js';
 import { ThreatModelPage } from './ThreatModelPage.js';
 
@@ -232,6 +233,7 @@ export function IssuePanel({ api }: { api: PanelApi }) {
             <TabList>
               <Tab>Threats ({dto.threatsTotal})</Tab>
               <Tab>Requirements ({dto.requirements.length})</Tab>
+              <Tab>Acceptances ({dto.acceptances.length})</Tab>
               <Tab>History</Tab>
             </TabList>
             <TabPanel>
@@ -306,6 +308,9 @@ export function IssuePanel({ api }: { api: PanelApi }) {
             </TabPanel>
             <TabPanel>
               <RequirementsTab dto={dto} api={api} onChanged={() => void load()} />
+            </TabPanel>
+            <TabPanel>
+              <AcceptancesTab dto={dto} api={api} onChanged={() => void load()} />
             </TabPanel>
             <TabPanel>
               <div style={{ display: 'grid', width: '100%' }}>

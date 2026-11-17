@@ -1,4 +1,12 @@
-import type { ApiError, Evidence, FactDto, PanelDto, Requirement, RequirementStatus, Threat, ThreatExplanation } from './types.js';
+import type { AcceptanceState, ApiError, Evidence, FactDto, PanelDto, Requirement, RequirementStatus, Threat, ThreatExplanation } from './types.js';
+
+export interface AcceptanceInput {
+  requirementId: string;
+  reason: string;
+  controls: string;
+  expiryDays: number;
+}
+export type ChainVerdict = { ok: true; length: number } | { ok: false; firstBrokenSeq: number; reason: 'prev_mismatch' | 'hash_mismatch' | 'seq_gap' };
 
 export type TriageInput =
   | { threatId: string; op: 'accept' }
@@ -24,6 +32,10 @@ export interface PanelApi {
   triage(input: TriageInput): Promise<Threat[] | ApiError>;
   confirm(reviewId: string, kind: 'review' | 'budget'): Promise<{ seq: number } | ApiError>;
   publish(): Promise<{ pageId: string; url: string; created: boolean } | ApiError>;
+  requestAcceptance(input: AcceptanceInput): Promise<{ acceptanceId: string; needsApprover: 'none' | 'tech_lead' | 'champion'; entryHash: string } | ApiError>;
+  decideAcceptance(acceptanceId: string, decision: 'approve' | 'reject', note?: string): Promise<{ state: AcceptanceState; entryHash: string } | ApiError>;
+  revokeAcceptance(acceptanceId: string, reason: string): Promise<{ entryHash: string } | ApiError>;
+  breakGlass(reason: string, hours: number): Promise<{ entryHash: string; until: string } | ApiError>;
 }
 
 export async function forgeApi(): Promise<PanelApi> {
@@ -39,6 +51,10 @@ export async function forgeApi(): Promise<PanelApi> {
     triage: (input) => invoke('threats.triage', input),
     confirm: (reviewId, kind) => invoke('review.confirm', { reviewId, kind }),
     publish: () => invoke('confluence.publish'),
+    requestAcceptance: (input) => invoke('acceptance.request', { ...input }),
+    decideAcceptance: (acceptanceId, decision, note) => invoke('acceptance.decide', { acceptanceId, decision, ...(note ? { note } : {}) }),
+    revokeAcceptance: (acceptanceId, reason) => invoke('acceptance.revoke', { acceptanceId, reason }),
+    breakGlass: (reason, hours) => invoke('override.breakglass', { reason, hours }),
   };
 }
 
@@ -61,6 +77,8 @@ export interface SetupStatus {
 export interface AdminApi {
   seed(projectKey: string, spaceKey: string): Promise<SeedResult | ApiError>;
   setupStatus(): Promise<SetupStatus | ApiError>;
+  verifyLedger(): Promise<ChainVerdict | ApiError>;
+  exportLedger(projectKey: string, from: string, to: string): Promise<{ csv: string; json: string } | ApiError>;
 }
 
 export async function forgeAdminApi(): Promise<AdminApi> {
@@ -68,6 +86,8 @@ export async function forgeAdminApi(): Promise<AdminApi> {
   return {
     seed: (projectKey, spaceKey) => invoke('admin.seed', { projectKey, spaceKey }),
     setupStatus: () => invoke('admin.setupStatus'),
+    verifyLedger: () => invoke('ledger.verify'),
+    exportLedger: (projectKey, from, to) => invoke('ledger.export', { projectKey, from, to }),
   };
 }
 

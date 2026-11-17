@@ -7,6 +7,7 @@ import { handleJob } from '../src/consumers/review-consumer.js';
 import { sweep } from '../src/jobs/sweeper.js';
 import { hourly } from '../src/jobs/hourly.js';
 import { daily } from '../src/jobs/daily.js';
+import { appendLedger } from '@redline/core';
 import { checkRerunLimit } from '../src/services/rate-limit.js';
 import { coreDeps } from './support/core-deps.js';
 
@@ -59,6 +60,14 @@ describe('hourly', () => {
     expect(t.jira.commented[0]!.issueId).toBe('OPS-1');
     expect(JSON.stringify(t.jira.commented[0]!.adf)).toContain('acc-admin');
     expect(JSON.stringify(t.jira.commented[0]!.adf)).toContain('1 of 4');
+  });
+
+  it('expires overdue acceptances (RL-5) even when no ops issue is configured', async () => {
+    const t = coreDeps();
+    await appendLedger(t.deps.ledger, t.clock, 'acceptance.requested', { acceptanceId: 'acc_1', requirementId: 'req_1', issueId: '10042', severity: 'High', expiresAt: '2026-11-15T11:00:00.000Z', needsApprover: 'none' }, 'acc-dev');
+    await hourly(t.deps);
+    const rows = await t.deps.ledger.all();
+    expect(rows.ok && rows.value.map((r) => r.eventType)).toEqual(['acceptance.requested', 'acceptance.expired']);
   });
 
   it('stays quiet at or below 20%, and without an ops issue', async () => {

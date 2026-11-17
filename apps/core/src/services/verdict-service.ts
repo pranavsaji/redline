@@ -104,6 +104,7 @@ async function ownVerdict(
     current = null;
   }
   const verdict = computeVerdict({
+    issueId: issue.id,
     review,
     currentContextHash: current,
     threats: threats.ok ? threats.value : [],

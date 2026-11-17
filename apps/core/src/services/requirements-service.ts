@@ -149,7 +149,7 @@ const HTTPS = (ref: string) => {
 };
 
 /** Whether this viewer can see the requirement's threat in the latest review or one of the recent revisions. */
-async function threatVisible(deps: CoreDeps, v: Viewer, threatId: string): Promise<Result<boolean>> {
+export async function threatVisible(deps: CoreDeps, v: Viewer, threatId: string): Promise<Result<boolean>> {
   const history = await deps.reviews.history(v.issueId);
   if (!history.ok) return history;
   for (const r of history.value.slice(-HISTORY_REVISIONS).reverse()) {

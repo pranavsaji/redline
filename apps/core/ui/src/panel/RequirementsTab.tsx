@@ -6,6 +6,7 @@ import { token } from '@atlaskit/tokens';
 import { errorText as errorTextOf, isError, type PanelApi } from '../bridge.js';
 import { SeverityLozenge } from '../components/SeverityLozenge.js';
 import type { PanelDto, Requirement, RequirementStatus } from '../types.js';
+import { AcceptRiskModal } from './AcceptRiskModal.js';
 import { EvidenceForm } from './EvidenceForm.js';
 import { field } from './form-styles.js';
 
@@ -40,10 +41,12 @@ function EvidenceLine({ r }: { r: Requirement }) {
 export function RequirementsTab({ dto, api, onChanged }: { dto: PanelDto; api: PanelApi; onChanged: () => void }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [verifying, setVerifying] = useState<string | null>(null);
+  const [accepting, setAccepting] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const canEdit = dto.roles.includes('developer');
   const champion = dto.roles.includes('champion');
   const missing = dto.requirements.filter((r) => !r.subtaskKey);
+  const openAcceptance = new Set(dto.acceptances.filter((a) => a.state === 'pending' || a.state === 'active').map((a) => a.requirementId));
 
   const create = async () => {
     setBusy(true);
@@ -110,6 +113,14 @@ export function RequirementsTab({ dto, api, onChanged }: { dto: PanelDto; api: P
                 </select>
               </label>
             )}
+            {canEdit && (r.status === 'Open' || r.status === 'InProgress') && !openAcceptance.has(r.id) && accepting !== r.id && (
+              <div>
+                <Button spacing="compact" onClick={() => (setVerifying(null), setAccepting(r.id))}>
+                  Accept risk
+                </Button>
+              </div>
+            )}
+            {accepting === r.id && <AcceptRiskModal requirement={r} dto={dto} api={api} onDone={onChanged} onCancel={() => setAccepting(null)} />}
             {verifying === r.id && (
               <EvidenceForm
                 onCancel={() => setVerifying(null)}

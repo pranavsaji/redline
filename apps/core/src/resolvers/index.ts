@@ -7,6 +7,8 @@ import { requirementsCreate, requirementsSetStatus } from './requirements.js';
 import { reviewConfirm, threatsTriage } from './threats.js';
 import { confluencePublish } from './confluence.js';
 import { adminSeed, adminSetupStatus } from './admin.js';
+import { acceptanceDecide, acceptanceRequest, acceptanceRevoke, breakGlassOverride } from './acceptances.js';
+import { ledgerExport, ledgerVerify } from './ledger.js';
 import { kvsSigningKeys } from '../adapters/signing-keys.js';
 import { systemClock } from '../adapters/clock.js';
 
@@ -72,6 +74,31 @@ resolver.define('admin.setupStatus', async ({ context }) => {
       return keys.ok && Object.keys(keys.value).length > 0;
     },
   });
+});
+
+resolver.define('acceptance.request', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return acceptanceRequest(composeCore({ cloudId: v.cloudId }), v, payload ?? {});
+});
+resolver.define('acceptance.decide', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return acceptanceDecide(composeCore({ cloudId: v.cloudId }), v, payload ?? {});
+});
+resolver.define('acceptance.revoke', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return acceptanceRevoke(composeCore({ cloudId: v.cloudId }), v, payload ?? {});
+});
+resolver.define('override.breakglass', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return breakGlassOverride(composeCore({ cloudId: v.cloudId }), v, payload ?? {});
+});
+resolver.define('ledger.verify', async ({ context }) => {
+  const v = viewerOf(context as Ctx);
+  return ledgerVerify(composeCore({ cloudId: v.cloudId }), { accountId: v.accountId });
+});
+resolver.define('ledger.export', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return ledgerExport(composeCore({ cloudId: v.cloudId }), { accountId: v.accountId }, payload ?? {});
 });
 
 export const panelResolver = resolver.getDefinitions();

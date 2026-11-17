@@ -1,6 +1,6 @@
 import { rebuildAcceptances, threatDiff, type DiscardedThreat, type Role } from '@redline/core';
 import { cweById, getAsvs } from '@redline/frameworks';
-import { severityRank, type Acceptance, type ContextFact, type Requirement, type Review, type Threat, type Verdict } from '@redline/shared';
+import { severityRank, type Acceptance, type Severity, type ContextFact, type Requirement, type Review, type Threat, type Verdict } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
 import type { JiraIssue } from '../adapters/jira.js';
 import { log } from '../adapters/log.js';
@@ -46,7 +46,12 @@ export interface PanelDto {
   facts: FactDto[];
   requirements: Requirement[];
   hiddenRequirements: number;
+  /** Risk acceptances for the requirements this viewer can see (RL-1). */
   acceptances: Acceptance[];
+  /** The caller, so the panel can hide Approve on their own request (the server refuses it anyway). */
+  viewerAccountId: string;
+  /** What the accept-risk form needs to cap expiry and preview the approver (RL-2). */
+  acceptancePolicy: { maxExpiryDays: { Critical: number; default: number }; techLeadMaxSeverity: Severity; championGroup: string; techLeadGroup: string };
   history: Array<{ revision: number; createdAt: string; riskScore: number; status: Review['status']; added: number; removed: number }>;
   samples: { received: number; expected: number };
   roles: Role[];
@@ -147,8 +152,10 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
   const shownRequirements = requirements.value.filter((r) => (r.status === 'Open' ? latestIds.has(r.threatId) : visibleThreatIds.has(r.threatId)));
   const existingThreatIds = new Set(scopedRevisions.flatMap((x) => x!.allThreatIds));
   const hiddenRequirements = requirements.value.filter((r) => existingThreatIds.has(r.threatId) && !visibleThreatIds.has(r.threatId)).length;
-  const reqIds = new Set(requirements.value.map((r) => r.id));
-  const acceptances = rebuildAcceptances(ledger.value, deps.clock.now()).filter((a) => a.issueId === v.issueId || reqIds.has(a.requirementId));
+  // Only acceptances of requirements this viewer can see: the reason may describe a source they cannot open.
+  const shownIds = new Set(shownRequirements.map((r) => r.id));
+  const acceptances = rebuildAcceptances(ledger.value, deps.clock.now()).filter((a) => shownIds.has(a.requirementId));
+  const p = policy.value;
 
   return {
     issueId: v.issueId,
@@ -165,6 +172,8 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
     requirements: shownRequirements,
     hiddenRequirements,
     acceptances,
+    viewerAccountId: v.accountId,
+    acceptancePolicy: { maxExpiryDays: p.maxExpiryDays, techLeadMaxSeverity: p.techLeadMaxSeverity, championGroup: p.championGroup, techLeadGroup: p.techLeadGroup },
     history: hist,
     samples: { received: review?.samplesReceived ?? 0, expected: review?.samplesExpected ?? 0 },
     roles,

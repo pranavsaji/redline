@@ -12,6 +12,8 @@ import {
 import { warnOnlyUntil } from './policy.js';
 
 export interface VerdictInput {
+  /** The work item being judged; break-glass overrides match it even before any review exists. */
+  issueId?: string;
   review: Review | null;
   currentContextHash: string | null;
   threats: Threat[];
@@ -105,7 +107,8 @@ export function computeVerdict(i: VerdictInput): Verdict {
 
   const base = { ...(r ? { reviewId: r.id, revision: r.revision } : {}), blockingCount, maxOpenSeverity: maxOpen, reasons, inheritedFrom: [], updatedAt };
   if (reasons.length === 0) return { state: 'pass', ...base };
-  const glass = r ? i.breakGlass.filter((b) => b.issueId === r.issueId && i.now.getTime() < new Date(b.until).getTime()) : [];
+  const target = i.issueId ?? r?.issueId;
+  const glass = target ? i.breakGlass.filter((b) => b.issueId === target && i.now.getTime() < new Date(b.until).getTime()) : [];
   if (glass.length > 0) {
     const until = Math.max(...glass.map((b) => new Date(b.until).getTime()));
     return { state: 'pass', overridden: true, validUntil: new Date(until).toISOString(), ...base };

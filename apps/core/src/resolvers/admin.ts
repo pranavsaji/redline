@@ -16,7 +16,7 @@ export const BITBUCKET_KEY_COPIED_KEY = 'setup:bitbucketKeyCopied';
 const DAY = 86_400_000;
 const SeedSchema = z.object({ projectKey: z.string().regex(/^[A-Z][A-Z0-9_]{0,254}$/), spaceKey: z.string().regex(/^[A-Za-z0-9~_-]{1,255}$/) });
 
-async function requireAdmin(deps: CoreDeps, a: Admin): Promise<ApiError | null> {
+export async function requireAdmin(deps: CoreDeps, a: Admin): Promise<ApiError | null> {
   if (!a.accountId) return { error: 'forbidden', message: 'Only a Jira administrator can do this.' };
   const r = await deps.jira.isAdmin(a.accountId);
   if (!r.ok) return { error: 'unavailable' };

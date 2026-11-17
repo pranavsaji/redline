@@ -41,6 +41,8 @@ const base: PanelDto = {
     { id: 'req_2', threatId: 'thr_1', issueId: '66405', issueKey: 'PAY-6', title: 'Magic links expire after 15 minutes', criteria: [{ given: 'a magic link', when: 'it is older than 15 minutes or already used', then: 'sign-in is refused' }], asvsIds: [], severity: 'High', status: 'Open' },
   ],
   acceptances: [],
+  viewerAccountId: 'acc-dev',
+  acceptancePolicy: { maxExpiryDays: { Critical: 30, default: 90 }, techLeadMaxSeverity: 'Medium', championGroup: 'redline-security-champions', techLeadGroup: 'redline-tech-leads' },
   history: [{ revision: 1, createdAt: '2026-11-16T05:30:43.000Z', riskScore: 72, status: 'ready', added: 4, removed: 0 }],
   samples: { received: 3, expected: 3 },
   roles: ['viewer', 'developer'],

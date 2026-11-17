@@ -74,6 +74,11 @@ describe('computeVerdict', () => {
     expect(computeVerdict(input({ breakGlass: [{ issueId: '10001', until: '2026-11-15T00:00:00Z' }] })).state).toBe('block');
     expect(v.validUntil).toBe('2026-11-16T00:00:00.000Z');
   });
+  it('8b. break-glass also overrides a work item with no review, matched by the input issueId', () => {
+    const glass = [{ issueId: '10001', until: '2026-11-16T00:00:00Z' }];
+    expect(computeVerdict(input({ review: null, issueId: '10001', breakGlass: glass }))).toMatchObject({ state: 'pass', overridden: true });
+    expect(computeVerdict(input({ review: null, issueId: '10002', breakGlass: glass })).state).toBe('block');
+  });
   it('warn-only turns a block into warn and expires after 14 days', () => {
     const since = new Date(NOW.getTime() - 86_400_000).toISOString();
     const policy = { ...DEFAULT_SITE_POLICY, warnOnly: [{ projectKey: 'PROJ', since, until: '2027-01-01T00:00:00Z' }] };
