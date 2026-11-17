@@ -15,12 +15,12 @@ export async function settingsGet(deps: { store: SettingsStore }, ctx: { repoUui
 
 /** `settings.save`: repository admins only (checked with Bitbucket as the user; any failure refuses). */
 export async function settingsSave(
-  deps: { store: SettingsStore; isRepoAdmin: (accountId: string, repoUuid: string) => Promise<boolean> },
-  ctx: { accountId: string; repoUuid: string },
+  deps: { store: SettingsStore; isRepoAdmin: (workspaceUuid: string, repoUuid: string) => Promise<boolean> },
+  ctx: { accountId: string; workspaceUuid: string; repoUuid: string },
   payload: unknown,
 ): Promise<RepoSettings | ApiError> {
   if (!REPO_UUID.test(ctx.repoUuid)) return { error: 'validation', message: 'Unknown repository.' };
-  const admin = ctx.accountId ? await deps.isRepoAdmin(ctx.accountId, ctx.repoUuid).catch(() => false) : false;
+  const admin = ctx.accountId ? await deps.isRepoAdmin(ctx.workspaceUuid, ctx.repoUuid).catch(() => false) : false;
   if (!admin) return { error: 'forbidden', message: 'Only a repository admin can change Redline settings.' };
   const parsed = parseSettingsInput((payload ?? {}) as Record<string, unknown>);
   if (!parsed.ok) return { error: 'validation', message: parsed.error.message };

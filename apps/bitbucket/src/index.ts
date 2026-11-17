@@ -1,6 +1,7 @@
 import Resolver from '@forge/resolver';
 import { forgeBitbucketClient } from './bitbucket-client.js';
 import { runMergeCheck, type PRCheckEvent } from './merge-check.js';
+import { repoAdminCheck } from './admin-check.js';
 import { settingsGet, settingsSave } from './resolvers.js';
 import { kvsSettingsStore, type SettingsKvs } from './settings-store.js';
 
@@ -15,20 +16,17 @@ export async function mergeCheck(event: PRCheckEvent): Promise<{ success: boolea
   return runMergeCheck(event, { client: forgeBitbucketClient(), settings: (uuid) => store.get(uuid), nowSec: () => Math.floor(Date.now() / 1000) });
 }
 
-/** Repository admin, asked of Bitbucket as the user (fails closed). */
-async function isRepoAdmin(_accountId: string, repoUuid: string): Promise<boolean> {
-  const { default: api, route } = await import('@forge/api');
-  const q = `repository.uuid="${repoUuid}"`;
-  const r = await api.asUser().requestBitbucket(route`/2.0/user/permissions/repositories?q=${q}`);
-  if (!r.ok) return false;
-  const body = (await r.json()) as { values?: Array<{ permission?: string; repository?: { uuid?: string } }> };
-  return (body.values ?? []).some((v) => v.permission === 'admin' && v.repository?.uuid?.toLowerCase() === repoUuid.toLowerCase());
-}
+const isRepoAdmin = async (workspaceUuid: string, repoUuid: string): Promise<boolean> => {
+  const { default: api, assumeTrustedRoute } = await import('@forge/api');
+  // admin-check builds the path from validated UUIDs only.
+  return repoAdminCheck((path) => api.asUser().requestBitbucket(assumeTrustedRoute(path)))(workspaceUuid, repoUuid);
+};
 
-type Ctx = { accountId?: unknown; extension?: { repository?: { uuid?: unknown } } };
+type Ctx = { accountId?: unknown; workspaceId?: unknown; extension?: { repository?: { uuid?: unknown } } };
+const braced = (v: unknown) => (typeof v === 'string' ? (/^[0-9a-f-]{36}$/i.test(v) ? `{${v}}` : v) : '');
 const ctxOf = (context: unknown) => {
   const c = context as Ctx;
-  return { accountId: typeof c.accountId === 'string' ? c.accountId : '', repoUuid: typeof c.extension?.repository?.uuid === 'string' ? c.extension.repository.uuid : '' };
+  return { accountId: typeof c.accountId === 'string' ? c.accountId : '', workspaceUuid: braced(c.workspaceId), repoUuid: braced(c.extension?.repository?.uuid) };
 };
 
 const resolver = new Resolver();
