@@ -20,6 +20,10 @@ export function mockApi(state = new URLSearchParams(window.location.search).get(
     decideAcceptance: async (_id, decision) => ({ state: decision === 'approve' ? 'active' : 'rejected', entryHash: 'e'.repeat(64) }),
     revokeAcceptance: async () => ({ entryHash: 'd'.repeat(64) }),
     breakGlass: async (_r, hours) => ({ entryHash: 'c'.repeat(64), until: new Date(Date.now() + hours * 3_600_000).toISOString() }),
+    attestation: async (repo, commitSha) => {
+      const token = `redline-att.v1.mock-${repo.replace('/', '-')}-${commitSha.slice(0, 7)}.sig`;
+      return { token, expiresAt: new Date(Date.now() + 86_400_000).toISOString(), prDescriptionSnippet: `Redline attestation for ${dto.issueKey} (expires tomorrow):\n${token}` };
+    },
     publish: async () => ({ pageId: '900', url: 'https://example.atlassian.net/wiki/spaces/PAY/pages/900', created: true }),
     explain: async (_r, threatId) => {
       const t = dto.threats.find((x) => x.id === threatId);
@@ -32,6 +36,9 @@ export function mockApi(state = new URLSearchParams(window.location.search).get(
 export function mockAdminApi(): AdminApi {
   return {
     seed: async (projectKey) => ({ epicKey: `${projectKey}-1`, storyKeys: [`${projectKey}-2`, `${projectKey}-3`], designPageUrl: 'https://example.atlassian.net/wiki/spaces/PAY/pages/1', incidentKeys: [`${projectKey}-4`, `${projectKey}-5`] }),
+    publicKeys: async () => ({ active: { kid: 'k-mock', publicKey: 'MCowBQYDK2VwAyEAmockpublickey' } }),
+    rotateKey: async () => ({ kid: 'k-mock-2' }),
+    keyCopied: async () => ({ ok: true }),
     verifyLedger: async () => ({ ok: true, length: 12 }),
     exportLedger: async (projectKey, from, to) => ({ csv: 'seq,created_at\n', json: JSON.stringify({ projectKey, from, to, entries: [] }) }),
     setupStatus: async () => ({ keys: true, sqlVersion: 3, validatorSeenOn: ['PAY'], automationRuleSeen: true, mcpEnabledHint: 'Rovo MCP: allow the clients your team uses in Atlassian Administration.', bitbucketKeyCopied: false }),

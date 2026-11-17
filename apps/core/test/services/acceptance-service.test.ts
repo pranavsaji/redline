@@ -1,54 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { verifyChain } from '@redline/crypto';
-import { ok, type AgentThreatModel, type Requirement, type Threat, type Verdict } from '@redline/shared';
-import { handleJob } from '../../src/consumers/review-consumer.js';
+import { ok, type Verdict } from '@redline/shared';
 import { acceptanceDecide, acceptanceRequest, acceptanceRevoke, breakGlassOverride } from '../../src/resolvers/acceptances.js';
 import { ledgerExport, ledgerVerify } from '../../src/resolvers/ledger.js';
 import { panelGet } from '../../src/resolvers/panel.js';
 import { expireAcceptances } from '../../src/services/acceptance-service.js';
 import { coreDeps, jiraIssue } from '../support/core-deps.js';
-import { sqliteLedger } from '../support/sqlite-ledger.js';
+import { ADMIN, CHAMP, CHAMPIONS, DEV, ISSUE, LEADS, reviewed } from '../support/reviewed.js';
 
-const ISSUE = '10042';
-const CHAMPIONS = 'redline-security-champions';
-const LEADS = 'redline-tech-leads';
-const DEV = 'acc-dev';
-const CHAMP = 'acc-champ';
-const ADMIN = 'acc-admin';
 const DAY = 86_400_000;
 
-const model: AgentThreatModel = {
-  schema: 'redline.threatmodel.v1',
-  issueKey: 'PAY-7',
-  threats: [
-    { stride: 'Spoofing', title: 'Forged refund webhooks', scenario: 'An attacker posts a fake refund event.', component: 'webhook endpoint', likelihood: 4, impact: 4, evidence: [{ quote: 'Public webhook that receives refund events' }] },
-  ],
-};
-
-/** PAY-7 reviewed with one High threat and its requirement; DEV is a tech lead, CHAMP a champion, ADMIN a Jira admin. */
-async function reviewed(o: { sqlLedger?: boolean; groups?: Record<string, string[]> } = {}) {
-  const t = coreDeps({ issues: [jiraIssue({ id: ISSUE, key: 'PAY-7', assignee: 'acc-owner' })] });
-  const sql = o.sqlLedger ? await sqliteLedger() : null;
-  if (sql) t.deps.ledger = sql.repo;
-  const groups = o.groups ?? { [DEV]: [LEADS], [CHAMP]: [CHAMPIONS] };
-  t.jira.groupsOf = async (id) => ok(groups[id] ?? []);
-  t.jira.isAdmin = async (id) => ok(id === ADMIN);
-  await handleJob(t.deps, { kind: 'gather', issueId: ISSUE, reason: 'created' });
-  const rev = (await t.deps.reviews.latest(ISSUE)) as { ok: true; value: { id: string } };
-  for (let n = 1; n <= 3; n++) {
-    await t.deps.reviews.saveSample(rev.value.id, n, model);
-    await handleJob(t.deps, { kind: 'assemble', reviewId: rev.value.id });
-  }
-  const reqs = async () => ((await t.deps.requirements.forIssue(ISSUE)) as { ok: true; value: Requirement[] }).value;
-  // Baseline rules add more requirements; verify all but the forged-webhook one so the journey is about a single requirement.
-  const all = await reqs();
-  const req = all.find((r) => /forged|webhook/i.test(r.title)) ?? all[0]!;
-  for (const r of all) if (r.id !== req.id) await t.deps.requirements.upsert({ ...r, status: 'Verified', verifiedBy: 'acc-x', evidence: { kind: 'manual', ref: 'checked', attester: 'acc-x' } });
-  await handleJob(t.deps, { kind: 'verdict', issueId: ISSUE });
-  t.pushed.length = 0;
-  const threats = ((await t.deps.reviews.threats(rev.value.id)) as { ok: true; value: Threat[] }).value;
-  return { t, sql, req, reqs, threats };
-}
 const as = (accountId: string) => ({ accountId, issueId: ISSUE });
 const verdict = (t: ReturnType<typeof coreDeps>) => t.verdicts._written.get(ISSUE) as Verdict & { message: string };
 const commentText = (adf: unknown) => JSON.stringify(adf);

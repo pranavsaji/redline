@@ -168,8 +168,16 @@ export interface VerdictSink {
   write(issueId: string, v: Verdict & Record<string, unknown>): Promise<Result<void>>;
 }
 
+export interface PublicKeyInfo {
+  active: { kid: string; publicKey: string };
+  /** Still trusted until retireAt (the grace period after a rotation). */
+  previous?: { kid: string; publicKey: string; retireAt: string };
+}
+
 export interface SigningKeyStore {
   active(): Promise<Result<KeyPair>>;
   publicKeys(): Promise<Result<Record<string, string>>>;
   rotate(): Promise<Result<KeyPair>>;
+  /** Active and in-grace previous public keys (creates the first key pair if there is none). */
+  describe(): Promise<Result<PublicKeyInfo>>;
 }

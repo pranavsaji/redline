@@ -9,6 +9,7 @@ import { confluencePublish } from './confluence.js';
 import { adminSeed, adminSetupStatus } from './admin.js';
 import { acceptanceDecide, acceptanceRequest, acceptanceRevoke, breakGlassOverride } from './acceptances.js';
 import { ledgerExport, ledgerVerify } from './ledger.js';
+import { attestationCopy, keysCopied, keysPublic, keysRotate } from './attestations.js';
 import { kvsSigningKeys } from '../adapters/signing-keys.js';
 import { systemClock } from '../adapters/clock.js';
 
@@ -99,6 +100,23 @@ resolver.define('ledger.verify', async ({ context }) => {
 resolver.define('ledger.export', async ({ payload, context }) => {
   const v = viewerOf(context as Ctx);
   return ledgerExport(composeCore({ cloudId: v.cloudId }), { accountId: v.accountId }, payload ?? {});
+});
+
+resolver.define('attestation.copy', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return attestationCopy(composeCore({ cloudId: v.cloudId }), v, payload ?? {});
+});
+resolver.define('keys.public', async ({ context }) => {
+  const v = viewerOf(context as Ctx);
+  return keysPublic(composeCore({ cloudId: v.cloudId }), { accountId: v.accountId });
+});
+resolver.define('keys.rotate', async ({ context }) => {
+  const v = viewerOf(context as Ctx);
+  return keysRotate(composeCore({ cloudId: v.cloudId }), { accountId: v.accountId });
+});
+resolver.define('keys.copied', async ({ context }) => {
+  const v = viewerOf(context as Ctx);
+  return keysCopied(composeCore({ cloudId: v.cloudId }), { accountId: v.accountId });
 });
 
 export const panelResolver = resolver.getDefinitions();

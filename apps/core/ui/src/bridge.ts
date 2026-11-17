@@ -6,6 +6,11 @@ export interface AcceptanceInput {
   controls: string;
   expiryDays: number;
 }
+export type AttestationOutcome = { token: string; expiresAt: string; prDescriptionSnippet: string } | { blocking: Array<{ code: string; message: string }> };
+export interface PublicKeyInfo {
+  active: { kid: string; publicKey: string };
+  previous?: { kid: string; publicKey: string; retireAt: string };
+}
 export type ChainVerdict = { ok: true; length: number } | { ok: false; firstBrokenSeq: number; reason: 'prev_mismatch' | 'hash_mismatch' | 'seq_gap' };
 
 export type TriageInput =
@@ -36,6 +41,7 @@ export interface PanelApi {
   decideAcceptance(acceptanceId: string, decision: 'approve' | 'reject', note?: string): Promise<{ state: AcceptanceState; entryHash: string } | ApiError>;
   revokeAcceptance(acceptanceId: string, reason: string): Promise<{ entryHash: string } | ApiError>;
   breakGlass(reason: string, hours: number): Promise<{ entryHash: string; until: string } | ApiError>;
+  attestation(repo: string, commitSha: string): Promise<AttestationOutcome | ApiError>;
 }
 
 export async function forgeApi(): Promise<PanelApi> {
@@ -55,6 +61,7 @@ export async function forgeApi(): Promise<PanelApi> {
     decideAcceptance: (acceptanceId, decision, note) => invoke('acceptance.decide', { acceptanceId, decision, ...(note ? { note } : {}) }),
     revokeAcceptance: (acceptanceId, reason) => invoke('acceptance.revoke', { acceptanceId, reason }),
     breakGlass: (reason, hours) => invoke('override.breakglass', { reason, hours }),
+    attestation: (repo, commitSha) => invoke('attestation.copy', { repo, commitSha }),
   };
 }
 
@@ -79,6 +86,9 @@ export interface AdminApi {
   setupStatus(): Promise<SetupStatus | ApiError>;
   verifyLedger(): Promise<ChainVerdict | ApiError>;
   exportLedger(projectKey: string, from: string, to: string): Promise<{ csv: string; json: string } | ApiError>;
+  publicKeys(): Promise<PublicKeyInfo | ApiError>;
+  rotateKey(): Promise<{ kid: string } | ApiError>;
+  keyCopied(): Promise<{ ok: true } | ApiError>;
 }
 
 export async function forgeAdminApi(): Promise<AdminApi> {
@@ -88,6 +98,9 @@ export async function forgeAdminApi(): Promise<AdminApi> {
     setupStatus: () => invoke('admin.setupStatus'),
     verifyLedger: () => invoke('ledger.verify'),
     exportLedger: (projectKey, from, to) => invoke('ledger.export', { projectKey, from, to }),
+    publicKeys: () => invoke('keys.public'),
+    rotateKey: () => invoke('keys.rotate'),
+    keyCopied: () => invoke('keys.copied'),
   };
 }
 

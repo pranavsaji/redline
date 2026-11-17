@@ -1,6 +1,7 @@
 import { InvocationError, InvocationErrorCode } from '@forge/events';
 import { getReviewContext } from './actions/get-review-context.js';
 import { submitThreatModel } from './actions/submit-threat-model.js';
+import { getMergeAttestation } from './actions/get-merge-attestation.js';
 import { composeCore, type ForgeContext } from './composition.js';
 import { reviewConsumer } from './consumers/review-consumer.js';
 import { daily } from './jobs/daily.js';
@@ -47,3 +48,4 @@ const actionCtx = (payload: ActionPayload, ctx?: ForgeContext): ForgeContext => 
 /** Rovo actions (agent-invoked). Identity comes only from payload.context.accountId. */
 export const getReviewContextHandler = async (payload: ActionPayload, ctx?: ForgeContext) => getReviewContext(payload, composeCore(actionCtx(payload, ctx)));
 export const submitThreatModelHandler = async (payload: ActionPayload, ctx?: ForgeContext) => submitThreatModel(payload, composeCore(actionCtx(payload, ctx)));
+export const getMergeAttestationHandler = async (payload: ActionPayload, ctx?: ForgeContext) => getMergeAttestation(payload, composeCore(actionCtx(payload, ctx)));

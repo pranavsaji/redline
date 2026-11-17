@@ -8,6 +8,7 @@ export {
   hourlyHandler,
   dailyHandler,
   getReviewContextHandler,
+  getMergeAttestationHandler,
   submitThreatModelHandler,
   validateTransitionHandler,
 } from './handlers.js';

@@ -95,6 +95,27 @@ modules:
           type: string
           required: true
           description: The complete threat model as a JSON string with "schema" set to "redline.threatmodel.v1"
+    - key: get-merge-attestation
+      name: Get Redline merge attestation
+      function: getMergeAttestationFn
+      actionVerb: CREATE
+      description: Signs a merge attestation for a Jira work item, Bitbucket repository and commit when Redline's verdict allows it, and returns the text to paste into the pull request description. If the work item is blocked, returns what blocks it instead.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: true
+          description: The Jira work item key, for example PAY-7
+        repo:
+          title: Repository
+          type: string
+          required: true
+          description: The Bitbucket repository as workspace/repository, for example acme/payments
+        commitSha:
+          title: Commit hash
+          type: string
+          required: true
+          description: The full 40-character hash of the pull request's head commit
   rovo:agent:
     - key: redline-reviewer
       name: Redline
@@ -105,7 +126,7 @@ modules:
         - Is release 4.2 safe to ship?
         - Which acceptances expire this month?
         - Explain threat T-7 like I'm new to security
-      actions: [ get-review-context, submit-threat-model ]
+      actions: [ get-review-context, submit-threat-model, get-merge-attestation ]
   function:
     - key: lifecycleFn
       handler: index.lifecycleHandler
@@ -128,6 +149,8 @@ modules:
       handler: index.getReviewContextHandler
     - key: submitThreatModelFn
       handler: index.submitThreatModelHandler
+    - key: getMergeAttestationFn
+      handler: index.getMergeAttestationHandler
     - key: validateTransitionFn
       handler: index.validateTransitionHandler
 resources:

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ClockPort, SigningKeyStore } from '@redline/core';
+import type { ClockPort, PublicKeyInfo, SigningKeyStore } from '@redline/core';
 import { generateKeyPair, type KeyPair } from '@redline/crypto';
 import { appError, err, ok, type Result } from '@redline/shared';
 import { forgeKvs, type KvsPort } from './kvs-config.js';
@@ -52,8 +52,8 @@ export function kvsSigningKeys(clock: ClockPort, store: KvsPort = forgeKvs()): S
     }
   }
 
-  return {
-    async active() {
+  const store_: SigningKeyStore = {
+    async active(): Promise<Result<KeyPair>> {
       const c = await config();
       if (!c.ok) return c;
       if (c.value === null) {
@@ -72,7 +72,7 @@ export function kvsSigningKeys(clock: ClockPort, store: KvsPort = forgeKvs()): S
       return s.value ? ok(s.value) : err(appError('crypto', `active signing key ${c.value.active} is missing from secret storage`));
     },
 
-    async publicKeys() {
+    async publicKeys(): Promise<Result<Record<string, string>>> {
       const c = await config();
       if (!c.ok) return c;
       if (c.value === null) return ok({});
@@ -89,7 +89,7 @@ export function kvsSigningKeys(clock: ClockPort, store: KvsPort = forgeKvs()): S
       return ok(out);
     },
 
-    async rotate() {
+    async rotate(): Promise<Result<KeyPair>> {
       const c = await config();
       if (!c.ok) return c;
       const k = await create();
@@ -105,5 +105,20 @@ export function kvsSigningKeys(clock: ClockPort, store: KvsPort = forgeKvs()): S
       }
       return k;
     },
+    async describe(): Promise<Result<PublicKeyInfo>> {
+      const a = await store_.active();
+      if (!a.ok) return a;
+      const c = await config();
+      if (!c.ok) return c;
+      const info: PublicKeyInfo = { active: { kid: a.value.kid, publicKey: a.value.publicKey } };
+      const prev = c.value?.previous;
+      if (prev && clock.now().getTime() < Date.parse(prev.retireAt)) {
+        const p = await secret(prev.kid);
+        if (!p.ok) return p;
+        if (p.value) info.previous = { kid: p.value.kid, publicKey: p.value.publicKey, retireAt: prev.retireAt };
+      }
+      return ok(info);
+    },
   };
+  return store_;
 }

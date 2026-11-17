@@ -1,5 +1,5 @@
 import api, { route } from '@forge/api';
-import { sqlFeedbackRepo, sqlIssueRepo, sqlLedgerRepo, sqlRequirementRepo, sqlReviewRepo, sqlUsageRepo } from '@redline/db';
+import { sqlAttestationRepo, sqlFeedbackRepo, sqlIssueRepo, sqlLedgerRepo, sqlRequirementRepo, sqlReviewRepo, sqlUsageRepo } from '@redline/db';
 import type { CoreDeps } from './deps.js';
 import { systemClock } from './adapters/clock.js';
 import { confluenceClient } from './adapters/confluence.js';
@@ -10,6 +10,7 @@ import { jiraClient } from './adapters/jira.js';
 import { defaultsFromEnv, forgeKvs, kvsConfigStore, type KvsPort } from './adapters/kvs-config.js';
 import { restGatherer } from './adapters/rest-gatherer.js';
 import { sqlRetention } from './adapters/retention.js';
+import { kvsSigningKeys } from './adapters/signing-keys.js';
 import { jiraVerdictSink } from './adapters/verdict-sink.js';
 
 export interface ForgeContext {
@@ -57,6 +58,8 @@ export function composeCore(ctx?: ForgeContext): CoreDeps {
     feedback: sqlFeedbackRepo(x),
     issues,
     usage: sqlUsageRepo(x),
+    attestations: sqlAttestationRepo(x),
+    keys: kvsSigningKeys(systemClock, state),
     jira,
     confluence,
     gatherer: restGatherer({ jira, confluence, reviews, issues, clock: systemClock, cloudId: cloudIdOf(ctx) }),

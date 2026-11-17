@@ -1,4 +1,5 @@
 import type {
+  AttestationRepo,
   ClockPort,
   ContextGatherer,
   FeedbackRepo,
@@ -6,6 +7,7 @@ import type {
   LedgerRepo,
   RequirementRepo,
   ReviewRepo,
+  SigningKeyStore,
   UsageRepo,
   VerdictSink,
 } from '@redline/core';
@@ -28,6 +30,9 @@ export interface CoreDeps {
   feedback: FeedbackRepo;
   issues: IssueRepo;
   usage: UsageRepo;
+  attestations: AttestationRepo;
+  /** Ed25519 merge-attestation keys (private halves in Forge secret storage). */
+  keys: SigningKeyStore;
   /** Jira as the app (triggers, consumers and jobs have no user). */
   jira: JiraClient;
   confluence: ConfluenceClient;

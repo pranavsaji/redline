@@ -1,5 +1,6 @@
 import {
   fixedClock,
+  memoryAttestationRepo,
   memoryFeedbackRepo,
   memoryIssueRepo,
   memoryLedgerRepo,
@@ -16,6 +17,7 @@ import type { JiraClient, JiraIssue } from '../../src/adapters/jira.js';
 import type { ConfluenceClient } from '../../src/adapters/confluence.js';
 import type { ReviewJob } from '../../src/jobs/types.js';
 import { memoryKvs } from './memory-kvs.js';
+import { kvsSigningKeys } from '../../src/adapters/signing-keys.js';
 import { contextHash } from '@redline/core';
 
 export const POLICY: SitePolicy = { ...DEFAULT_SITE_POLICY, enabledProjects: ['PAY'], reviewIssueTypes: ['Story', 'Epic'], agentSamples: 3, agentTimeoutMinutes: 15 };
@@ -113,6 +115,8 @@ export function coreDeps(o: { issues?: JiraIssue[]; policy?: SitePolicy; now?: s
     feedback: memoryFeedbackRepo(),
     issues: memoryIssueRepo(),
     usage: memoryUsageRepo(),
+    attestations: memoryAttestationRepo(),
+    keys: kvsSigningKeys(clock, kv),
     jira,
     confluence: {} as ConfluenceClient,
     gatherer,
