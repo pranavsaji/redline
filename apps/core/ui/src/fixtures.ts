@@ -44,6 +44,7 @@ const base: PanelDto = {
   history: [{ revision: 1, createdAt: '2026-11-16T05:30:43.000Z', riskScore: 72, status: 'ready', added: 4, removed: 0 }],
   samples: { received: 3, expected: 3 },
   roles: ['viewer', 'developer'],
+  threatModelPage: null,
 };
 
 const withReview = (o: Partial<NonNullable<PanelDto['review']>>, rest: Partial<PanelDto> = {}): PanelDto => ({ ...base, review: { ...base.review!, ...o }, ...rest });

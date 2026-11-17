@@ -7,6 +7,14 @@ import { log } from '../adapters/log.js';
 import { ReviewJobSchema, type ReviewJob } from '../jobs/types.js';
 import { isBudgetPaused, monthOf } from '../services/budget.js';
 import { contextKey, refreshVerdict } from '../services/verdict-service.js';
+import { isPublished, publishThreatModel } from '../services/confluence-page.js';
+
+/** Propagate to children, and re-publish the Confluence page when this work item has one (RQ-6). */
+async function afterChange(deps: CoreDeps, issueId: string, republish: boolean): Promise<Result<void>> {
+  const jobs: ReviewJob[] = [{ kind: 'propagate', issueId }];
+  if (republish && (await isPublished(deps, issueId))) jobs.push({ kind: 'publish', issueId });
+  return deps.queue.push(jobs);
+}
 
 export const SCHEMA_VERSION_KEY = 'schema:version';
 
@@ -110,7 +118,8 @@ async function gather(deps: CoreDeps, job: Extract<ReviewJob, { kind: 'gather' }
   log('review.created', { issueId: job.issueId, revision, reason: job.reason, paused: paused.value, partial: b.partial });
   const v = await refreshVerdict(deps, job.issueId);
   if (!v.ok) return v;
-  return deps.queue.push([{ kind: 'propagate', issueId: job.issueId }]);
+  // A published page now trails the newest revision: re-publish so it says it is out of date.
+  return afterChange(deps, job.issueId, true);
 }
 
 async function assemble(deps: CoreDeps, reviewId: string): Promise<Result<void>> {
@@ -144,7 +153,7 @@ async function assemble(deps: CoreDeps, reviewId: string): Promise<Result<void>>
   log('review.assembled', { reviewId, status, samples: samples.value.length });
   const v = await refreshVerdict(deps, review.issueId);
   if (!v.ok) return v;
-  return deps.queue.push([{ kind: 'propagate', issueId: review.issueId }]);
+  return afterChange(deps, review.issueId, status === 'ready' && review.status !== 'ready');
 }
 
 async function propagate(deps: CoreDeps, issueId: string): Promise<Result<void>> {
@@ -173,6 +182,16 @@ export async function handleJob(deps: CoreDeps, job: ReviewJob): Promise<Result<
     case 'verdict': {
       const v = await refreshVerdict(deps, job.issueId);
       return v.ok ? voidOk() : v;
+    }
+    case 'publish': {
+      const p = await publishThreatModel(deps, job.issueId);
+      if (p.ok) return voidOk();
+      // Nothing to publish or no design page is not worth retrying; transient failures are.
+      if (p.error.code === 'validation' || p.error.code === 'not_found') {
+        log('publish.skipped', { issueId: job.issueId, code: p.error.code });
+        return voidOk();
+      }
+      return p;
     }
     case 'migrate': {
       const m = await deps.migrate();

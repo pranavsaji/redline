@@ -61,6 +61,7 @@ export function fakeJira(issues: JiraIssue[]): JiraClient & { props: Map<string,
     getProperty: async (id, key) => ok(props.get(`${id}:${key}`) ?? null),
     subtaskType: async () => ok('10003'),
     createSubtask: async () => ok({ id: '1', key: 'X-1' }),
+    addRemoteLink: async () => ok(undefined),
     addLabel: async (_id, l) => {
       labels.push(`+${l}`);
       return ok(undefined);

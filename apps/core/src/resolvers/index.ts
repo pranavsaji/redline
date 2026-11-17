@@ -5,6 +5,7 @@ import { forgeGraphRequest, graphEnricher } from '../adapters/graph-enricher.js'
 import { panelEnrich, panelGet, panelRerun, panelThreats, threatExplain, type Viewer } from './panel.js';
 import { requirementsCreate, requirementsSetStatus } from './requirements.js';
 import { reviewConfirm, threatsTriage } from './threats.js';
+import { confluencePublish } from './confluence.js';
 
 type Ctx = { accountId?: unknown; cloudId?: unknown; extension?: { issue?: { id?: unknown } } };
 
@@ -51,6 +52,10 @@ resolver.define('threats.triage', async ({ payload, context }) => {
 resolver.define('review.confirm', async ({ payload, context }) => {
   const v = viewerOf(context as Ctx);
   return reviewConfirm(composeCore({ cloudId: v.cloudId }), v, payload ?? {});
+});
+resolver.define('confluence.publish', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return confluencePublish(composeCore({ cloudId: v.cloudId }), v, payload ?? {});
 });
 
 export const panelResolver = resolver.getDefinitions();

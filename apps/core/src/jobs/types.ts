@@ -17,6 +17,7 @@ export const ReviewJobSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('propagate'), issueId }).strict(),
   /** Recompute one work item's verdict (used for non-reviewed issue types under a reviewed parent). */
   z.object({ kind: z.literal('verdict'), issueId }).strict(),
+  z.object({ kind: z.literal('publish'), issueId }).strict(),
   z.object({ kind: z.literal('migrate') }).strict(),
 ]);
 export type ReviewJob = z.infer<typeof ReviewJobSchema>;

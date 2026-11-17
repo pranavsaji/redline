@@ -66,6 +66,8 @@ export interface JiraClient {
   subtaskType(projectId: string): Promise<Result<string>>;
   createSubtask(parentId: string, fields: { summary: string; description: AdfDoc; labels: string[]; issueTypeId: string }): Promise<Result<{ id: string; key: string }>>;
   addLabel(issueId: string, label: string): Promise<Result<void>>;
+  /** Creates or updates (same globalId) a web link on the work item. */
+  addRemoteLink(issueId: string, link: { globalId: string; url: string; title: string }): Promise<Result<void>>;
   removeLabel(issueId: string, label: string): Promise<Result<void>>;
   comment(issueId: string, adf: AdfDoc): Promise<Result<void>>;
   search(jql: string, fields: string[], max: number): Promise<Result<JiraIssue[]>>;
@@ -434,6 +436,11 @@ export function createJiraClient(request: FetchLike, opts: JiraClientOptions = {
       if (!r.ok) return r;
       const p = parse(z.object({ id: z.string(), key: z.string() }), r.value, 'create issue');
       return p.ok ? ok({ id: p.value.id, key: p.value.key }) : p;
+    },
+
+    async addRemoteLink(issueId, l) {
+      if (!ISSUE_REF.test(issueId)) return badRef('issue id');
+      return voidOf(await call(`/rest/api/3/issue/${seg(issueId)}/remotelink`, json('POST', { globalId: l.globalId, object: { url: l.url, title: l.title } })));
     },
 
     async addLabel(issueId, label) {

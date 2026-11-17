@@ -9,6 +9,7 @@ import { checkRerunLimit } from '../services/rate-limit.js';
 import { rolesOf } from '../services/roles.js';
 import { refreshVerdict, verdictKey } from '../services/verdict-service.js';
 import { newScopeCache, scopeForViewer, type ScopeCache } from '../services/viewer-scope.js';
+import { PAGE_KEY } from '../services/confluence-page.js';
 
 export const PAGE_SIZE = 50;
 const HISTORY_REVISIONS = 5;
@@ -49,6 +50,8 @@ export interface PanelDto {
   history: Array<{ revision: number; createdAt: string; riskScore: number; status: Review['status']; added: number; removed: number }>;
   samples: { received: number; expected: number };
   roles: Role[];
+  /** The published Confluence threat-model page, if any (RQ-5). */
+  threatModelPage: { url: string } | null;
 }
 
 type Denied = { error: 'not_found' | 'unavailable' | 'rate_limited' };
@@ -95,6 +98,7 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
     deps.config.site(),
     deps.state.get<Verdict & { panelUrl?: string }>(verdictKey(v.issueId)).catch(() => undefined),
   ]);
+  const page = await deps.state.get<{ url?: unknown }>(PAGE_KEY(v.issueId)).catch(() => undefined);
   if (!latest.ok || !history.ok || !requirements.ok || !ledger.ok || !policy.ok) return { error: 'unavailable' };
   const review = latest.value;
   let verdict = stored ?? null;
@@ -164,6 +168,7 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
     history: hist,
     samples: { received: review?.samplesReceived ?? 0, expected: review?.samplesExpected ?? 0 },
     roles,
+    threatModelPage: page && typeof page.url === 'string' ? { url: page.url } : null,
   };
 }
 

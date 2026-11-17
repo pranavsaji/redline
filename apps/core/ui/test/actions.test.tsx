@@ -146,3 +146,23 @@ describe('Threat triage (champions)', () => {
     expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
   });
 });
+
+describe('Confluence threat-model page (RQ-5)', () => {
+  it('a developer publishes from the History tab and then sees the page link', async () => {
+    const publish = vi.fn(async () => ({ pageId: '900', url: 'https://x/wiki/pages/900', created: true }));
+    await open({ ...withRoles('ready', ['viewer', 'developer']), publish }, /History/);
+    await userEvent.click(screen.getByRole('button', { name: 'Publish to Confluence' }));
+    expect(publish).toHaveBeenCalled();
+    expect((await screen.findByRole('link', { name: 'Open the threat-model page' })).getAttribute('href')).toBe('https://x/wiki/pages/900');
+  });
+
+  it('an already published item shows the link and an Update button; publish errors are shown', async () => {
+    const publish = vi.fn(async () => ({ error: 'validation' as const, message: 'Link a Confluence design page to this work item first.' }));
+    const api = withRoles('ready', ['viewer', 'developer']);
+    const dto = { ...structuredClone(FIXTURES.ready!), roles: ['viewer', 'developer'] as PanelDto['roles'], threatModelPage: { url: 'https://x/wiki/pages/900' } };
+    await open({ ...api, get: async () => dto, publish }, /History/);
+    expect(screen.getByRole('link', { name: 'Open the threat-model page' })).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Update the Confluence page' }));
+    expect(await screen.findByText('Link a Confluence design page to this work item first.')).toBeTruthy();
+  });
+});

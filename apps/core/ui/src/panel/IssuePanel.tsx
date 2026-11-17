@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ApiError } from '../types.js';
 import Button from '@atlaskit/button/new';
 import Lozenge from '@atlaskit/lozenge';
 import SectionMessage, { SectionMessageAction } from '@atlaskit/section-message';
@@ -14,6 +15,7 @@ import { ThreatCard } from './ThreatCard.js';
 import { pollMs, viewOf } from './states.js';
 import { RequirementsTab } from './RequirementsTab.js';
 import { ThreatTriage } from './ThreatEditor.js';
+import { ThreatModelPage } from './ThreatModelPage.js';
 
 const DISCARD_REASON: Record<string, string> = {
   low_votes: 'Too few agent runs agreed',
@@ -33,7 +35,12 @@ export function IssuePanel({ api }: { api: PanelApi }) {
   const load = useCallback(async () => {
     try {
       const r = await api.get();
-      if (isError(r)) setError(r.error === 'not_found' ? 'You do not have access to this work item.' : 'Redline is unavailable right now. Try again in a minute.');
+      if (isError(r))
+        setError(
+          r.error === 'not_found'
+            ? 'You do not have access to this work item.'
+            : 'Redline is unavailable right now. Try again in a minute.',
+        );
       else {
         setDto(r);
         setError(null);
@@ -57,9 +64,16 @@ export function IssuePanel({ api }: { api: PanelApi }) {
 
   const rerun = async () => {
     setBusy(true);
-    const r = await api.rerun().catch(() => ({ error: 'unavailable' as const }));
+    const r = await api.rerun().catch((): ApiError => ({ error: 'unavailable' }));
     setBusy(false);
-    if (isError(r)) setNotice(r.error === 'rate_limited' ? 'You have re-run reviews 10 times this hour. Try again later.' : r.error === 'not_found' ? 'You need edit permission to re-run the review.' : 'The re-run could not start. Try again.');
+    if (isError(r))
+      setNotice(
+        r.error === 'rate_limited'
+          ? 'You have re-run reviews 10 times this hour. Try again later.'
+          : r.error === 'not_found'
+            ? 'You need edit permission to re-run the review.'
+            : 'The re-run could not start. Try again.',
+      );
     else {
       setNotice('Review started. This usually takes about a minute.');
       void load();
@@ -68,15 +82,24 @@ export function IssuePanel({ api }: { api: PanelApi }) {
 
   const confirm = async (kind: 'review' | 'budget') => {
     if (!dto?.review) return;
-    const r = await api.confirm(dto.review.id, kind).catch(() => ({ error: 'unavailable' as const }));
+    const r = await api.confirm(dto.review.id, kind).catch((): ApiError => ({ error: 'unavailable' }));
     if (isError(r)) setNotice(errorText(r));
     else {
-      setNotice(kind === 'budget' ? 'Confirmed. The confirmation is in the ledger and the admin was alerted.' : 'Threats confirmed. Their requirements now decide the gate.');
+      setNotice(
+        kind === 'budget'
+          ? 'Confirmed. The confirmation is in the ledger and the admin was alerted.'
+          : 'Threats confirmed. Their requirements now decide the gate.',
+      );
       void load();
     }
   };
 
-  if (error) return <SectionMessage appearance="error" title="Redline">{error}</SectionMessage>;
+  if (error)
+    return (
+      <SectionMessage appearance="error" title="Redline">
+        {error}
+      </SectionMessage>
+    );
   if (!dto || !view)
     return (
       <div style={{ padding: 16, display: 'flex', gap: 8, alignItems: 'center' }} aria-live="polite">
@@ -86,7 +109,8 @@ export function IssuePanel({ api }: { api: PanelApi }) {
 
   const canRun = dto.roles.includes('developer');
   const champion = dto.roles.includes('champion');
-  const settled = dto.review !== null && !['queued', 'gathering', 'awaiting_agent', 'modeling'].includes(dto.review.status);
+  const settled =
+    dto.review !== null && !['queued', 'gathering', 'awaiting_agent', 'modeling'].includes(dto.review.status);
   const humanReason = dto.verdict?.reasons.find((r) => r.code === 'needs_human' || r.code === 'injection_unconfirmed');
   const facts = new Map(dto.facts.map((f) => [f.id, f]));
   const threats = [...dto.threats, ...(more?.threats ?? [])];
@@ -107,35 +131,77 @@ export function IssuePanel({ api }: { api: PanelApi }) {
             </SectionMessage>
           )}
           {view.state === 'failed' && (
-            <SectionMessage appearance="error" title="The review failed" actions={[<SectionMessageAction key="retry" onClick={rerun}>Retry review</SectionMessageAction>]}>
+            <SectionMessage
+              appearance="error"
+              title="The review failed"
+              actions={[
+                <SectionMessageAction key="retry" onClick={rerun}>
+                  Retry review
+                </SectionMessageAction>,
+              ]}
+            >
               Redline could not finish this review, so Done and merge stay blocked until it runs again.
             </SectionMessage>
           )}
           {view.state === 'timeout' && (
-            <SectionMessage appearance="error" title="The AI review did not arrive in time" actions={[<SectionMessageAction key="retry" onClick={rerun}>Retry review</SectionMessageAction>]}>
-              {dto.samples.received} of {dto.samples.expected} agent runs arrived. A missing review counts as a failed one, so Done and merge stay blocked.
+            <SectionMessage
+              appearance="error"
+              title="The AI review did not arrive in time"
+              actions={[
+                <SectionMessageAction key="retry" onClick={rerun}>
+                  Retry review
+                </SectionMessageAction>,
+              ]}
+            >
+              {dto.samples.received} of {dto.samples.expected} agent runs arrived. A missing review counts as a failed
+              one, so Done and merge stay blocked.
             </SectionMessage>
           )}
           {view.state === 'budget' && (
             <SectionMessage
               appearance="warning"
               title="Reviews are paused at the AI budget"
-              actions={champion ? [<SectionMessageAction key="confirm" onClick={() => void confirm('budget')}>Confirm this work item</SectionMessageAction>] : []}
+              actions={
+                champion
+                  ? [
+                      <SectionMessageAction key="confirm" onClick={() => void confirm('budget')}>
+                        Confirm this work item
+                      </SectionMessageAction>,
+                    ]
+                  : []
+              }
             >
-              The site reached its review budget or ran out of Rovo credits. A security champion can confirm this work item; the confirmation is recorded in the ledger.
+              The site reached its review budget or ran out of Rovo credits. A security champion can confirm this work
+              item; the confirmation is recorded in the ledger.
             </SectionMessage>
           )}
           {humanReason && (
             <SectionMessage
               appearance="warning"
               title="Threats need a security champion"
-              actions={champion ? [<SectionMessageAction key="confirm" onClick={() => void confirm('review')}>Confirm threats</SectionMessageAction>] : []}
+              actions={
+                champion
+                  ? [
+                      <SectionMessageAction key="confirm" onClick={() => void confirm('review')}>
+                        Confirm threats
+                      </SectionMessageAction>,
+                    ]
+                  : []
+              }
             >
               {humanReason.message}
             </SectionMessage>
           )}
           {view.stale && (
-            <SectionMessage appearance="warning" title="Context changed since the last review" actions={[<SectionMessageAction key="rerun" onClick={rerun}>Re-run review</SectionMessageAction>]}>
+            <SectionMessage
+              appearance="warning"
+              title="Context changed since the last review"
+              actions={[
+                <SectionMessageAction key="rerun" onClick={rerun}>
+                  Re-run review
+                </SectionMessageAction>,
+              ]}
+            >
               The design or linked work changed. Re-run the review before moving this work item to Done.
             </SectionMessage>
           )}
@@ -146,8 +212,14 @@ export function IssuePanel({ api }: { api: PanelApi }) {
           )}
           {injected.length > 0 && (
             <SectionMessage appearance="warning" title="Redline ignored instructions found in this page">
-              <p style={{ margin: '0 0 6px' }}>These sources contain text aimed at the AI. It was treated as data, and threats based on it need a security champion.</p>
-              <ul aria-label="Sources with suspected instructions" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <p style={{ margin: '0 0 6px' }}>
+                These sources contain text aimed at the AI. It was treated as data, and threats based on it need a
+                security champion.
+              </p>
+              <ul
+                aria-label="Sources with suspected instructions"
+                style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', gap: 6, flexWrap: 'wrap' }}
+              >
                 {injected.map((f) => (
                   <li key={f.id}>
                     <Lozenge appearance="moved">⚠ {f.title}</Lozenge>
@@ -189,14 +261,17 @@ export function IssuePanel({ api }: { api: PanelApi }) {
                   </ThreatCard>
                 ))}
                 {dto.hiddenThreats > 0 && (
-                  <p style={{ color: token('color.text.subtlest'), font: token('font.body.small') }}>{dto.hiddenThreats} threat(s) cite sources you cannot open and are not shown.</p>
+                  <p style={{ color: token('color.text.subtlest'), font: token('font.body.small') }}>
+                    {dto.hiddenThreats} threat(s) cite sources you cannot open and are not shown.
+                  </p>
                 )}
                 {cursor !== null && (
                   <div>
                     <Button
                       onClick={async () => {
                         const r = await api.threats(cursor);
-                        if (!isError(r)) setMore({ threats: [...(more?.threats ?? []), ...r.threats], cursor: r.cursor });
+                        if (!isError(r))
+                          setMore({ threats: [...(more?.threats ?? []), ...r.threats], cursor: r.cursor });
                       }}
                     >
                       Show more threats
@@ -205,11 +280,18 @@ export function IssuePanel({ api }: { api: PanelApi }) {
                 )}
                 {(dto.discarded.length > 0 || dto.hiddenDiscarded > 0) && (
                   <div>
-                    <Button appearance="subtle" onClick={() => setShowDiscarded(!showDiscarded)} aria-expanded={showDiscarded}>
+                    <Button
+                      appearance="subtle"
+                      onClick={() => setShowDiscarded(!showDiscarded)}
+                      aria-expanded={showDiscarded}
+                    >
                       {showDiscarded ? 'Hide' : 'Show'} discarded threats ({dto.discarded.length + dto.hiddenDiscarded})
                     </Button>
                     {showDiscarded && (
-                      <ul aria-label="Discarded threats" style={{ margin: '6px 0 0', paddingLeft: 18, display: 'grid', gap: 4 }}>
+                      <ul
+                        aria-label="Discarded threats"
+                        style={{ margin: '6px 0 0', paddingLeft: 18, display: 'grid', gap: 4 }}
+                      >
                         {dto.discarded.map((d, i) => (
                           <li key={`${d.title}-${i}`}>
                             <s>{d.title}</s> — {DISCARD_REASON[d.reason] ?? d.reason}
@@ -226,30 +308,41 @@ export function IssuePanel({ api }: { api: PanelApi }) {
               <RequirementsTab dto={dto} api={api} onChanged={() => void load()} />
             </TabPanel>
             <TabPanel>
-              <table style={{ borderCollapse: 'collapse', marginTop: 8, width: '100%' }}>
-                <caption style={{ textAlign: 'left', font: token('font.body.small'), color: token('color.text.subtle') }}>Review history</caption>
-                <thead>
-                  <tr>
-                    {['Revision', 'When', 'Risk', 'Status', 'Added', 'Removed'].map((h) => (
-                      <th key={h} scope="col" style={{ textAlign: 'left', padding: 4, borderBottom: `1px solid ${token('color.border')}` }}>
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {dto.history.map((h) => (
-                    <tr key={h.revision}>
-                      <td style={{ padding: 4 }}>{h.revision}</td>
-                      <td style={{ padding: 4 }}>{new Date(h.createdAt).toLocaleString()}</td>
-                      <td style={{ padding: 4 }}>{h.riskScore}</td>
-                      <td style={{ padding: 4 }}>{h.status.replace('_', ' ')}</td>
-                      <td style={{ padding: 4 }}>+{h.added}</td>
-                      <td style={{ padding: 4 }}>−{h.removed}</td>
+              <div style={{ display: 'grid', width: '100%' }}>
+                <ThreatModelPage dto={dto} api={api} />
+                <table style={{ borderCollapse: 'collapse', marginTop: 8, width: '100%' }}>
+                  <caption
+                    style={{ textAlign: 'left', font: token('font.body.small'), color: token('color.text.subtle') }}
+                  >
+                    Review history
+                  </caption>
+                  <thead>
+                    <tr>
+                      {['Revision', 'When', 'Risk', 'Status', 'Added', 'Removed'].map((h) => (
+                        <th
+                          key={h}
+                          scope="col"
+                          style={{ textAlign: 'left', padding: 4, borderBottom: `1px solid ${token('color.border')}` }}
+                        >
+                          {h}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {dto.history.map((h) => (
+                      <tr key={h.revision}>
+                        <td style={{ padding: 4 }}>{h.revision}</td>
+                        <td style={{ padding: 4 }}>{new Date(h.createdAt).toLocaleString()}</td>
+                        <td style={{ padding: 4 }}>{h.riskScore}</td>
+                        <td style={{ padding: 4 }}>{h.status.replace('_', ' ')}</td>
+                        <td style={{ padding: 4 }}>+{h.added}</td>
+                        <td style={{ padding: 4 }}>−{h.removed}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </TabPanel>
           </Tabs>
         </>

@@ -47,6 +47,10 @@ describe('panel.get', () => {
     expect(dto.facts[0]).not.toHaveProperty('excerpt');
     expect(dto.history).toEqual([expect.objectContaining({ revision: 1, added: dto.threats.length, removed: 0 })]);
     expect(dto.roles).toContain('developer');
+    expect(dto.threatModelPage).toBeNull();
+    t.kv.data.set('page:10042', { pageId: '900', parentId: '500', url: 'https://x/wiki/pages/900' });
+    const again = await panelGet(t.deps, viewer());
+    expect(!('error' in again) && again.threatModelPage).toEqual({ url: 'https://x/wiki/pages/900' });
   });
 
   it('computes and stores the verdict when the KVS copy is missing (items reviewed before the mirror existed)', async () => {

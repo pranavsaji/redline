@@ -247,6 +247,12 @@ describe('jira client: writes', () => {
     expect(await jira.getProperty('PAY 8', 'redline.verdict')).toMatchObject({ ok: false, error: { code: 'validation' } });
   });
 
+  it('addRemoteLink upserts by globalId', async () => {
+    const { jira, calls } = client([[/POST \/rest\/api\/3\/issue\/10042\/remotelink$/, { status: 200, body: JSON.stringify({ id: 1 }) }]]);
+    expect(await jira.addRemoteLink('10042', { globalId: 'redline-threat-model-10042', url: 'https://x/wiki/pages/9', title: 'Threat model' })).toEqual({ ok: true, value: undefined });
+    expect(JSON.parse(calls[0]!.init!.body!)).toEqual({ globalId: 'redline-threat-model-10042', object: { url: 'https://x/wiki/pages/9', title: 'Threat model' } });
+  });
+
   it('addLabel / removeLabel use the update verbs', async () => {
     const { jira, calls } = client([[/PUT \/rest\/api\/3\/issue\/10042$/, { status: 204 }]]);
     await jira.addLabel('10042', 'redline-review');

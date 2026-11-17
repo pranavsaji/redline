@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ApiError } from '../types.js';
 import Button from '@atlaskit/button/new';
 import Lozenge from '@atlaskit/lozenge';
 import { token } from '@atlaskit/tokens';
@@ -46,7 +47,7 @@ export function RequirementsTab({ dto, api, onChanged }: { dto: PanelDto; api: P
 
   const create = async () => {
     setBusy(true);
-    const r = await api.createRequirements(missing.map((x) => x.threatId)).catch(() => ({ error: 'unavailable' as const }));
+    const r = await api.createRequirements(missing.map((x) => x.threatId)).catch((): ApiError => ({ error: 'unavailable' }));
     setBusy(false);
     if (isError(r)) return setNotice(errorTextOf(r));
     const keys = r.created.map((c) => c.subtaskKey);
@@ -58,7 +59,7 @@ export function RequirementsTab({ dto, api, onChanged }: { dto: PanelDto; api: P
   const change = async (r: Requirement, status: RequirementStatus) => {
     if (status === 'Verified') return setVerifying(r.id);
     setVerifying(null);
-    const out = await api.setStatus(r.id, status).catch(() => ({ error: 'unavailable' as const }));
+    const out = await api.setStatus(r.id, status).catch((): ApiError => ({ error: 'unavailable' }));
     if (isError(out)) setNotice(errorTextOf(out));
     else onChanged();
   };
@@ -113,7 +114,7 @@ export function RequirementsTab({ dto, api, onChanged }: { dto: PanelDto; api: P
               <EvidenceForm
                 onCancel={() => setVerifying(null)}
                 onSubmit={async (evidence) => {
-                  const out = await api.setStatus(r.id, 'Verified', evidence).catch(() => ({ error: 'unavailable' as const }));
+                  const out = await api.setStatus(r.id, 'Verified', evidence).catch((): ApiError => ({ error: 'unavailable' }));
                   if (isError(out)) return errorTextOf(out);
                   setVerifying(null);
                   setNotice(`${r.subtaskKey ?? 'Requirement'} marked Verified.`);

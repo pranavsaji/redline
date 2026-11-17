@@ -1,4 +1,5 @@
 import { useId, useState, type FormEvent } from 'react';
+import type { ApiError } from '../types.js';
 import Button from '@atlaskit/button/new';
 import { errorText as errorTextOf, isError, type PanelApi, type TriageInput } from '../bridge.js';
 import type { Threat } from '../types.js';
@@ -56,7 +57,7 @@ export function ThreatEditor({ threat, others, api, onDone, onCancel }: { threat
     const input = build();
     if (typeof input === 'string') return setError(input);
     setSaving(true);
-    const r = await api.triage(input).catch(() => ({ error: 'unavailable' as const }));
+    const r = await api.triage(input).catch((): ApiError => ({ error: 'unavailable' }));
     setSaving(false);
     if (isError(r)) return setError(errorTextOf(r));
     setError(null);

@@ -23,6 +23,7 @@ export interface PanelApi {
   setStatus(requirementId: string, status: RequirementStatus, evidence?: Pick<Evidence, 'kind' | 'ref'>): Promise<Requirement | ApiError>;
   triage(input: TriageInput): Promise<Threat[] | ApiError>;
   confirm(reviewId: string, kind: 'review' | 'budget'): Promise<{ seq: number } | ApiError>;
+  publish(): Promise<{ pageId: string; url: string; created: boolean } | ApiError>;
 }
 
 export async function forgeApi(): Promise<PanelApi> {
@@ -37,6 +38,7 @@ export async function forgeApi(): Promise<PanelApi> {
     setStatus: (requirementId, status, evidence) => invoke('requirements.setStatus', { requirementId, status, ...(evidence ? { evidence } : {}) }),
     triage: (input) => invoke('threats.triage', input),
     confirm: (reviewId, kind) => invoke('review.confirm', { reviewId, kind }),
+    publish: () => invoke('confluence.publish'),
   };
 }
 

@@ -16,3 +16,4 @@ export * from './incremental.js';
 export * from './posture.js';
 export * from './pipeline.js';
 export * from './review-context.js';
+export * from './render/threat-model-storage.js';

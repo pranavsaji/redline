@@ -16,6 +16,7 @@ export function mockApi(state = new URLSearchParams(window.location.search).get(
     },
     triage: async () => dto.threats,
     confirm: async () => ({ seq: 1 }),
+    publish: async () => ({ pageId: '900', url: 'https://example.atlassian.net/wiki/spaces/PAY/pages/900', created: true }),
     explain: async (_r, threatId) => {
       const t = dto.threats.find((x) => x.id === threatId);
       return { story: `${t?.plainLanguage ?? ''} ${t?.scenario ?? ''}`.trim(), fixes: ['Expire sign-in links after 15 minutes and after first use.'], refs: [{ framework: 'CWE', id: 'CWE-640', title: 'Weak Password Recovery Mechanism', url: 'https://cwe.mitre.org/data/definitions/640.html' }] };
