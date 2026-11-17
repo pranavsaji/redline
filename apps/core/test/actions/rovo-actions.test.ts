@@ -256,6 +256,16 @@ describe('release-readiness', () => {
     expect(r.blockers[0]!.reasons.join(' ')).toMatch(/open security requirement/);
   });
 
+  it('a fix version with no reviewable work items is not a Go: it says nothing was found', async () => {
+    const { t } = await reviewed();
+    t.jira.search = async () => ok([]);
+    const r = await getReleaseReadiness({ fixVersion: '9.9', ...ctx(ME) }, t.deps);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.items).toBe(0);
+    expect(r.call).toBe('Conditional');
+    expect(r.conditions.join(' ')).toMatch(/No work items you can see in fix version 9\.9 are reviewed by Redline/);
+  });
+
   it('Go when everything passes; an enabled-project item with no review blocks (fail closed)', async () => {
     const { t } = await reviewed({ allVerified: true });
     t.jira.search = async () => ok([jiraIssue({ id: ISSUE, key: 'PAY-7', fixVersions: ['4.2'] })]);

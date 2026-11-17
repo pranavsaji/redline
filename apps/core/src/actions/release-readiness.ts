@@ -70,8 +70,12 @@ export async function getReleaseReadiness(payload: ActionPayload & Record<string
   const shown = await splitVisibleAcceptances(deps, caller, relevant);
   const hidden = shown.hidden;
   const base = releaseReadiness(items, shown.visible, now);
-  const hiddenNote = hidden > 0 ? [`${hidden} accepted risk${hidden === 1 ? '' : 's'} on a requirement you cannot see`] : [];
-  const r = { ...base, conditions: [...base.conditions, ...hiddenNote], call: base.call === 'Go' && hidden > 0 ? ('Conditional' as const) : base.call };
+  const notes = [
+    ...(hidden > 0 ? [`${hidden} accepted risk${hidden === 1 ? '' : 's'} on a requirement you cannot see`] : []),
+    // An empty or misspelt version must not read as "Go".
+    ...(items.length === 0 ? [`No work items you can see in fix version ${fixVersion} are reviewed by Redline; check the version name`] : []),
+  ];
+  const r = { ...base, conditions: [...base.conditions, ...notes], call: base.call === 'Go' && notes.length > 0 ? ('Conditional' as const) : base.call };
   const keyOf = new Map(items.map((i) => [i.issueId, i.issueKey]));
   const truncated = listed.length > RELEASE_MAX_ITEMS;
   const call: ReleaseCall = truncated && r.call === 'Go' ? 'Conditional' : r.call;
