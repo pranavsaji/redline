@@ -39,6 +39,8 @@ export interface PrFacts {
 const ISSUE_KEY = /\b([A-Z][A-Z0-9]+-\d+)\b/;
 const ISSUE_KEYS = /\b([A-Z][A-Z0-9]+-\d+)\b/g;
 const MSG_SIGNATURE = 'Redline: attestation signature invalid. Copy a fresh attestation from the Jira issue panel.';
+/** Bitbucket stores descriptions as Markdown and escapes punctuation (`\_`, `\-`); undo that before looking for tokens. */
+export const unescapeMarkdown = (text: string) => text.replace(/\\([\\`*_{}[\]()#+\-.!|~<>])/g, '$1');
 const utcMinute = (sec: number) => `${new Date(sec * 1000).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 
 /** The payload's repo, commit and iat, read without trusting it (only to choose which token to verify). */
@@ -93,7 +95,7 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
     message: `Redline: this change touches security-sensitive files (${shown}) and has no attestation. Ask your IDE agent for get-merge-attestation on ${key}, or click Copy attestation in Jira.`,
   };
 
-  const tokens = findAttestations(i.pr.description);
+  const tokens = findAttestations(unescapeMarkdown(i.pr.description));
   if (tokens.length === 0) return missing;
   const repo = i.pr.repoFullName.toLowerCase();
   const peeked = tokens.map((t) => ({ t, p: peek(t) }));

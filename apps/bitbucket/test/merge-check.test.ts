@@ -62,6 +62,14 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
     expect(await run(`Ready.\n${token()}`)).toEqual({ success: true, outcome: 'pass_attested', message: 'Redline: attested by PAY-7, 2 requirements verified.' });
   });
 
+  it('a token pasted through Bitbucket’s Markdown editor (underscores escaped as \\_) still verifies', async () => {
+    let t = token();
+    for (let n = 0; !t.includes('_') && n < 50; n++) t = token({ nonce: `nonce${n}` });
+    expect(t).toContain('_');
+    const markdown = `Redline attestation for PAY-7 \\(expires soon\\):  \n${t.replace(/_/g, '\\_').replace(/-/g, '\\-')}`;
+    expect((await run(markdown)).outcome).toBe('pass_attested');
+  });
+
   it('Review Focus 3: an older attestation for commit A and a newer one for head B passes', async () => {
     const older = token({ commitSha: OLD, iat: NOW - 7200, nonce: 'older1' });
     const newer = token({ commitSha: HEAD, iat: NOW - 60, nonce: 'newer1' });

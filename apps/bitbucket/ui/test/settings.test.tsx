@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import './setup-dom.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEventLib from '@testing-library/user-event';
 import axe from 'axe-core';
 import { encodeAttestation, generateKeyPair } from '@redline/crypto';
@@ -18,7 +18,8 @@ describe('Repository settings (Task 27)', () => {
   it('shows the saved keys, paths, mode and threshold', async () => {
     render(<RepoSettings api={api()} />);
     const form = await screen.findByRole('form', { name: 'Redline settings' });
-    expect((within(form).getByRole('textbox', { name: /Redline public keys/ }) as HTMLTextAreaElement).value).toBe(key.publicKey);
+    // The form renders (disabled) before the settings arrive; wait for the loaded values.
+    await waitFor(() => expect((within(form).getByRole('textbox', { name: /Redline public keys/ }) as HTMLTextAreaElement).value).toBe(key.publicKey));
     expect((within(form).getByRole('textbox', { name: /Extra sensitive paths/ }) as HTMLTextAreaElement).value).toBe('billing/**');
     expect((within(form).getByRole('radio', { name: /Block/ }) as HTMLInputElement).checked).toBe(true);
     expect((within(form).getByRole('spinbutton', { name: /Diff score threshold/ }) as HTMLInputElement).value).toBe('40');
