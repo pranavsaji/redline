@@ -1,0 +1,30 @@
+{
+  "name": "@redline/bitbucket-ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@atlaskit/button": "^25.8.1",
+    "@atlaskit/css-reset": "^8.4.10",
+    "@atlaskit/tokens": "^20.12.0",
+    "@forge/bridge": "^5.17.0",
+    "@redline/crypto": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.12",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "axe-core": "^4.14.0",
+    "jsdom": "^25.0.1",
+    "vite": "^6.4.6"
+  }
+}

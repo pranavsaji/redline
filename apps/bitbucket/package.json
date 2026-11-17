@@ -10,9 +10,10 @@
     "@forge/api": "^8.5.0",
     "@forge/kvs": "^2.1.2",
     "@forge/resolver": "^2.0.2",
-    "@redline/shared": "workspace:*",
+    "@redline/core": "workspace:*",
     "@redline/crypto": "workspace:*",
-    "@redline/core": "workspace:*"
+    "@redline/shared": "workspace:*",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

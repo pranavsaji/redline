@@ -1,0 +1,6 @@
+{
+  "values": [
+    { "status": "modified", "lines_added": 40, "lines_removed": 3, "old": { "path": "src/auth/webhook.ts" }, "new": { "path": "src/auth/webhook.ts" } },
+    { "status": "added", "lines_added": 20, "lines_removed": 0, "old": null, "new": { "path": "test/auth/webhook.test.ts" } }
+  ]
+}

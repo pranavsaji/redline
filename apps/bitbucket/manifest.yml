@@ -12,11 +12,24 @@ modules:
       name: Redline security attestation
       description: Requires a valid Redline attestation for security-sensitive changes
       triggers: [ on-code-pushed, on-merge ]
+  bitbucket:repoSettingsMenuPage:
+    - key: redline-repo-settings
+      title: Redline
+      resource: settings
+      resolver:
+        function: settingsResolverFn
+      render: default
   function:
     - key: mergeCheck
       handler: index.mergeCheck
+    - key: settingsResolverFn
+      handler: index.settingsResolver
+resources:
+  - key: settings
+    path: ui/build
 permissions:
   scopes:
     - read:pullrequest:bitbucket
     - read:repository:bitbucket
+    - read:user:bitbucket
     - storage:app

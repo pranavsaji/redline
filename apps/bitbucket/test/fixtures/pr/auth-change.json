@@ -1,0 +1,7 @@
+{
+  "id": 7,
+  "title": "PAY-7 Verify refund webhook signatures",
+  "description": "Adds HMAC verification.\n\n{{ATTESTATION}}",
+  "source": { "branch": { "name": "feature/PAY-7-webhook-hmac" }, "commit": { "hash": "bbbbbbbbbbbb" } },
+  "destination": { "branch": { "name": "main" }, "commit": { "hash": "dddddddddddd" }, "repository": { "full_name": "acme/payments", "uuid": "{repo-uuid}" } }
+}
