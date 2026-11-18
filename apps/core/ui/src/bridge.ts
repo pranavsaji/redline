@@ -1,4 +1,4 @@
-import type { AcceptanceState, ApiError, DrillDto, Evidence, FactDto, PanelDto, PostureDto, ReleaseReadinessResult, Requirement, RequirementStatus, Severity, Threat, ThreatExplanation } from './types.js';
+import type { AcceptanceState, AdminPolicyDto, ApiError, DigestConfig, DrillDto, Evidence, FactDto, OpsConfig, PanelDto, PostureDto, ReleaseReadinessResult, Requirement, RequirementStatus, RunDto, Severity, SitePolicy, Threat, ThreatExplanation, UsageDto } from './types.js';
 
 export interface AcceptanceInput {
   requirementId: string;
@@ -89,6 +89,15 @@ export interface AdminApi {
   publicKeys(): Promise<PublicKeyInfo | ApiError>;
   rotateKey(): Promise<{ kid: string } | ApiError>;
   keyCopied(): Promise<{ ok: true } | ApiError>;
+  getPolicy(): Promise<AdminPolicyDto | ApiError>;
+  setPolicy(policy: SitePolicy): Promise<{ policy: SitePolicy } | ApiError>;
+  warnOnly(projectKey: string, days: number): Promise<{ projectKey: string; since: string; until: string; entryHash: string } | ApiError>;
+  endWarnOnly(projectKey: string): Promise<{ projectKey: string; entryHash: string } | ApiError>;
+  runs(): Promise<{ runs: RunDto[] } | ApiError>;
+  usage(): Promise<UsageDto | ApiError>;
+  /** Leave a key out to keep it; null turns it off. */
+  setNotifications(n: { ops?: OpsConfig | null; digest?: DigestConfig | null }): Promise<{ ops: OpsConfig | null; digest: DigestConfig | null } | ApiError>;
+  projectStatuses(projectKey: string): Promise<{ projectKey: string; statuses: string[] } | ApiError>;
 }
 
 export async function forgeAdminApi(): Promise<AdminApi> {
@@ -101,6 +110,14 @@ export async function forgeAdminApi(): Promise<AdminApi> {
     publicKeys: () => invoke('keys.public'),
     rotateKey: () => invoke('keys.rotate'),
     keyCopied: () => invoke('keys.copied'),
+    getPolicy: () => invoke('admin.getPolicy'),
+    setPolicy: (policy) => invoke('admin.setPolicy', { policy }),
+    warnOnly: (projectKey, days) => invoke('admin.warnOnly', { projectKey, days }),
+    endWarnOnly: (projectKey) => invoke('admin.warnOnlyEnd', { projectKey }),
+    runs: () => invoke('admin.runs'),
+    usage: () => invoke('admin.usage'),
+    setNotifications: (n) => invoke('admin.setNotifications', { ...n }),
+    projectStatuses: (projectKey) => invoke('admin.projectStatuses', { projectKey }),
   };
 }
 

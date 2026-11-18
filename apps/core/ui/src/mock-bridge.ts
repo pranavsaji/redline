@@ -1,6 +1,7 @@
 import type { AdminApi, PanelApi, PostureApi } from './bridge.js';
 import { DRILL_FIXTURE, POSTURE_FIXTURE, RELEASE_FIXTURE } from './posture/fixtures.js';
 import { FIXTURES } from './fixtures.js';
+import { ADMIN_POLICY_FIXTURE, RUNS_FIXTURE, USAGE_FIXTURE } from './admin/fixtures.js';
 
 /** Local preview: `pnpm --filter @redline/core-ui dev`, then ?state=ready|in_progress|failed|… and ?theme=dark. */
 export function mockApi(state = new URLSearchParams(window.location.search).get('state') ?? 'ready'): PanelApi {
@@ -33,9 +34,29 @@ export function mockApi(state = new URLSearchParams(window.location.search).get(
   };
 }
 
-/** Local preview of the admin page: `?view=admin`. */
-export function mockAdminApi(): AdminApi {
+/** Local preview of the admin page: `?view=admin` (`&state=first` shows the first-run wizard). */
+export function mockAdminApi(state = typeof window === 'undefined' ? 'ready' : (new URLSearchParams(window.location.search).get('state') ?? 'ready')): AdminApi {
+  const dto = structuredClone(ADMIN_POLICY_FIXTURE);
+  if (state === 'first') Object.assign(dto, { saved: false, policy: { ...dto.policy, enabledProjects: [] } });
+  const DAY = 86_400_000;
   return {
+    getPolicy: async () => structuredClone(dto),
+    setPolicy: async (policy) => ((dto.policy = { ...structuredClone(policy), warnOnly: dto.policy.warnOnly }), (dto.saved = true), { policy: structuredClone(dto.policy) }),
+    warnOnly: async (projectKey, days) => {
+      const since = new Date().toISOString();
+      const until = new Date(Date.now() + days * DAY).toISOString();
+      dto.policy.warnOnly = [...dto.policy.warnOnly.filter((w) => w.projectKey !== projectKey), { projectKey, since, until }];
+      return { projectKey, since, until, entryHash: 'a'.repeat(64) };
+    },
+    endWarnOnly: async (projectKey) => ((dto.policy.warnOnly = dto.policy.warnOnly.filter((w) => w.projectKey !== projectKey)), { projectKey, entryHash: 'b'.repeat(64) }),
+    runs: async () => ({ runs: structuredClone(RUNS_FIXTURE) }),
+    usage: async () => structuredClone(USAGE_FIXTURE),
+    setNotifications: async (n) => {
+      if (n.ops !== undefined) dto.ops = n.ops;
+      if (n.digest !== undefined) dto.digest = n.digest;
+      return { ops: dto.ops, digest: dto.digest };
+    },
+    projectStatuses: async (projectKey) => ({ projectKey, statuses: ['To Do', 'In Progress', 'In Review', 'Done'] }),
     seed: async (projectKey) => ({ epicKey: `${projectKey}-1`, storyKeys: [`${projectKey}-2`, `${projectKey}-3`], designPageUrl: 'https://example.atlassian.net/wiki/spaces/PAY/pages/1', incidentKeys: [`${projectKey}-4`, `${projectKey}-5`] }),
     publicKeys: async () => ({ active: { kid: 'k-mock', publicKey: 'MCowBQYDK2VwAyEAmockpublickey' } }),
     rotateKey: async () => ({ kid: 'k-mock-2' }),
