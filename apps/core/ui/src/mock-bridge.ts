@@ -1,6 +1,6 @@
 import type { AdminApi, PanelApi, PostureApi } from './bridge.js';
 import { DRILL_FIXTURE, POSTURE_FIXTURE, RELEASE_FIXTURE } from './posture/fixtures.js';
-import { FIXTURES } from './fixtures.js';
+import { DIFF_FIXTURE, FIXTURES } from './fixtures.js';
 import { ADMIN_POLICY_FIXTURE, RUNS_FIXTURE, USAGE_FIXTURE } from './admin/fixtures.js';
 
 /** Local preview: `pnpm --filter @redline/core-ui dev`, then ?state=ready|in_progress|failed|… and ?theme=dark. */
@@ -10,6 +10,15 @@ export function mockApi(state = new URLSearchParams(window.location.search).get(
     get: async () => structuredClone(dto),
     threats: async () => ({ threats: [], cursor: null }),
     rerun: async () => ({ ok: true }),
+    diff: async (from, to) => ({ ...structuredClone(DIFF_FIXTURE), ...(from ? { from } : {}), ...(to ? { to } : {}) }),
+    whatIf: async (change) => {
+      const baseline = { exposure: 'internal' as const, dataClasses: ['pii' as const] };
+      const signals = { exposure: change.exposure ?? baseline.exposure, dataClasses: change.dataClasses ?? baseline.dataClasses };
+      const mult = { internal: 1, partner: 1.15, public: 1.3 }[signals.exposure];
+      const extra = signals.dataClasses.filter((d) => !baseline.dataClasses.includes(d as 'pii')).length * 8;
+      const current = dto.review?.riskScore ?? 0;
+      return { current, riskScore: Math.min(100, Math.round((current + extra) * mult)), signals: { ...signals, dataClasses: [...signals.dataClasses] }, baseline: { ...baseline, dataClasses: [...baseline.dataClasses] }, partial: false };
+    },
     enrich: async () => ({ added: 0, partial: true, facts: [] }),
     createRequirements: async (threatIds) => ({ created: threatIds.map((id, i) => ({ requirementId: `req_${id}`, subtaskKey: `PAY-${100 + i}` })), skipped: [] }),
     setStatus: async (requirementId, status, evidence) => {

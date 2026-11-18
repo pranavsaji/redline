@@ -14,3 +14,16 @@ export function riskScore(
   const data = Math.min(20, [...new Set(signals.dataClasses)].reduce((n, d) => n + DATA_CLASS_WEIGHT[d], 0));
   return Math.min(100, Math.round((base + data) * EXPOSURE_MULTIPLIER[signals.exposure]));
 }
+
+/**
+ * R12 what-if: the score this review would get with a different exposure or set of data classes (replacing the current
+ * set). Pure; nothing is stored.
+ */
+export function whatIfScore(
+  threats: ReadonlyArray<{ severity: Severity; state: ThreatState }>,
+  signals: { dataClasses: readonly DataClass[]; exposure: Exposure },
+  change: { exposure?: Exposure; dataClasses?: readonly DataClass[] },
+): { current: number; riskScore: number; signals: { exposure: Exposure; dataClasses: DataClass[] } } {
+  const next = { exposure: change.exposure ?? signals.exposure, dataClasses: [...new Set(change.dataClasses ?? signals.dataClasses)] };
+  return { current: riskScore(threats, signals), riskScore: riskScore(threats, next), signals: next };
+}

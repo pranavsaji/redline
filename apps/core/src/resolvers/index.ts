@@ -2,7 +2,7 @@ import Resolver from '@forge/resolver';
 import queryKeys from '../../graph/query-keys.json';
 import { composeCore } from '../composition.js';
 import { forgeGraphRequest, graphEnricher } from '../adapters/graph-enricher.js';
-import { panelEnrich, panelGet, panelRerun, panelThreats, threatExplain, type Viewer } from './panel.js';
+import { panelDiff, panelEnrich, panelGet, panelRerun, panelThreats, panelWhatIf, threatExplain, type Viewer } from './panel.js';
 import { requirementsCreate, requirementsSetStatus } from './requirements.js';
 import { reviewConfirm, threatsTriage } from './threats.js';
 import { confluencePublish } from './confluence.js';
@@ -39,6 +39,14 @@ resolver.define('panel.rerun', async ({ context }) => {
 resolver.define('panel.enrich', async ({ context }) => {
   const v = viewerOf(context as Ctx);
   return panelEnrich(composeCore({ cloudId: v.cloudId }), v, graphEnricher(forgeGraphRequest, queryKeys as Record<string, string>));
+});
+resolver.define('panel.diff', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return panelDiff(composeCore({ cloudId: v.cloudId }), v, payload ?? {});
+});
+resolver.define('panel.whatIf', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return panelWhatIf(composeCore({ cloudId: v.cloudId }), v, payload ?? {});
 });
 resolver.define('threat.explain', async ({ payload, context }) => {
   const v = viewerOf(context as Ctx);

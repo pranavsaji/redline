@@ -1,6 +1,6 @@
 import { assembleReview, requirementsFor } from '@redline/core';
 import { PROMPT_VERSION } from '@redline/prompts';
-import { appError, err, ok, type ContextBundle, type Result, type Review, type SitePolicy } from '@redline/shared';
+import { appError, err, ok, type ContextBundle, type ContextFact, type Result, type Review, type SitePolicy, type Threat } from '@redline/shared';
 import type { Sample } from '@redline/core';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
@@ -20,6 +20,19 @@ export const SCHEMA_VERSION_KEY = 'schema:version';
 
 const voidOk = (): Result<void> => ok(undefined);
 
+/** R7: the previous revision's threats and facts, so threats on unchanged sources carry over (with their triage). */
+async function priorRevision(deps: CoreDeps, review: Review): Promise<Result<{ threats: Threat[]; facts: ContextFact[] } | null>> {
+  if (review.revision <= 1) return ok(null);
+  const history = await deps.reviews.history(review.issueId);
+  if (!history.ok) return history;
+  const prev = history.value.filter((r) => r.revision < review.revision).at(-1);
+  if (!prev) return ok(null);
+  const [threats, facts] = await Promise.all([deps.reviews.threats(prev.id), deps.reviews.facts(prev.id)]);
+  if (!threats.ok) return threats;
+  if (!facts.ok) return facts;
+  return ok({ threats: threats.value, facts: facts.value });
+}
+
 /** Runs assembleReview and stores the result: threats, discarded, and requirement rows (existing rows keep their status). */
 async function applyAssembly(deps: CoreDeps, review: Review, bundle: ContextBundle, samples: Sample[], policy: SitePolicy, mode: 'progress' | 'final') {
   const priorDismissed = [];
@@ -28,7 +41,12 @@ async function applyAssembly(deps: CoreDeps, review: Review, bundle: ContextBund
     if (!d.ok) return d;
     priorDismissed.push(...d.value);
   }
-  const out = assembleReview({ review, bundle, samples, samplesExpected: review.samplesExpected, priorDismissed, policy, promptVersion: PROMPT_VERSION, now: deps.clock.now(), mode });
+  const prior = await priorRevision(deps, review);
+  if (!prior.ok) return prior;
+  const out = assembleReview({
+    review, bundle, samples, samplesExpected: review.samplesExpected, priorDismissed, policy, promptVersion: PROMPT_VERSION, now: deps.clock.now(), mode,
+    ...(prior.value ? { prior: prior.value } : {}),
+  });
   const saved = await deps.reviews.saveThreats(review.id, out.threats, out.discarded);
   if (!saved.ok) return saved;
   // Until every agent run is in, consensus is provisional: only rule-based threats get requirement rows, so threats

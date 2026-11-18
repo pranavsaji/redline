@@ -1,4 +1,4 @@
-import type { FactDto, PanelDto, Threat } from './types.js';
+import type { FactDto, PanelDto, Threat, ThreatDiffDto } from './types.js';
 
 const now = '2026-11-16T05:31:25.000Z';
 const fact = (id: string, title: string, over: Partial<FactDto> = {}): FactDto => ({
@@ -61,5 +61,21 @@ export const FIXTURES: Record<string, PanelDto> = {
   budget: withReview({ status: 'failed', failureReason: 'budget' }, { verdict: { ...base.verdict!, reasons: [{ code: 'budget_paused', message: 'Reviews are paused at the AI budget. A security champion can confirm this work item.' }] } }),
   injection: { ...base, facts: FACTS.map((f) => (f.id === 'fact_page' ? { ...f, injectionSuspected: true, injectionReasons: ['ai_directive'] } : f)) },
   stale: { ...base, verdict: { ...base.verdict!, reasons: [...base.verdict!.reasons, { code: 'review_stale', message: 'The design or linked work changed since the last review.', action: { label: 'Re-run review', href: '?rerun=1' } }] } },
+  revised: withReview({ revision: 2 }, { history: [{ revision: 1, createdAt: '2026-11-16T05:30:43.000Z', riskScore: 60, status: 'ready', added: 2, removed: 0 }, { revision: 2, createdAt: '2026-11-17T09:12:00.000Z', riskScore: 72, status: 'ready', added: 2, removed: 0 }] }),
   pass: { ...base, verdict: { ...base.verdict!, state: 'pass', blockingCount: 0, maxOpenSeverity: null, reasons: [] }, requirements: base.requirements.map((r) => ({ ...r, status: 'Verified' as const, verifiedBy: 'acc-dev', evidence: { kind: 'pr' as const, ref: 'https://bitbucket.org/acme/payments/pull-requests/42', attester: 'acc-dev' } })) },
+};
+
+/** R7 preview: what a re-run after one new design paragraph shows. */
+export const DIFF_FIXTURE: ThreatDiffDto = {
+  from: 1,
+  to: 2,
+  added: [
+    { id: 'thr_n1', title: 'Forged manager refund approval in chat', stride: 'Spoofing', severity: 'High', state: 'accepted', component: 'refund tool' },
+    { id: 'thr_n2', title: 'Order history emailed to an attacker address', stride: 'InformationDisclosure', severity: 'Medium', state: 'accepted', component: 'order export' },
+  ],
+  removed: [],
+  changed: [],
+  unchanged: 1,
+  hidden: 0,
+  summary: '2 new threats since last review',
 };

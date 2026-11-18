@@ -7,6 +7,7 @@ import {
   type AgentThreatModel,
   type Citation,
   type ContextBundle,
+  type ContextFact,
   type DismissReason,
   type Mapping,
   type Result,
@@ -27,6 +28,7 @@ import { plainLanguageFor } from './threats/plain-language.js';
 import { severityOf } from './threats/severity.js';
 import { normalizeText } from './threats/text.js';
 import { riskScore } from './scoring.js';
+import { diffBundles, threatsToReevaluate } from './incremental.js';
 import { isFailedSample, type DiscardedThreat, type Sample } from './ports.js';
 
 export const AGENT_SCHEMA_MARKER = 'redline.threatmodel.v1';
@@ -132,6 +134,11 @@ export interface AssembleInput {
   mode?: 'progress' | 'final';
   /** Extra injection signal from outside the facts (e.g. the quarantined extractor flagged the material). */
   injectionSuspected?: boolean;
+  /**
+   * R7: the previous revision's threats and facts. Threats whose citations all point at unchanged sources are carried
+   * over with their votes, state and triage; agent output then only adds threats (or raises a carried one's severity).
+   */
+  prior?: { threats: readonly Threat[]; facts: ReadonlyArray<Pick<ContextFact, 'id' | 'sourceAri' | 'version'>> };
 }
 export interface AssembleOutput {
   threats: Threat[];
@@ -157,6 +164,11 @@ function raiseSignals(signals: Signals, models: AgentThreatModel[]): Signals {
     if (s.llmFeatures) llm = true;
   }
   return { ...signals, exposure, dataClasses: [...dataClasses], llmFeatures: llm, payment: signals.payment || dataClasses.has('payment') };
+}
+
+/** The signals a review is scored on: the deterministic ones from the facts, raised by the agent sketches. */
+export function reviewSignals(facts: readonly ContextFact[], samples: readonly Sample[]): Signals {
+  return raiseSignals(extractSignals([...facts]), samples.filter((s): s is AgentThreatModel => !isFailedSample(s)));
 }
 
 const threatId = (reviewId: string, origin: string, stride: string, title: string): string =>
@@ -185,7 +197,7 @@ export function assembleReview(i: AssembleInput): AssembleOutput {
   const facts = i.bundle.facts;
   const valid = i.samples.filter((s): s is AgentThreatModel => !isFailedSample(s));
   const discarded: DiscardedThreat[] = i.samples.flatMap((s, n) => (isFailedSample(s) ? [{ title: `Agent run ${n + 1}: ${s.failed}`, reason: 'schema' as const }] : []));
-  const signals = raiseSignals(extractSignals(facts), valid);
+  const signals = reviewSignals(facts, valid);
   const injectionSuspected = facts.some((f) => f.injectionSuspected) || i.injectionSuspected === true;
   const factById = new Map(facts.map((f) => [f.id, f]));
   const voteBase = Math.max(1, valid.length);
@@ -298,6 +310,8 @@ export function assembleReview(i: AssembleInput): AssembleOutput {
     });
   }
 
+  if (i.prior) carryOver(threats, i.prior, facts, i.review.id);
+
   threats.sort((a, b) => severityRank(b.severity) - severityRank(a.severity) || b.votes - a.votes || a.title.localeCompare(b.title));
 
   const received = i.samples.length;
@@ -314,6 +328,37 @@ export function assembleReview(i: AssembleInput): AssembleOutput {
     injectionSuspected,
     signals,
   };
+}
+
+/**
+ * R7, in place: prior threats citing only unchanged facts replace their fresh counterparts (keeping votes, state and
+ * triage, taking the higher severity); prior threats with no fresh counterpart are added back. Fresh threats with no
+ * prior counterpart stay as new. Threats citing a changed or removed source are not carried: the fresh run decides.
+ */
+function carryOver(threats: Threat[], prior: NonNullable<AssembleInput['prior']>, facts: readonly ContextFact[], reviewId: string): void {
+  const present = new Set(facts.map((f) => f.id));
+  const { keep } = threatsToReevaluate([...prior.threats], prior.facts, diffBundles(prior.facts, facts));
+  const matched = new Set<number>();
+  for (const old of keep) {
+    if (old.citations.length === 0 || !old.citations.every((c) => present.has(c.factId))) continue;
+    const idx = threats.findIndex((t, n) => !matched.has(n) && similar(t, old, { ignoreComponent: true }));
+    const fresh = idx >= 0 ? threats[idx] : undefined;
+    const carried: Threat = {
+      ...old,
+      id: threatId(reviewId, old.origin, old.stride, old.title),
+      reviewId,
+      ...(fresh && severityRank(fresh.severity) > severityRank(old.severity)
+        ? { severity: fresh.severity, likelihood: Math.max(old.likelihood, fresh.likelihood), impact: Math.max(old.impact, fresh.impact) }
+        : {}),
+    };
+    if (idx >= 0) {
+      threats[idx] = carried;
+      matched.add(idx);
+    } else if (!threats.some((t) => t.id === carried.id)) {
+      threats.push(carried);
+      matched.add(threats.length - 1);
+    }
+  }
 }
 
 export const isBlockingSeverity = (t: Pick<Threat, 'severity'>, policy: Pick<SitePolicy, 'blockAtOrAbove'>): boolean =>

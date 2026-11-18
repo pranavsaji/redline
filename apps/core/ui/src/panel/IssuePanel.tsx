@@ -10,6 +10,8 @@ import { errorText, isError, type PanelApi } from '../bridge.js';
 import type { PanelDto, Threat } from '../types.js';
 import { EmptyState } from './EmptyState.js';
 import { Header } from './Header.js';
+import { ThreatDiff } from './ThreatDiff.js';
+import { WhatIf } from './WhatIf.js';
 import { StatusSteps } from './StatusSteps.js';
 import { ThreatCard } from './ThreatCard.js';
 import { pollMs, viewOf } from './states.js';
@@ -126,6 +128,7 @@ export function IssuePanel({ api }: { api: PanelApi }) {
       ) : (
         <>
           <Header dto={dto} />
+          {dto.review && <WhatIf api={api} />}
           {view.state === 'in_progress' && (
             <SectionMessage appearance="information" title="Review in progress">
               <StatusSteps steps={view.steps} />
@@ -238,6 +241,7 @@ export function IssuePanel({ api }: { api: PanelApi }) {
             </TabList>
             <TabPanel>
               <div style={{ display: 'grid', gap: 8, paddingTop: 8, width: '100%' }}>
+                {dto.history.length >= 2 && <ThreatDiff api={api} revisions={dto.history.map((h) => h.revision)} />}
                 {threats.length === 0 && <p style={{ color: token('color.text.subtle') }}>No threats yet.</p>}
                 {threats.map((t) => (
                   <ThreatCard

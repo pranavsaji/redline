@@ -11,6 +11,9 @@ describe('resolver registry', () => {
       expect(await call({ call: { functionKey, payload: {} }, context: {} })).toMatchObject({ error: 'forbidden' });
     },
   );
+  it.each(['panel.diff', 'panel.whatIf'])('%s is registered, and refuses a call with no work item or user', async (functionKey) => {
+    expect(await call({ call: { functionKey, payload: {} }, context: {} })).toEqual({ error: 'not_found' });
+  });
   it('an unknown call is not registered', async () => {
     await expect(call({ call: { functionKey: 'admin.nope' }, context: {} })).rejects.toThrow(/no definition/);
   });

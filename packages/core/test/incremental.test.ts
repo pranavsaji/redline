@@ -29,3 +29,119 @@ describe('incremental re-review', () => {
     expect(r.unchanged).toEqual([]);
   });
 });
+
+import type { AgentThreat, Review, Threat } from '@redline/shared';
+import { assembleReview, contextHash, DEFAULT_SITE_POLICY, EXPOSURE_MULTIPLIER, normalizeFact, riskScore, whatIfScore, type Sample } from '../src/index.js';
+import { rawFacts } from './fixtures/ai-support-agent.js';
+import { ISSUE_KEY, model, refundAbuse, transcriptLeak } from './fixtures/agent-samples.js';
+
+const ADDENDUM =
+  'Store managers approve refunds above the limit by replying to a chat message from the agent. Order history exports are emailed to whatever address the customer types into the chat.';
+const addendum = normalizeFact({
+  sourceAri: 'ari:cloud:confluence::page/2003',
+  sourceType: 'confluence_page',
+  title: 'Design addendum: escalations',
+  url: 'https://demo.atlassian.net/wiki/pages/2003',
+  text: `<p>${ADDENDUM}</p>`,
+  version: '1',
+  trusted: false,
+  origin: 'rest',
+});
+const approvalSpoof: AgentThreat = {
+  stride: 'Spoofing',
+  title: 'Forged manager refund approval in chat',
+  scenario: 'A customer pastes a fake manager reply and the agent treats it as approval.',
+  component: 'refund tool',
+  likelihood: 4,
+  impact: 4,
+  evidence: [{ quote: 'Store managers approve refunds above the limit by replying to a chat message from the agent.' }],
+};
+const exportLeak: AgentThreat = {
+  stride: 'InformationDisclosure',
+  title: 'Order history emailed to an attacker address',
+  scenario: 'Someone in the chat asks for the export to go to their own address.',
+  component: 'order export',
+  likelihood: 4,
+  impact: 3,
+  evidence: [{ quote: 'Order history exports are emailed to whatever address the customer types into the chat.' }],
+};
+
+const base = rawFacts.map(normalizeFact);
+const rev = (n: number): Review => ({
+  id: `rev_${n}`, issueId: '10001', issueKey: ISSUE_KEY, revision: n, status: 'awaiting_agent', contextHash: 'h', riskScore: 0, partial: false,
+  promptVersion: 'v1.2.0', modelIds: [], samplesExpected: 3, samplesReceived: 0, tokensIn: 0, tokensOut: 0, createdAt: '2026-11-15T00:00:00.000Z', updatedAt: '2026-11-15T00:00:00.000Z',
+});
+const run = (n: number, facts: typeof base, samples: Sample[], prior?: { threats: Threat[]; facts: typeof base }) =>
+  assembleReview({
+    review: rev(n),
+    bundle: { issueId: '10001', issueKey: ISSUE_KEY, facts, partial: false, partialReasons: [], contextHash: contextHash(facts), gatheredAt: '2026-11-15T00:00:00.000Z' },
+    samples, samplesExpected: 3, priorDismissed: [], policy: DEFAULT_SITE_POLICY, promptVersion: 'v1.2.0', now: new Date('2026-11-15T00:00:00Z'),
+    ...(prior ? { prior } : {}),
+  });
+
+describe('R7: incremental re-review (assembleReview with the previous revision)', () => {
+  const first = run(1, base, [1, 2, 3].map(() => model([refundAbuse, transcriptLeak])));
+  // A champion dismissed the transcript threat and triaged the refund threat.
+  const triaged = first.threats.map((t) => (t.title === transcriptLeak.title ? { ...t, state: 'dismissed' as const, dismissReason: 'already_mitigated' as const } : t));
+  const next = [...base, addendum];
+  const second = run(2, next, [1, 2, 3].map(() => model([refundAbuse, transcriptLeak, approvalSpoof, exportLeak])), { threats: triaged, facts: base });
+
+  it('re-running after one new design paragraph keeps the dismissed threat dismissed', () => {
+    const leak = second.threats.filter((t) => t.title === transcriptLeak.title);
+    expect(leak).toHaveLength(1);
+    expect(leak[0]).toMatchObject({ state: 'dismissed', dismissReason: 'already_mitigated', reviewId: 'rev_2' });
+  });
+
+  it('the diff shows exactly the two new threats as added', () => {
+    const d = threatDiff(triaged, second.threats);
+    expect(d.added.map((t) => t.title).sort()).toEqual([approvalSpoof.title, exportLeak.title].sort());
+    expect(d.removed).toEqual([]);
+  });
+
+  it('carried threats keep their votes and get ids in the new review', () => {
+    const before = triaged.find((t) => t.title === refundAbuse.title)!;
+    const after = second.threats.find((t) => t.title === refundAbuse.title)!;
+    expect(after.votes).toBe(before.votes);
+    expect(after.id).not.toBe(before.id);
+    expect(new Set(second.threats.map((t) => t.id)).size).toBe(second.threats.length);
+  });
+
+  it('carried threats are present before any new agent sample arrives', () => {
+    const waiting = run(2, next, [], { threats: triaged, facts: base });
+    expect(waiting.status).toBe('awaiting_agent');
+    expect(waiting.threats.find((t) => t.title === transcriptLeak.title)?.state).toBe('dismissed');
+    expect(waiting.threats.some((t) => t.title === refundAbuse.title)).toBe(true);
+  });
+
+  it('threats citing a changed source are re-evaluated, not carried', () => {
+    const edited = base.map((f) => (f.sourceAri.endsWith('page/2001') ? normalizeFact({ ...rawFacts[1]!, version: '8' }) : f));
+    const out = run(2, edited, [1, 2, 3].map(() => model([refundAbuse])), { threats: triaged, facts: base });
+    expect(out.threats.some((t) => t.title === transcriptLeak.title)).toBe(false);
+  });
+
+  it('a carried threat’s severity can rise with new agent evidence, never fall', () => {
+    const louder = { ...refundAbuse, likelihood: 5, impact: 5 };
+    const out = run(2, next, [1, 2, 3].map(() => model([louder])), { threats: triaged, facts: base });
+    expect(out.threats.find((t) => t.title === refundAbuse.title)?.severity).toBe('Critical');
+    const quieter = { ...refundAbuse, likelihood: 1, impact: 1 };
+    const low = run(2, next, [1, 2, 3].map(() => model([quieter])), { threats: triaged, facts: base });
+    expect(low.threats.find((t) => t.title === refundAbuse.title)?.severity).toBe(triaged.find((t) => t.title === refundAbuse.title)!.severity);
+  });
+});
+
+describe('R12: what-if score (nothing saved)', () => {
+  const threats = [{ severity: 'High' as const, state: 'accepted' as const }, { severity: 'Medium' as const, state: 'accepted' as const }];
+  it('public exposure raises the score by the exposure multiplier', () => {
+    const now = { exposure: 'internal' as const, dataClasses: ['pii' as const] };
+    const r = whatIfScore(threats, now, { exposure: 'public' });
+    expect(r.current).toBe(riskScore(threats, now));
+    expect(r.riskScore).toBe(Math.round((12 + 5 + 6) * EXPOSURE_MULTIPLIER.public));
+    expect(r.riskScore).toBeGreaterThan(r.current);
+    expect(r.signals).toEqual({ exposure: 'public', dataClasses: ['pii'] });
+  });
+  it('adding a data class raises it; leaving both unset changes nothing', () => {
+    const now = { exposure: 'internal' as const, dataClasses: [] as const };
+    expect(whatIfScore(threats, now, { dataClasses: ['payment'] }).riskScore).toBe(12 + 5 + 10);
+    expect(whatIfScore(threats, now, {}).riskScore).toBe(whatIfScore(threats, now, {}).current);
+  });
+});

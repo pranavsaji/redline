@@ -1,6 +1,7 @@
-import { rebuildAcceptances, threatDiff, type DiscardedThreat, type Role } from '@redline/core';
+import { z } from 'zod';
+import { rebuildAcceptances, reviewSignals, threatDiff, whatIfScore, type DiscardedThreat, type Role } from '@redline/core';
 import { cweById, getAsvs } from '@redline/frameworks';
-import { severityRank, type Acceptance, type Severity, type ContextFact, type Requirement, type Review, type Threat, type Verdict } from '@redline/shared';
+import { DataClassSchema, ExposureSchema, severityRank, type Acceptance, type DataClass, type Exposure, type Severity, type ContextFact, type Requirement, type Review, type Threat, type Verdict } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
 import type { JiraIssue } from '../adapters/jira.js';
 import { log } from '../adapters/log.js';
@@ -10,6 +11,7 @@ import { rolesOf } from '../services/roles.js';
 import { readVerdict, refreshVerdict, verdictKey } from '../services/verdict-service.js';
 import { newScopeCache, scopeForViewer, type ScopeCache } from '../services/viewer-scope.js';
 import { PAGE_KEY } from '../services/confluence-page.js';
+import type { ApiError } from './errors.js';
 
 export const PAGE_SIZE = 50;
 const HISTORY_REVISIONS = 5;
@@ -264,4 +266,103 @@ export async function panelEnrich(
   if (!r.ok) return { added: 0, partial: true, facts: [] };
   const facts = r.value.facts.filter((f) => f.origin === 'graph').map(toFactDto);
   return { added: facts.length, partial: r.value.partial, facts };
+}
+
+export interface ThreatBrief {
+  id: string;
+  title: string;
+  stride: Threat['stride'];
+  severity: Severity;
+  state: Threat['state'];
+  component: string;
+}
+export interface ThreatDiffDto {
+  from: number;
+  to: number;
+  added: ThreatBrief[];
+  removed: ThreatBrief[];
+  changed: Array<{ before: ThreatBrief; after: ThreatBrief }>;
+  unchanged: number;
+  /** Threats in the newer revision this viewer cannot see (their sources are restricted); counted, never listed. */
+  hidden: number;
+  summary: string;
+}
+
+const brief = (t: Threat): ThreatBrief => ({ id: t.id, title: t.title, stride: t.stride, severity: t.severity, state: t.state, component: t.component });
+const Rev = z.number().int().min(1).max(100_000);
+const DiffSchema = z.object({ from: Rev.optional(), to: Rev.optional() }).strip();
+
+function diffSummary(added: number, removed: number, from: number, to: number): string {
+  const since = from === to - 1 ? 'since last review' : `since revision ${from}`;
+  const head = added === 0 ? `No new threats ${since}` : `${added} new threat${added === 1 ? '' : 's'} ${since}`;
+  return removed > 0 ? `${head}; ${removed} no longer raised` : head;
+}
+
+/** R7 `panel.diff`: what changed between two revisions of this work item's review (default: the last two), as the viewer may see it. */
+export async function panelDiff(deps: CoreDeps, v: Viewer, payload: unknown): Promise<ThreatDiffDto | ApiError> {
+  const auth = await authorise(deps, v, 'browse');
+  if ('error' in auth) return auth;
+  const p = DiffSchema.safeParse(payload ?? {});
+  if (!p.success) return { error: 'validation', message: 'Revisions are whole numbers.' };
+  const history = await deps.reviews.history(v.issueId);
+  if (!history.ok) return { error: 'unavailable' };
+  const revs = history.value;
+  const to = p.data.to ?? revs.at(-1)?.revision;
+  const from = p.data.from ?? (to !== undefined ? revs.filter((r) => r.revision < to).at(-1)?.revision : undefined);
+  if (from !== undefined && to !== undefined && from >= to) return { error: 'validation', message: 'Compare an earlier revision with a later one.' };
+  const a = revs.find((r) => r.revision === from);
+  const b = revs.find((r) => r.revision === to);
+  if (!a || !b) return { error: 'not_found' };
+  const cache = newScopeCache();
+  const [sa, sb] = await Promise.all([scopedReview(deps, v, a.id, cache), scopedReview(deps, v, b.id, cache)]);
+  if (!sa || !sb) return { error: 'unavailable' };
+  const d = threatDiff(sa.threats, sb.threats);
+  return {
+    from: a.revision,
+    to: b.revision,
+    added: d.added.map(brief),
+    removed: d.removed.map(brief),
+    changed: d.changed.map((c) => ({ before: brief(c.before), after: brief(c.after) })),
+    unchanged: d.unchanged.length,
+    hidden: sb.hiddenThreats,
+    summary: diffSummary(d.added.length, d.removed.length, a.revision, b.revision),
+  };
+}
+
+const WhatIfSchema = z
+  .object({
+    exposure: ExposureSchema.optional(),
+    dataClasses: z.array(DataClassSchema).max(10).optional(),
+  })
+  .strip();
+
+export interface WhatIfDto {
+  /** The score as this viewer sees the review now, and with the change. */
+  current: number;
+  riskScore: number;
+  signals: { exposure: Exposure; dataClasses: DataClass[] };
+  /** The review's own exposure and data classes, to start the controls from. */
+  baseline: { exposure: Exposure; dataClasses: DataClass[] };
+  /** True when sources this viewer cannot open were left out of the estimate. */
+  partial: boolean;
+}
+
+/**
+ * R12 `panel.whatIf`: re-scores the latest review with a different exposure or data classes. Nothing is saved. Scored
+ * from what this viewer may see (threats and facts scoped to them), so it never reveals restricted sources.
+ */
+export async function panelWhatIf(deps: CoreDeps, v: Viewer, payload: unknown): Promise<WhatIfDto | ApiError> {
+  const auth = await authorise(deps, v, 'browse');
+  if ('error' in auth) return auth;
+  const p = WhatIfSchema.safeParse(payload ?? {});
+  if (!p.success) return { error: 'validation', message: 'Exposure is internal, partner or public; data classes are pii, credentials, payment, health or secrets.' };
+  const latest = await deps.reviews.latest(v.issueId);
+  if (!latest.ok) return { error: 'unavailable' };
+  if (!latest.value) return { error: 'not_found' };
+  const [scoped, samples] = await Promise.all([scopedReview(deps, v, latest.value.id), deps.reviews.samples(latest.value.id)]);
+  if (!scoped || !samples.ok) return { error: 'unavailable' };
+  const s = reviewSignals(scoped.facts, scoped.hiddenFacts > 0 ? [] : samples.value);
+  const baseline = { exposure: s.exposure, dataClasses: [...s.dataClasses] };
+  const w = whatIfScore(scoped.threats, baseline, p.data);
+  return { current: w.current, riskScore: w.riskScore, signals: w.signals, baseline, partial: scoped.hiddenFacts > 0 };
 }

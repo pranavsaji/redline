@@ -1,4 +1,4 @@
-import type { AcceptanceState, AdminPolicyDto, ApiError, DigestConfig, DrillDto, Evidence, FactDto, OpsConfig, PanelDto, PostureDto, ReleaseReadinessResult, Requirement, RequirementStatus, RunDto, Severity, SitePolicy, Threat, ThreatExplanation, UsageDto } from './types.js';
+import type { AcceptanceState, AdminPolicyDto, ApiError, DataClass, Exposure, ThreatDiffDto, WhatIfDto, DigestConfig, DrillDto, Evidence, FactDto, OpsConfig, PanelDto, PostureDto, ReleaseReadinessResult, Requirement, RequirementStatus, RunDto, Severity, SitePolicy, Threat, ThreatExplanation, UsageDto } from './types.js';
 
 export interface AcceptanceInput {
   requirementId: string;
@@ -42,6 +42,10 @@ export interface PanelApi {
   revokeAcceptance(acceptanceId: string, reason: string): Promise<{ entryHash: string } | ApiError>;
   breakGlass(reason: string, hours: number): Promise<{ entryHash: string; until: string } | ApiError>;
   attestation(repo: string, commitSha: string): Promise<AttestationOutcome | ApiError>;
+  /** R7: threats added, removed and changed between two revisions (default: the last two). */
+  diff(from?: number, to?: number): Promise<ThreatDiffDto | ApiError>;
+  /** R12: the score with a different exposure or data classes. Nothing is saved. */
+  whatIf(change: { exposure?: Exposure; dataClasses?: DataClass[] }): Promise<WhatIfDto | ApiError>;
 }
 
 export async function forgeApi(): Promise<PanelApi> {
@@ -62,6 +66,8 @@ export async function forgeApi(): Promise<PanelApi> {
     revokeAcceptance: (acceptanceId, reason) => invoke('acceptance.revoke', { acceptanceId, reason }),
     breakGlass: (reason, hours) => invoke('override.breakglass', { reason, hours }),
     attestation: (repo, commitSha) => invoke('attestation.copy', { repo, commitSha }),
+    diff: (from, to) => invoke('panel.diff', { ...(from ? { from } : {}), ...(to ? { to } : {}) }),
+    whatIf: (change) => invoke('panel.whatIf', { ...change }),
   };
 }
 
