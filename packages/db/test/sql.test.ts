@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { repoContract } from '../../core/test/contracts/repos.contract.js';
-import { MIGRATIONS, migrate, sqlAttestationRepo, sqlFeedbackRepo, sqlIssueRepo, sqlLedgerRepo, sqlRequirementRepo, sqlReviewRepo, sqlUsageRepo } from '../src/index.js';
+import { MIGRATIONS, migrate, sqlAttestationRepo, sqlFeedbackRepo, sqlIssueRepo, sqlLedgerRepo, sqlRequirementRepo, sqlReviewRepo, sqlUsageRepo, sqlTreeHeadRepo } from '../src/index.js';
 import { sqliteExecutor } from './sqlite-executor.js';
 
 const fresh = async () => {
@@ -20,6 +20,7 @@ repoContract('sql', {
   issues: async () => sqlIssueRepo(await fresh()),
   attestations: async () => sqlAttestationRepo(await fresh()),
   usage: async () => sqlUsageRepo(await fresh()),
+  treeHeads: async () => sqlTreeHeadRepo(await fresh()),
 });
 
 describe('migrations', () => {

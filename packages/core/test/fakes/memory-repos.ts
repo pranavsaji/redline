@@ -11,6 +11,8 @@ import type {
   LedgerRow,
   RequirementRepo,
   ReviewRepo,
+  TreeHead,
+  TreeHeadRepo,
   Sample,
   UsageRepo,
   VerdictSink,
@@ -237,6 +239,27 @@ export function memoryVerdictSink(): VerdictSink & { _written: Map<string, unkno
     _written: written,
     async write(issueId, v) {
       written.set(issueId, clone(v));
+      return ok(undefined);
+    },
+  };
+}
+
+export function memoryTreeHeadRepo(): TreeHeadRepo {
+  const heads = new Map<number, TreeHead>();
+  const sorted = () => [...heads.values()].sort((a, b) => b.treeSize - a.treeSize).map(clone);
+  return {
+    async add(h) {
+      if (heads.has(h.treeSize)) return err(appError('conflict', `tree head ${h.treeSize} exists`));
+      heads.set(h.treeSize, clone(h));
+      return ok(undefined);
+    },
+    latest: async () => ok(sorted()[0] ?? null),
+    lastPublished: async () => ok(sorted().find((h) => h.publishedPageId) ?? null),
+    list: async (limit) => ok(sorted().slice(0, Math.max(0, limit))),
+    async markPublished(treeSize, pageId) {
+      const h = heads.get(treeSize);
+      if (!h) return err(appError('not_found', `tree head ${treeSize}`));
+      heads.set(treeSize, { ...h, publishedPageId: pageId });
       return ok(undefined);
     },
   };

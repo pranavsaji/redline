@@ -72,6 +72,6 @@ describe('weekly digest (PR-4)', () => {
   it('the daily job publishes it on Monday', async () => {
     const { t, created } = await setup();
     await daily(t.deps);
-    expect(created).toHaveLength(1);
+    expect(created.filter((c) => c.title.startsWith('Redline security posture'))).toHaveLength(1);
   });
 });

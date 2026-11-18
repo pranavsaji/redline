@@ -1,5 +1,5 @@
 import api, { route } from '@forge/api';
-import { sqlAttestationRepo, sqlFeedbackRepo, sqlIssueRepo, sqlLedgerRepo, sqlRequirementRepo, sqlReviewRepo, sqlUsageRepo } from '@redline/db';
+import { sqlAttestationRepo, sqlTreeHeadRepo, sqlFeedbackRepo, sqlIssueRepo, sqlLedgerRepo, sqlRequirementRepo, sqlReviewRepo, sqlUsageRepo } from '@redline/db';
 import type { CoreDeps } from './deps.js';
 import { systemClock } from './adapters/clock.js';
 import { confluenceClient } from './adapters/confluence.js';
@@ -59,6 +59,7 @@ export function composeCore(ctx?: ForgeContext): CoreDeps {
     issues,
     usage: sqlUsageRepo(x),
     attestations: sqlAttestationRepo(x),
+    treeHeads: sqlTreeHeadRepo(x),
     keys: kvsSigningKeys(systemClock, state),
     jira,
     confluence,

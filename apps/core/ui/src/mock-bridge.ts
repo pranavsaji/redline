@@ -65,6 +65,8 @@ export function mockAdminApi(state = typeof window === 'undefined' ? 'ready' : (
       if (n.digest !== undefined) dto.digest = n.digest;
       return { ops: dto.ops, digest: dto.digest };
     },
+    treeHead: async () => ({ treeHead: { treeSize: 12, rootHash: '3a03ebd5cbaa6828e1bf78ea19554fe4b9992ff4492ab79faca95065a0c66352', timestamp: '2026-11-18T03:00:00.000Z', kid: 'k-mock' }, publicKey: 'MCowBQYDK2VwAyEAmockpublickey', publishedPageId: null }),
+    ledgerProof: async (seq) => ({ seq, treeSize: 12, json: JSON.stringify({ format: 'redline-ledger-proof-v1', entry: { seq }, leafIndex: seq - 1, auditPath: [], treeHead: { treeSize: 12 } }, null, 2) }),
     projectStatuses: async (projectKey) => ({ projectKey, statuses: ['To Do', 'In Progress', 'In Review', 'Done'] }),
     seed: async (projectKey) => ({ epicKey: `${projectKey}-1`, storyKeys: [`${projectKey}-2`, `${projectKey}-3`], designPageUrl: 'https://example.atlassian.net/wiki/spaces/PAY/pages/1', incidentKeys: [`${projectKey}-4`, `${projectKey}-5`] }),
     publicKeys: async () => ({ active: { kid: 'k-mock', publicKey: 'MCowBQYDK2VwAyEAmockpublickey' } }),

@@ -172,6 +172,26 @@ export interface AttestationRepo {
   forIssue(issueKey: string): Promise<Result<AttestationRow[]>>;
 }
 
+/** R5: a signed head of the Merkle tree over the ledger's entry hashes (RFC 9162 style). */
+export interface TreeHead {
+  treeSize: number;
+  rootHash: string;
+  timestamp: string;
+  kid: string;
+  signature: string;
+  /** The Confluence page it was published to, once it has been. */
+  publishedPageId?: string;
+}
+export interface TreeHeadRepo {
+  /** Fails with `conflict` when a head for this size already exists. */
+  add(h: TreeHead): Promise<Result<void>>;
+  latest(): Promise<Result<TreeHead | null>>;
+  lastPublished(): Promise<Result<TreeHead | null>>;
+  /** Newest (largest) first. */
+  list(limit: number): Promise<Result<TreeHead[]>>;
+  markPublished(treeSize: number, pageId: string): Promise<Result<void>>;
+}
+
 export interface UsageRepo {
   add(month: string, delta: { tokensIn: number; tokensOut: number; reviews: number }): Promise<Result<void>>;
   get(month: string): Promise<Result<{ tokensIn: number; tokensOut: number; reviews: number }>>;

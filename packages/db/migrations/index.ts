@@ -57,4 +57,13 @@ export const MIGRATIONS: Migration[] = [
       `CREATE TABLE IF NOT EXISTS posture_snapshots (day VARCHAR(10) PRIMARY KEY, snapshot_json MEDIUMTEXT NOT NULL)`,
     ],
   },
+  {
+    version: 2,
+    name: 'merkle_heads',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS merkle_heads (
+        tree_size INT PRIMARY KEY, root_hash VARCHAR(64) NOT NULL, kid VARCHAR(64) NOT NULL, signature VARCHAR(128) NOT NULL,
+        published_page_id VARCHAR(40), created_at VARCHAR(30) NOT NULL)`,
+    ],
+  },
 ];

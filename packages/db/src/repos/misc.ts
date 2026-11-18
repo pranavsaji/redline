@@ -1,5 +1,5 @@
-import { DismissReasonSchema, ok, StrideSchema, type DismissReason, type Stride } from '@redline/shared';
-import type { AttestationRepo, FeedbackRepo, IssueRepo, UsageRepo } from '@redline/core';
+import { appError, DismissReasonSchema, err, ok, StrideSchema, type DismissReason, type Stride } from '@redline/shared';
+import type { AttestationRepo, FeedbackRepo, IssueRepo, TreeHead, TreeHeadRepo, UsageRepo } from '@redline/core';
 import type { SqlExecutor } from '../executor.js';
 
 export function sqlFeedbackRepo(x: SqlExecutor): FeedbackRepo {
@@ -92,6 +92,39 @@ export function sqlUsageRepo(x: SqlExecutor): UsageRepo {
       if (!r.ok) return r;
       const v = r.value[0];
       return ok(v ? { tokensIn: Number(v.tokens_in), tokensOut: Number(v.tokens_out), reviews: Number(v.reviews) } : { tokensIn: 0, tokensOut: 0, reviews: 0 });
+    },
+  };
+}
+
+type HeadRow = { tree_size: number; root_hash: string; kid: string; signature: string; published_page_id: string | null; created_at: string };
+const HEAD_COLS = 'tree_size, root_hash, kid, signature, published_page_id, created_at';
+const toHead = (v: HeadRow): TreeHead => ({
+  treeSize: Number(v.tree_size), rootHash: v.root_hash, timestamp: v.created_at, kid: v.kid, signature: v.signature, ...(v.published_page_id ? { publishedPageId: v.published_page_id } : {}),
+});
+
+export function sqlTreeHeadRepo(x: SqlExecutor): TreeHeadRepo {
+  const many = async (sql: string, params: unknown[]) => {
+    const r = await x.query<HeadRow>(sql, params);
+    return r.ok ? ok(r.value.map(toHead)) : r;
+  };
+  return {
+    async add(h) {
+      const r = await x.exec(`INSERT INTO merkle_heads (${HEAD_COLS}) VALUES (?, ?, ?, ?, ?, ?)`, [h.treeSize, h.rootHash, h.kid, h.signature, h.publishedPageId ?? null, h.timestamp]);
+      return r.ok ? ok(undefined) : r;
+    },
+    async latest() {
+      const r = await many(`SELECT ${HEAD_COLS} FROM merkle_heads ORDER BY tree_size DESC LIMIT 1`, []);
+      return r.ok ? ok(r.value[0] ?? null) : r;
+    },
+    async lastPublished() {
+      const r = await many(`SELECT ${HEAD_COLS} FROM merkle_heads WHERE published_page_id IS NOT NULL ORDER BY tree_size DESC LIMIT 1`, []);
+      return r.ok ? ok(r.value[0] ?? null) : r;
+    },
+    list: (limit) => many(`SELECT ${HEAD_COLS} FROM merkle_heads ORDER BY tree_size DESC LIMIT ${Math.max(0, Math.min(1000, Math.floor(limit)))}`, []),
+    async markPublished(treeSize, pageId) {
+      const r = await x.exec('UPDATE merkle_heads SET published_page_id = ? WHERE tree_size = ?', [pageId, treeSize]);
+      if (!r.ok) return r;
+      return r.value.affectedRows > 0 ? ok(undefined) : err(appError('not_found', `tree head ${treeSize}`));
     },
   };
 }

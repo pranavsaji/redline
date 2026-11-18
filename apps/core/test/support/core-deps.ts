@@ -6,6 +6,7 @@ import {
   memoryLedgerRepo,
   memoryRequirementRepo,
   memoryReviewRepo,
+  memoryTreeHeadRepo,
   memoryUsageRepo,
   memoryVerdictSink,
 } from '@redline/core/testing';
@@ -126,6 +127,7 @@ export function coreDeps(o: { issues?: JiraIssue[]; policy?: SitePolicy; now?: s
     issues: memoryIssueRepo(),
     usage: memoryUsageRepo(),
     attestations: memoryAttestationRepo(),
+    treeHeads: memoryTreeHeadRepo(),
     keys: kvsSigningKeys(clock, kv),
     jira,
     confluence: {} as ConfluenceClient,

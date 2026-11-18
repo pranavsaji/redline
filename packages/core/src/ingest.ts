@@ -310,7 +310,7 @@ export function assembleReview(i: AssembleInput): AssembleOutput {
     });
   }
 
-  if (i.prior) carryOver(threats, i.prior, facts, i.review.id);
+  if (i.prior) carryOver(threats, i.prior, facts, i.review.id, injectionSuspected);
 
   threats.sort((a, b) => severityRank(b.severity) - severityRank(a.severity) || b.votes - a.votes || a.title.localeCompare(b.title));
 
@@ -331,31 +331,42 @@ export function assembleReview(i: AssembleInput): AssembleOutput {
 }
 
 /**
- * R7, in place: prior threats citing only unchanged facts replace their fresh counterparts (keeping votes, state and
- * triage, taking the higher severity); prior threats with no fresh counterpart are added back. Fresh threats with no
- * prior counterpart stay as new. Threats citing a changed or removed source are not carried: the fresh run decides.
+ * R7, in place: prior threats citing only unchanged facts carry over with their votes, state and triage. A fresh
+ * threat is folded into its carried counterpart only when it too cites only unchanged facts; one citing a new or
+ * changed source stays new, so new evidence is never hidden behind an old decision. The stricter state wins (a fresh
+ * needs_human is never downgraded), and when the material shows injection an earlier dismissal does not suppress the
+ * fresh threat. Severity only rises. Prior threats citing a changed or removed source are not carried.
  */
-function carryOver(threats: Threat[], prior: NonNullable<AssembleInput['prior']>, facts: readonly ContextFact[], reviewId: string): void {
+function carryOver(threats: Threat[], prior: NonNullable<AssembleInput['prior']>, facts: readonly ContextFact[], reviewId: string, injectionSuspected: boolean): void {
   const present = new Set(facts.map((f) => f.id));
+  const unchanged = new Set(prior.facts.map((f) => f.id).filter((id) => present.has(id)));
+  const onlyUnchanged = (t: Pick<Threat, 'citations'>) => t.citations.length > 0 && t.citations.every((c) => unchanged.has(c.factId));
   const { keep } = threatsToReevaluate([...prior.threats], prior.facts, diffBundles(prior.facts, facts));
   const matched = new Set<number>();
   for (const old of keep) {
-    if (old.citations.length === 0 || !old.citations.every((c) => present.has(c.factId))) continue;
-    const idx = threats.findIndex((t, n) => !matched.has(n) && similar(t, old, { ignoreComponent: true }));
+    if (!onlyUnchanged(old)) continue;
+    const id = threatId(reviewId, old.origin, old.stride, old.title);
+    const idx = threats.findIndex((t, n) => !matched.has(n) && onlyUnchanged(t) && similar(t, old, { ignoreComponent: true }));
     const fresh = idx >= 0 ? threats[idx] : undefined;
-    const carried: Threat = {
-      ...old,
-      id: threatId(reviewId, old.origin, old.stride, old.title),
-      reviewId,
-      ...(fresh && severityRank(fresh.severity) > severityRank(old.severity)
-        ? { severity: fresh.severity, likelihood: Math.max(old.likelihood, fresh.likelihood), impact: Math.max(old.impact, fresh.impact) }
-        : {}),
-    };
-    if (idx >= 0) {
-      threats[idx] = carried;
+    if (fresh) {
       matched.add(idx);
-    } else if (!threats.some((t) => t.id === carried.id)) {
-      threats.push(carried);
+      // Under injection, the fresh assessment stands: an old dismissal must not be steerable into hiding it.
+      if (injectionSuspected && old.state === 'dismissed') continue;
+      const { dismissReason: _d, ...rest } = old;
+      const stricter = fresh.state === 'needs_human' && old.state !== 'needs_human';
+      threats[idx] = {
+        ...(stricter ? { ...rest, state: 'needs_human' as const } : old),
+        id,
+        reviewId,
+        ...(severityRank(fresh.severity) > severityRank(old.severity)
+          ? { severity: fresh.severity, likelihood: Math.max(old.likelihood, fresh.likelihood), impact: Math.max(old.impact, fresh.impact) }
+          : {}),
+      };
+    } else {
+      // A fresh threat with the same title but new evidence keeps its id; the carried one gets its own.
+      const free = threats.some((t) => t.id === id) ? threatId(reviewId, `${old.origin}+prior`, old.stride, old.title) : id;
+      if (threats.some((t) => t.id === free)) continue;
+      threats.push({ ...old, id: free, reviewId });
       matched.add(threats.length - 1);
     }
   }

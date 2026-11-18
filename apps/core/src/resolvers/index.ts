@@ -8,7 +8,7 @@ import { reviewConfirm, threatsTriage } from './threats.js';
 import { confluencePublish } from './confluence.js';
 import { adminGetPolicy, adminProjectStatuses, adminRuns, adminSeed, adminSetNotifications, adminSetPolicy, adminSetupStatus, adminUsage, adminWarnOnly, adminWarnOnlyEnd } from './admin.js';
 import { acceptanceDecide, acceptanceRequest, acceptanceRevoke, breakGlassOverride } from './acceptances.js';
-import { ledgerExport, ledgerVerify } from './ledger.js';
+import { ledgerExport, ledgerProof, ledgerTreeHead, ledgerVerify } from './ledger.js';
 import { postureDrill, postureGet, releaseReport } from './posture.js';
 import { attestationCopy, keysCopied, keysPublic, keysRotate } from './attestations.js';
 import { kvsSigningKeys } from '../adapters/signing-keys.js';
@@ -158,6 +158,15 @@ resolver.define('ledger.verify', async ({ context }) => {
 resolver.define('ledger.export', async ({ payload, context }) => {
   const v = viewerOf(context as Ctx);
   return ledgerExport(composeCore({ cloudId: v.cloudId }), { accountId: v.accountId }, payload ?? {});
+});
+
+resolver.define('ledger.proof', async ({ payload, context }) => {
+  const v = viewerOf(context as Ctx);
+  return ledgerProof(composeCore({ cloudId: v.cloudId }), { accountId: v.accountId }, payload ?? {});
+});
+resolver.define('ledger.treeHead', async ({ context }) => {
+  const v = viewerOf(context as Ctx);
+  return ledgerTreeHead(composeCore({ cloudId: v.cloudId }), { accountId: v.accountId });
 });
 
 resolver.define('attestation.copy', async ({ payload, context }) => {

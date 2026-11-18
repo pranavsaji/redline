@@ -9,7 +9,7 @@ import type {
   ReviewRepo,
   SigningKeyStore,
   UsageRepo,
-  VerdictSink,
+  VerdictSink, TreeHeadRepo
 } from '@redline/core';
 import type { Result } from '@redline/shared';
 import type { ConfluenceClient } from './adapters/confluence.js';
@@ -31,6 +31,8 @@ export interface CoreDeps {
   issues: IssueRepo;
   usage: UsageRepo;
   attestations: AttestationRepo;
+  /** R5: signed Merkle tree heads over the ledger. */
+  treeHeads: TreeHeadRepo;
   /** Ed25519 merge-attestation keys (private halves in Forge secret storage). */
   keys: SigningKeyStore;
   /** Jira as the app (triggers, consumers and jobs have no user). */

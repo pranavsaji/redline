@@ -104,6 +104,15 @@ export interface AdminApi {
   /** Leave a key out to keep it; null turns it off. */
   setNotifications(n: { ops?: OpsConfig | null; digest?: DigestConfig | null }): Promise<{ ops: OpsConfig | null; digest: DigestConfig | null } | ApiError>;
   projectStatuses(projectKey: string): Promise<{ projectKey: string; statuses: string[] } | ApiError>;
+  /** R5: an inclusion proof (JSON) for one ledger entry against the current signed tree head. */
+  ledgerProof(seq: number): Promise<{ json: string; seq: number; treeSize: number } | ApiError>;
+  treeHead(): Promise<TreeHeadInfo | ApiError>;
+}
+
+export interface TreeHeadInfo {
+  treeHead: { treeSize: number; rootHash: string; timestamp: string; kid: string };
+  publicKey: string | null;
+  publishedPageId: string | null;
 }
 
 export async function forgeAdminApi(): Promise<AdminApi> {
@@ -124,6 +133,8 @@ export async function forgeAdminApi(): Promise<AdminApi> {
     usage: () => invoke('admin.usage'),
     setNotifications: (n) => invoke('admin.setNotifications', { ...n }),
     projectStatuses: (projectKey) => invoke('admin.projectStatuses', { projectKey }),
+    ledgerProof: (seq) => invoke('ledger.proof', { seq }),
+    treeHead: () => invoke('ledger.treeHead'),
   };
 }
 

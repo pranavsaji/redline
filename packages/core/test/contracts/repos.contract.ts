@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Requirement, Review, Threat } from '@redline/shared';
 import { GENESIS_HASH } from '@redline/crypto';
 import { appendLedger } from '../../src/ledger.js';
-import type { AttestationRepo, FeedbackRepo, IssueRepo, LedgerRepo, RequirementRepo, ReviewRepo, UsageRepo } from '../../src/ports.js';
+import type { AttestationRepo, FeedbackRepo, IssueRepo, LedgerRepo, RequirementRepo, ReviewRepo, UsageRepo, TreeHeadRepo } from '../../src/ports.js';
 import { fixedClock } from '../fakes/fixed-clock.js';
 
 export interface RepoFactory {
@@ -13,6 +13,7 @@ export interface RepoFactory {
   issues(): Promise<IssueRepo>;
   attestations(): Promise<AttestationRepo>;
   usage(): Promise<UsageRepo>;
+  treeHeads(): Promise<TreeHeadRepo>;
 }
 
 const review = (o: Partial<Review> = {}): Review => ({
@@ -98,6 +99,20 @@ export function repoContract(name: string, f: RepoFactory): void {
         ],
       });
       expect(await r.stages('rev_none')).toEqual({ ok: true, value: [] });
+    });
+
+    it('tree heads: add, latest, list newest first, mark published; a size is stored once', async () => {
+      const r = await f.treeHeads();
+      expect(await r.latest()).toEqual({ ok: true, value: null });
+      const h = (n: number) => ({ treeSize: n, rootHash: String(n).padStart(64, 'a'), timestamp: `2026-11-1${n}T00:00:00.000Z`, kid: 'k1', signature: 's'.repeat(86) });
+      await r.add(h(3));
+      await r.add(h(7));
+      expect((await r.add(h(7))).ok).toBe(false);
+      expect(await r.latest()).toEqual({ ok: true, value: h(7) });
+      await r.markPublished(7, '9001');
+      const list = await r.list(10);
+      expect(list).toEqual({ ok: true, value: [{ ...h(7), publishedPageId: '9001' }, h(3)] });
+      expect(await r.lastPublished()).toEqual({ ok: true, value: { ...h(7), publishedPageId: '9001' } });
     });
 
     it('requirements: upsert, get, forIssue', async () => {

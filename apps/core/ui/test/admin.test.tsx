@@ -233,3 +233,39 @@ describe('Admin page layout (Task 30)', () => {
     expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
   });
 });
+
+describe('Admin: transparency log (R5)', () => {
+  it('shows the current signed tree head and whether it is published', async () => {
+    render(<AdminPage api={mockAdminApi()} />);
+    const head = await screen.findByRole('group', { name: 'Signed tree head' });
+    expect(head.textContent).toMatch(/12 entries/);
+    expect(head.textContent).toMatch(/Root 3a03ebd5cbaa…/);
+    expect(head.textContent).toMatch(/key k-mock/);
+    expect(head.textContent).toMatch(/Not published to Confluence yet/);
+  });
+
+  it('downloads an inclusion proof for one entry, to check offline', async () => {
+    const api = mockAdminApi();
+    const ledgerProof = vi.fn(api.ledgerProof);
+    render(<AdminPage api={{ ...api, ledgerProof }} />);
+    const form = await screen.findByRole('form', { name: 'Inclusion proof' });
+    await userEvent.type(within(form).getByRole('spinbutton', { name: 'Ledger entry number' }), '3');
+    await userEvent.click(within(form).getByRole('button', { name: 'Get proof' }));
+    expect(ledgerProof).toHaveBeenCalledWith(3);
+    const link = await within(form).findByRole('link', { name: 'Download proof for entry 3' });
+    expect(link.getAttribute('download')).toBe('redline-ledger-proof-3.json');
+    expect(decodeURIComponent(link.getAttribute('href')!)).toContain('"format": "redline-ledger-proof-v1"');
+    expect(within(form).getByText(/node scripts\/verify-ledger-proof.mjs/)).toBeTruthy();
+  });
+
+  it('rejects an entry number below 1 without calling the server', async () => {
+    const api = mockAdminApi();
+    const ledgerProof = vi.fn(api.ledgerProof);
+    render(<AdminPage api={{ ...api, ledgerProof }} />);
+    const form = await screen.findByRole('form', { name: 'Inclusion proof' });
+    await userEvent.type(within(form).getByRole('spinbutton', { name: 'Ledger entry number' }), '0');
+    await userEvent.click(within(form).getByRole('button', { name: 'Get proof' }));
+    expect(ledgerProof).not.toHaveBeenCalled();
+    expect(within(form).getByRole('alert').textContent).toBe('Give a ledger entry number (1 or more).');
+  });
+});

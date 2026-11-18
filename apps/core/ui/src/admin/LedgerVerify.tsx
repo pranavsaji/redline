@@ -4,6 +4,7 @@ import { token } from '@atlaskit/tokens';
 import { errorText, isError, type AdminApi, type ChainVerdict } from '../bridge.js';
 import type { ApiError } from '../types.js';
 import { box, errorText as errorStyle, field, label } from '../panel/form-styles.js';
+import { TransparencyLog } from './TransparencyLog.js';
 
 const BROKEN: Record<Extract<ChainVerdict, { ok: false }>['reason'], string> = {
   hash_mismatch: 'an entry was changed after it was written',
@@ -106,6 +107,7 @@ export function LedgerVerify({ api }: { api: AdminApi }) {
           )}
         </div>
       </form>
+      <TransparencyLog api={api} />
     </section>
   );
 }
