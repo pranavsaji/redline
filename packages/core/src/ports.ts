@@ -73,8 +73,20 @@ export interface ReviewRepo {
   updateThreat(id: string, patch: Partial<Threat>): Promise<Result<void>>;
   saveSample(reviewId: string, n: number, sample: Sample): Promise<Result<void>>;
   samples(reviewId: string): Promise<Result<Sample[]>>;
-  saveStage(reviewId: string, stage: string, status: 'running' | 'done' | 'failed', checkpoint?: unknown, error?: string): Promise<Result<void>>;
+  /** `at` is when the stage reached this status (defaults to now); the admin page reads it as the run's trace. */
+  saveStage(reviewId: string, stage: string, status: 'running' | 'done' | 'failed', checkpoint?: unknown, error?: string, at?: string): Promise<Result<void>>;
   stage(reviewId: string, stage: string): Promise<Result<{ status: string; checkpoint?: unknown } | null>>;
+  /** Newest first by createdAt, at most `limit` (capped at 500); with `since`, only reviews created at or after it. */
+  recent(limit: number, since?: string): Promise<Result<Review[]>>;
+  /** The review's stage trace in time order, without checkpoints. */
+  stages(reviewId: string): Promise<Result<StageTrace[]>>;
+}
+
+export interface StageTrace {
+  stage: string;
+  status: string;
+  error?: string;
+  at: string;
 }
 
 export interface RequirementRepo {
@@ -94,6 +106,7 @@ export type LedgerEventType =
   | 'review.champion_confirmed'
   | 'budget.champion_confirmed'
   | 'policy.warn_only'
+  | 'policy.changed'
   | 'key.rotated';
 
 export interface LedgerInsert {

@@ -65,6 +65,8 @@ export interface JiraClient {
   /** The property's value, or null when the work item has no such property. */
   getProperty(issueIdOrKey: string, key: string): Promise<Result<unknown>>;
   projectInfo(projectKey: string): Promise<Result<{ id: string; key: string; issueTypes: Array<{ id: string; name: string; subtask: boolean }> }>>;
+  /** Every workflow status name used in the project, across its issue types, in first-seen order. */
+  projectStatuses(projectKey: string): Promise<Result<string[]>>;
   ensureComponent(projectKey: string, name: string): Promise<Result<void>>;
   createIssue(f: { projectId: string; issueTypeId: string; summary: string; description: AdfDoc; labels: string[]; components?: string[]; parentId?: string }): Promise<Result<{ id: string; key: string }>>;
   /** The project's sub-task issue type id (Redline requirements are created as sub-tasks). */
@@ -451,6 +453,15 @@ export function createJiraClient(request: FetchLike, opts: JiraClientOptions = {
       const p = parse(z.object({ id: z.string(), key: z.string(), issueTypes: z.array(z.object({ id: z.string(), name: z.string(), subtask: z.boolean().nullish() })).nullish() }), r.value, 'project');
       if (!p.ok) return p;
       return ok({ id: p.value.id, key: p.value.key, issueTypes: (p.value.issueTypes ?? []).map((t) => ({ id: t.id, name: t.name, subtask: t.subtask === true })) });
+    },
+
+    async projectStatuses(projectKey) {
+      if (!PROJECT_KEY.test(projectKey)) return badRef('project key');
+      const r = await call(`/rest/api/3/project/${seg(projectKey)}/statuses`);
+      if (!r.ok) return r;
+      const p = parse(z.array(z.object({ statuses: z.array(z.object({ name: z.string() })).nullish() })), r.value, 'project statuses');
+      if (!p.ok) return p;
+      return ok([...new Set(p.value.flatMap((t) => (t.statuses ?? []).map((x) => x.name)))]);
     },
 
     async ensureComponent(projectKey, name) {

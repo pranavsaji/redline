@@ -14,7 +14,31 @@ export const verdictKey = (issueId: string) => `verdict:${issueId}`;
 
 const MAX_ANCESTORS = 5;
 
-export type StoredVerdict = Verdict & { panelUrl?: string; message?: string; riskScore?: number; notApplicable?: boolean };
+export type StoredVerdict = Verdict & { panelUrl?: string; message?: string; riskScore?: number; notApplicable?: boolean; policyVersion?: number };
+
+/**
+ * Bumped by the admin page on every policy or warn-only change. A stored verdict computed under an older version is
+ * recomputed before anyone relies on it, so tightening the policy or ending warn-only early takes effect at once.
+ */
+export const POLICY_VERSION_KEY = 'config:site:version';
+
+export const POLICY_CHANGED_MESSAGE =
+  'Redline blocks Done: the Redline policy changed since this work item was checked, and it could not be rechecked. Open the Redline panel to retry.';
+
+/** The current policy version; null when it cannot be read (callers treat that as changed). */
+export async function policyVersion(deps: Pick<CoreDeps, 'state'>): Promise<number | null> {
+  try {
+    const v = await deps.state.get<unknown>(POLICY_VERSION_KEY);
+    return typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : 0;
+  } catch {
+    return null;
+  }
+}
+
+const storedVersion = (v: object) => {
+  const n = (v as { policyVersion?: unknown }).policyVersion;
+  return typeof n === 'number' ? n : 0;
+};
 
 export const LAPSED_MESSAGE =
   'Redline blocks Done: the break-glass override or warn-only window for this work item has ended, and its verdict could not be recomputed. Open the Redline panel to retry.';
@@ -38,16 +62,22 @@ export async function readVerdict(deps: CoreDeps, issueId: string): Promise<Resu
   const first = await get();
   if (!first.ok) return first;
   const now = deps.clock.now();
-  if (!lenient(first.value) || !verdictLapsed(first.value, now)) return ok((first.value ?? undefined) as StoredVerdict | undefined);
-  log('verdict.lapsed', { issueId });
+  const value = first.value;
+  if (typeof value !== 'object' || value === null) return ok((value ?? undefined) as StoredVerdict | undefined);
+  const current = await policyVersion(deps);
+  const lapsed = (v: object) => lenient(v) && verdictLapsed(v, now);
+  const outdated = (v: object) => current === null || storedVersion(v) < current;
+  if (!lapsed(value) && !outdated(value)) return ok(value as StoredVerdict);
+  log(lapsed(value) ? 'verdict.lapsed' : 'verdict.policy_changed', { issueId });
   const fresh = await refreshVerdict(deps, issueId);
   if (fresh.ok) {
     const again = await get();
-    if (again.ok && typeof again.value === 'object' && again.value !== null && !(lenient(again.value) && verdictLapsed(again.value, now)))
-      return ok(again.value as StoredVerdict);
+    if (again.ok && typeof again.value === 'object' && again.value !== null && !lapsed(again.value) && !outdated(again.value)) return ok(again.value as StoredVerdict);
   }
-  const { overridden: _o, validUntil: _u, ...rest } = first.value;
-  return ok({ ...rest, state: 'block', message: LAPSED_MESSAGE });
+  const stored = value as StoredVerdict;
+  if (stored.state === 'block' && !stored.overridden) return ok(stored);
+  const { overridden: _o, validUntil: _u, ...rest } = stored;
+  return ok({ ...rest, state: 'block', message: lapsed(value) ? LAPSED_MESSAGE : POLICY_CHANGED_MESSAGE });
 }
 
 type Ledgered = {
@@ -170,7 +200,7 @@ async function writeFailClosed(deps: CoreDeps, issueId: string, panelUrl: string
     updatedAt: deps.clock.now().toISOString(),
   };
   const value = { ...v, panelUrl, message: gateMessage(v, new Map(), panelUrl, policy?.ok ? policy.value.guardedTransitions : ['Done']) };
-  await write(deps, issueId, value);
+  await write(deps, issueId, value, (await policyVersion(deps)) ?? 0);
 }
 
 /**
@@ -186,7 +216,8 @@ function requirementSubtaskVerdict(req: Requirement, story: Verdict, storyKey: s
 }
 
 /** App storage first (the gate reads it; failure is an error so the job retries), then the issue property (display). */
-async function write(deps: CoreDeps, issueId: string, value: Verdict & Record<string, unknown>): Promise<Result<void>> {
+async function write(deps: CoreDeps, issueId: string, verdict: Verdict & Record<string, unknown>, version: number): Promise<Result<void>> {
+  const value = { ...verdict, policyVersion: version };
   try {
     await deps.state.set(verdictKey(issueId), value);
   } catch (e) {
@@ -205,6 +236,8 @@ async function write(deps: CoreDeps, issueId: string, value: Verdict & Record<st
  */
 export async function refreshVerdict(deps: CoreDeps, issueId: string): Promise<Result<Verdict>> {
   const now = deps.clock.now();
+  // Read before the policy: a change landing in between leaves this verdict marked old, so it is computed again.
+  const version = (await policyVersion(deps)) ?? 0;
   const site = await deps.siteUrl();
   const fetched = await deps.jira.issue(issueId);
   if (!fetched.ok) {
@@ -239,7 +272,7 @@ export async function refreshVerdict(deps: CoreDeps, issueId: string): Promise<R
       const sv = await ownVerdict(deps, story.value, policy.value, ledgered, storyUrl, now);
       if (!sv.ok) return fail(sv);
       const v = requirementSubtaskVerdict(mine, sv.value.verdict, story.value.key, now);
-      const w = await write(deps, issue.id, { ...v, panelUrl: storyUrl, message: gateMessage(v, new Map(), storyUrl, guarded) });
+      const w = await write(deps, issue.id, { ...v, panelUrl: storyUrl, message: gateMessage(v, new Map(), storyUrl, guarded) }, version);
       return w.ok ? ok(v) : w;
     }
   }
@@ -272,6 +305,6 @@ export async function refreshVerdict(deps: CoreDeps, issueId: string): Promise<R
     ...(own.value.riskScore !== undefined ? { riskScore: own.value.riskScore } : {}),
     ...(own.value.notApplicable && final.state === 'pass' ? { notApplicable: true } : {}),
   };
-  const w = await write(deps, issue.id, value);
+  const w = await write(deps, issue.id, value, version);
   return w.ok ? ok(final) : w;
 }

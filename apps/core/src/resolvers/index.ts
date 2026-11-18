@@ -6,7 +6,7 @@ import { panelEnrich, panelGet, panelRerun, panelThreats, threatExplain, type Vi
 import { requirementsCreate, requirementsSetStatus } from './requirements.js';
 import { reviewConfirm, threatsTriage } from './threats.js';
 import { confluencePublish } from './confluence.js';
-import { adminSeed, adminSetupStatus } from './admin.js';
+import { adminGetPolicy, adminProjectStatuses, adminRuns, adminSeed, adminSetNotifications, adminSetPolicy, adminSetupStatus, adminUsage, adminWarnOnly, adminWarnOnlyEnd } from './admin.js';
 import { acceptanceDecide, acceptanceRequest, acceptanceRevoke, breakGlassOverride } from './acceptances.js';
 import { ledgerExport, ledgerVerify } from './ledger.js';
 import { postureDrill, postureGet, releaseReport } from './posture.js';
@@ -76,6 +76,42 @@ resolver.define('admin.setupStatus', async ({ context }) => {
       return keys.ok && Object.keys(keys.value).length > 0;
     },
   });
+});
+const admin = (context: unknown) => {
+  const v = viewerOf(context as Ctx);
+  return { deps: composeCore({ cloudId: v.cloudId }), a: { accountId: v.accountId } };
+};
+resolver.define('admin.getPolicy', async ({ context }) => {
+  const { deps, a } = admin(context);
+  return adminGetPolicy(deps, a);
+});
+resolver.define('admin.setPolicy', async ({ payload, context }) => {
+  const { deps, a } = admin(context);
+  return adminSetPolicy(deps, a, payload ?? {});
+});
+resolver.define('admin.warnOnly', async ({ payload, context }) => {
+  const { deps, a } = admin(context);
+  return adminWarnOnly(deps, a, payload ?? {});
+});
+resolver.define('admin.warnOnlyEnd', async ({ payload, context }) => {
+  const { deps, a } = admin(context);
+  return adminWarnOnlyEnd(deps, a, payload ?? {});
+});
+resolver.define('admin.runs', async ({ context }) => {
+  const { deps, a } = admin(context);
+  return adminRuns(deps, a);
+});
+resolver.define('admin.usage', async ({ context }) => {
+  const { deps, a } = admin(context);
+  return adminUsage(deps, a);
+});
+resolver.define('admin.setNotifications', async ({ payload, context }) => {
+  const { deps, a } = admin(context);
+  return adminSetNotifications(deps, a, payload ?? {});
+});
+resolver.define('admin.projectStatuses', async ({ payload, context }) => {
+  const { deps, a } = admin(context);
+  return adminProjectStatuses(deps, a, payload ?? {});
 });
 
 resolver.define('posture.get', async ({ payload, context }) => {

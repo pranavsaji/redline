@@ -272,6 +272,13 @@ describe('jira client: writes', () => {
     expect(await jira.projectInfo('pay; x')).toMatchObject({ ok: false, error: { code: 'validation' } });
   });
 
+  it('projectStatuses lists each status name once, across issue types', async () => {
+    const body = [{ name: 'Story', statuses: [{ name: 'To Do' }, { name: 'In Progress' }, { name: 'Done' }] }, { name: 'Bug', statuses: [{ name: 'To Do' }, { name: 'Closed' }] }];
+    const { jira } = client([[/GET \/rest\/api\/3\/project\/PAY\/statuses$/, { status: 200, body: JSON.stringify(body) }]]);
+    expect(await jira.projectStatuses('PAY')).toEqual({ ok: true, value: ['To Do', 'In Progress', 'Done', 'Closed'] });
+    expect(await jira.projectStatuses('pay; x')).toMatchObject({ ok: false, error: { code: 'validation' } });
+  });
+
   it('ensureComponent creates the component only when the project lacks it', async () => {
     const has = client([[/GET \/rest\/api\/3\/project\/PAY\/components$/, { status: 200, body: JSON.stringify([{ id: '1', name: 'support-agent' }]) }]]);
     expect(await has.jira.ensureComponent('PAY', 'support-agent')).toEqual({ ok: true, value: undefined });

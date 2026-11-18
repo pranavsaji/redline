@@ -76,6 +76,30 @@ export function repoContract(name: string, f: RepoFactory): void {
       expect((await r.stage('rev_1', 'none')).ok && (await r.stage('rev_1', 'none'))).toEqual({ ok: true, value: null });
     });
 
+    it('reviews: recent lists newest first (optionally since a time); stages lists the trace in time order', async () => {
+      const r = await f.reviews();
+      await r.create(review({ id: 'rev_a', issueId: '1', createdAt: '2026-11-01T00:00:00.000Z' }));
+      await r.create(review({ id: 'rev_b', issueId: '2', createdAt: '2026-11-03T00:00:00.000Z' }));
+      await r.create(review({ id: 'rev_c', issueId: '3', createdAt: '2026-11-02T00:00:00.000Z' }));
+      const all = await r.recent(2);
+      expect(all.ok && all.value.map((x) => x.id)).toEqual(['rev_b', 'rev_c']);
+      const since = await r.recent(10, '2026-11-02T00:00:00.000Z');
+      expect(since.ok && since.value.map((x) => x.id)).toEqual(['rev_b', 'rev_c']);
+      await r.saveStage('rev_a', 'gather', 'done', undefined, undefined, '2026-11-01T00:00:05.000Z');
+      await r.saveStage('rev_a', 'assemble', 'failed', undefined, 'schema', '2026-11-01T00:01:00.000Z');
+      await r.saveStage('rev_a', 'agent_1', 'done', { big: 'x' }, undefined, '2026-11-01T00:00:40.000Z');
+      const trace = await r.stages('rev_a');
+      expect(trace).toEqual({
+        ok: true,
+        value: [
+          { stage: 'gather', status: 'done', at: '2026-11-01T00:00:05.000Z' },
+          { stage: 'agent_1', status: 'done', at: '2026-11-01T00:00:40.000Z' },
+          { stage: 'assemble', status: 'failed', error: 'schema', at: '2026-11-01T00:01:00.000Z' },
+        ],
+      });
+      expect(await r.stages('rev_none')).toEqual({ ok: true, value: [] });
+    });
+
     it('requirements: upsert, get, forIssue', async () => {
       const r = await f.requirements();
       await r.upsert(req());

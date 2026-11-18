@@ -107,6 +107,7 @@ async function gather(deps: CoreDeps, job: Extract<ReviewJob, { kind: 'gather' }
   }
   const facts = await deps.reviews.saveFacts(review.id, b.facts);
   if (!facts.ok) return facts;
+  await trace(deps, review.id, 'gather', paused.value ? 'failed' : 'done', paused.value ? 'budget' : undefined);
   const out = await applyAssembly(deps, review, b, [], policy.value, 'progress');
   if (!out.ok) return out;
   const upd = await deps.reviews.update(review.id, { riskScore: out.value.riskScore, updatedAt: now.toISOString() });
@@ -120,6 +121,23 @@ async function gather(deps: CoreDeps, job: Extract<ReviewJob, { kind: 'gather' }
   if (!v.ok) return v;
   // A published page now trails the newest revision: re-publish so it says it is out of date.
   return afterChange(deps, job.issueId, true);
+}
+
+/** The run trace the admin page shows (review_stages). Best effort: a trace write never fails the review. */
+export async function trace(deps: Pick<CoreDeps, 'reviews' | 'clock'>, reviewId: string, stage: string, status: 'running' | 'done' | 'failed', error?: string): Promise<void> {
+  const r = await deps.reviews.saveStage(reviewId, stage, status, undefined, error, deps.clock.now().toISOString()).catch(() => null);
+  if (!r?.ok) log('trace.failed', { reviewId, stage });
+}
+
+/** One `agent_<n>` stage per agent sample, recorded the first time an assembly sees it. */
+async function traceSamples(deps: CoreDeps, reviewId: string, samples: readonly Sample[]): Promise<void> {
+  const seen = await deps.reviews.stages(reviewId);
+  const have = new Set(seen.ok ? seen.value.map((s) => s.stage) : []);
+  for (let n = 1; n <= samples.length; n++) {
+    if (have.has(`agent_${n}`)) continue;
+    const s = samples[n - 1]!;
+    await trace(deps, reviewId, `agent_${n}`, 'failed' in s ? 'failed' : 'done', 'failed' in s ? s.failed : undefined);
+  }
 }
 
 async function assemble(deps: CoreDeps, reviewId: string): Promise<Result<void>> {
@@ -150,6 +168,8 @@ async function assemble(deps: CoreDeps, reviewId: string): Promise<Result<void>>
   const status = review.status === 'failed' ? 'failed' : out.value.status;
   const upd = await deps.reviews.update(review.id, { status, riskScore: out.value.riskScore, samplesReceived: samples.value.length, updatedAt: deps.clock.now().toISOString() });
   if (!upd.ok) return upd;
+  await traceSamples(deps, review.id, samples.value);
+  await trace(deps, review.id, 'assemble', status === 'failed' ? 'failed' : 'done', status === 'failed' ? (review.failureReason ?? 'failed') : undefined);
   log('review.assembled', { reviewId, status, samples: samples.value.length });
   const v = await refreshVerdict(deps, review.issueId);
   if (!v.ok) return v;

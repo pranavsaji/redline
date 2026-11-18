@@ -122,9 +122,9 @@ export function sqlReviewRepo(x: SqlExecutor): ReviewRepo {
       const r = await x.query<Row>('SELECT sample_json FROM agent_samples WHERE review_id = ? ORDER BY n ASC', [reviewId]);
       return r.ok ? collect(r.value.map((row) => parseJson(SampleSchema, row.sample_json, 'agent_samples'))) : r;
     },
-    async saveStage(reviewId, stage, status, checkpoint, error) {
+    async saveStage(reviewId, stage, status, checkpoint, error, at) {
       const r = await x.exec('REPLACE INTO review_stages (review_id, stage, status, checkpoint_json, error, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [
-        reviewId, stage, status, checkpoint === undefined ? null : JSON.stringify(checkpoint), error ?? null, new Date().toISOString(),
+        reviewId, stage, status, checkpoint === undefined ? null : JSON.stringify(checkpoint), error ?? null, at ?? new Date().toISOString(),
       ]);
       return r.ok ? ok(undefined) : r;
     },
@@ -140,6 +140,17 @@ export function sqlReviewRepo(x: SqlExecutor): ReviewRepo {
         return err(appError('internal', 'review_stages: checkpoint is not JSON'));
       }
       return ok({ status: String(row.status), ...(checkpoint === undefined ? {} : { checkpoint }) });
+    },
+    recent: (limit, since) => {
+      const n = Math.max(1, Math.min(500, Math.floor(limit)));
+      return since
+        ? many(`SELECT ${COLS} FROM reviews WHERE created_at >= ? ORDER BY created_at DESC LIMIT ${n}`, [since])
+        : many(`SELECT ${COLS} FROM reviews ORDER BY created_at DESC LIMIT ${n}`, []);
+    },
+    async stages(reviewId) {
+      const r = await x.query<Row>('SELECT stage, status, error, updated_at FROM review_stages WHERE review_id = ? ORDER BY updated_at ASC, stage ASC', [reviewId]);
+      if (!r.ok) return r;
+      return ok(r.value.map((row) => ({ stage: String(row.stage), status: String(row.status), ...(row.error ? { error: String(row.error) } : {}), at: String(row.updated_at) })));
     },
   };
 }

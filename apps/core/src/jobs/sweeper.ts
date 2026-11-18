@@ -1,7 +1,7 @@
 import { MIGRATIONS } from '@redline/db';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
-import { SCHEMA_VERSION_KEY } from '../consumers/review-consumer.js';
+import { SCHEMA_VERSION_KEY, trace } from '../consumers/review-consumer.js';
 import { refreshVerdict } from '../services/verdict-service.js';
 
 const LATEST_SCHEMA = Math.max(...MIGRATIONS.map((m) => m.version));
@@ -28,6 +28,7 @@ export async function sweep(deps: CoreDeps): Promise<void> {
   for (const r of stuck.value) {
     const u = await deps.reviews.update(r.id, { status: 'agent_timeout', updatedAt: now.toISOString() });
     if (!u.ok) continue;
+    await trace(deps, r.id, 'agent', 'failed', 'agent_timeout');
     log('review.agent_timeout', { reviewId: r.id, received: r.samplesReceived, expected: r.samplesExpected });
     await refreshVerdict(deps, r.issueId);
     await deps.queue.push([{ kind: 'propagate', issueId: r.issueId }]);

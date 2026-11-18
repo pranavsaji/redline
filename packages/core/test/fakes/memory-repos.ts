@@ -24,7 +24,7 @@ export function memoryReviewRepo(): ReviewRepo & { _reviews: Map<string, Review>
   const threats = new Map<string, Threat[]>();
   const discarded = new Map<string, DiscardedThreat[]>();
   const samples = new Map<string, Map<number, Sample>>();
-  const stages = new Map<string, { status: string; checkpoint?: unknown; error?: string }>();
+  const stages = new Map<string, { status: string; checkpoint?: unknown; error?: string; at: string }>();
   return {
     _reviews: reviews,
     async latest(issueId) {
@@ -91,13 +91,27 @@ export function memoryReviewRepo(): ReviewRepo & { _reviews: Map<string, Review>
       const m = samples.get(reviewId);
       return ok(m ? [...m.entries()].sort((a, b) => a[0] - b[0]).map(([, s]) => clone(s)) : []);
     },
-    async saveStage(reviewId, stage, status, checkpoint, error) {
-      stages.set(`${reviewId}:${stage}`, { status, checkpoint: clone(checkpoint), ...(error ? { error } : {}) });
+    async saveStage(reviewId, stage, status, checkpoint, error, at) {
+      stages.set(`${reviewId}:${stage}`, { status, checkpoint: clone(checkpoint), ...(error ? { error } : {}), at: at ?? new Date().toISOString() });
       return ok(undefined);
     },
     async stage(reviewId, stage) {
       const s = stages.get(`${reviewId}:${stage}`);
-      return ok(s ? clone(s) : null);
+      if (!s) return ok(null);
+      const { at: _at, ...rest } = clone(s);
+      return ok(rest);
+    },
+    async recent(limit, since) {
+      const n = Math.max(1, Math.min(500, Math.floor(limit)));
+      const list = [...reviews.values()].filter((r) => !since || r.createdAt >= since).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return ok(list.slice(0, n).map(clone));
+    },
+    async stages(reviewId) {
+      const list = [...stages.entries()]
+        .filter(([k]) => k.startsWith(`${reviewId}:`))
+        .map(([k, v]) => ({ stage: k.slice(reviewId.length + 1), status: v.status, ...(v.error ? { error: v.error } : {}), at: v.at }))
+        .sort((a, b) => a.at.localeCompare(b.at) || a.stage.localeCompare(b.stage));
+      return ok(list);
     },
   };
 }
