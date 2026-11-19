@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { SEVERITIES, severityRank, type ReviewStatus, type Severity } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
-import type { TrendPoint } from '../adapters/retention.js';
+import type { TrendPoint } from '@redline/db';
 import { log } from '../adapters/log.js';
 import { getPostureSummary, type PostureSummaryResult } from '../actions/posture-summary.js';
 import { getReleaseReadiness, type ReleaseReadinessResult } from '../actions/release-readiness.js';

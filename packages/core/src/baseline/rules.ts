@@ -12,7 +12,7 @@ const RULES: Rule[] = [
     when: (s) => (s.auth ? 'auth' : undefined),
     threat: {
       stride: 'Spoofing', title: 'Account takeover through weak authentication', component: 'authentication',
-      scenario: 'An attacker reuses stolen or guessed credentials or a leaked session token to act as a customer.',
+      scenario: 'An attacker reuses stolen or guessed credentials or a leaked session token to act as another user.',
       likelihood: 3, impact: 4, asvs: ['V6.3.1', 'V7.2.1'], cwe: ['CWE-287'],
       plainLanguage: 'Someone could log in as a customer using a stolen password or session.',
     },
@@ -21,7 +21,7 @@ const RULES: Rule[] = [
     when: (s) => (s.dataClasses.includes('pii') ? 'pii' : undefined),
     threat: {
       stride: 'InformationDisclosure', title: 'Personal data exposed to unauthorised users', component: 'customer data',
-      scenario: 'A user or automated client requests records that belong to another customer and receives their personal data.',
+      scenario: 'A user or automated client requests records that belong to someone else and receives their personal data.',
       likelihood: 3, impact: 4, asvs: ['V8.2.1', 'V14.2.1'], cwe: ['CWE-359', 'CWE-639'],
       plainLanguage: 'Someone could see another customer’s personal details.',
     },
@@ -30,7 +30,7 @@ const RULES: Rule[] = [
     when: (s) => (s.payment ? 'payment' : undefined),
     threat: {
       stride: 'Tampering', title: 'Payment amount or recipient manipulated', component: 'payment flow',
-      scenario: 'An attacker alters the amount, currency or recipient of a payment or refund between request and execution.',
+      scenario: 'An attacker alters the amount, currency or recipient of a payment between request and execution.',
       likelihood: 3, impact: 5, asvs: ['V2.3.1', 'V2.2.1'], cwe: ['CWE-841'],
       plainLanguage: 'Someone could change how much money moves, or where it goes.',
     },
@@ -66,7 +66,7 @@ const RULES: Rule[] = [
     when: (s) => (s.llmFeatures ? 'llmFeatures' : undefined),
     threat: {
       stride: 'ElevationOfPrivilege', title: 'Agent goal hijack through injected instructions', component: 'AI agent',
-      scenario: 'Text the agent reads (a chat message, order note, page or tool result) contains instructions that redirect it to act for the attacker (prompt injection).',
+      scenario: 'Text the agent reads (user input, stored content, a page or a tool result) contains instructions that redirect it to act for the attacker (prompt injection).',
       likelihood: 4, impact: 4, asvs: ['V8.3.1', 'V2.2.1'], cwe: ['CWE-1427'],
       plainLanguage: 'Someone could slip instructions into what the AI reads and make it work for them.',
     },
@@ -75,7 +75,7 @@ const RULES: Rule[] = [
     when: (s) => (s.llmFeatures ? 'llmFeatures' : undefined),
     threat: {
       stride: 'Tampering', title: 'Tool misuse by an over-privileged agent', component: 'AI agent tools',
-      scenario: 'The agent calls a tool (for example refunds or data lookups) with attacker-chosen arguments or beyond what the user is allowed to do.',
+      scenario: 'The agent calls one of its tools with attacker-chosen arguments, or does something the requesting user is not allowed to do.',
       likelihood: 3, impact: 4, asvs: ['V8.2.1', 'V8.3.1'], cwe: ['CWE-250', 'CWE-1426'],
       plainLanguage: 'The AI could be tricked into using its tools, like refunds, in ways nobody intended.',
     },
@@ -84,7 +84,7 @@ const RULES: Rule[] = [
     when: (s) => (s.thirdParty.length > 0 ? `thirdParty:${s.thirdParty[0]}` : undefined),
     threat: {
       stride: 'InformationDisclosure', title: 'Sensitive data sent to a third-party service', component: 'third-party integration',
-      scenario: 'Customer data is passed to an external provider without minimisation, contract controls or encryption in transit.',
+      scenario: 'Data is passed to an external provider without minimisation, contract controls or encryption in transit.',
       likelihood: 2, impact: 3, asvs: ['V12.2.1', 'V14.2.1'], cwe: ['CWE-200'],
       plainLanguage: 'Customer data could leave our systems and be exposed by another company.',
     },

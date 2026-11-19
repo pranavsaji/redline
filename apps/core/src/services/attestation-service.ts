@@ -49,7 +49,7 @@ export async function requestAttestation(deps: CoreDeps, i: { issueKey: string; 
   if (verdict.unreviewed)
     return ok({ blocking: [{ code: 'no_review', message: `Redline does not review ${issue.value.key} (its project or issue type is not enabled), so it cannot attest a merge. Name the reviewed story or epic in the pull request and request the attestation there.` }] });
 
-  const [policy, requirements, key] = await Promise.all([deps.config.site(), deps.requirements.forIssue(issue.value.id), deps.keys.active()]);
+  const [policy, requirements, key, latest] = await Promise.all([deps.config.site(), deps.requirements.forIssue(issue.value.id), deps.keys.active(), deps.reviews.latest(issue.value.id)]);
   if (!policy.ok) return policy;
   if (!requirements.ok) return requirements;
   if (!key.ok) return key;
@@ -63,6 +63,7 @@ export async function requestAttestation(deps: CoreDeps, i: { issueKey: string; 
     key: key.value,
     nowSec: Math.floor(now.getTime() / 1000),
     ttlHours: policy.value.attestationTtlHours,
+    partial: latest.ok && latest.value?.partial === true,
   });
   if (!signed.ok) return signed.error.code === 'forbidden' ? ok({ blocking: verdict.reasons.length > 0 ? verdict.reasons : [{ code: 'review_failed', message: signed.error.message }] }) : signed;
   const p = signed.value.payload;

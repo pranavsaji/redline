@@ -44,6 +44,17 @@ describe('requestAttestation (AT-1)', () => {
     expect(await ledgerTypes(t)).toEqual([]);
   });
 
+  it('M9: the attestation records that the review was made with partial context', async () => {
+    const { t } = await reviewed({ allVerified: true });
+    const rev = (await t.deps.reviews.latest(ISSUE)) as { ok: true; value: { id: string } };
+    await t.deps.reviews.update(rev.value.id, { partial: true });
+    const r = await requestAttestation(t.deps, { issueKey: 'PAY-7', repo: REPO, commitSha: SHA, accountId: DEV });
+    if (!r.ok || !('token' in r.value)) throw new Error(`expected a token: ${JSON.stringify(r)}`);
+    const keys = (await t.deps.keys.publicKeys()) as { ok: true; value: Record<string, string> };
+    const d = decodeAttestation(r.value.token, keys.value, Math.floor(t.clock.now().getTime() / 1000));
+    expect(d.ok && d.value.partial).toBe(true);
+  });
+
   it('a blocked verdict returns the blocking list and writes no ledger entry or token', async () => {
     const { t } = await reviewed();
     const r = await requestAttestation(t.deps, { issueKey: 'PAY-7', repo: REPO, commitSha: SHA, accountId: DEV });

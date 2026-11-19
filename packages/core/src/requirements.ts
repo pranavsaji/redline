@@ -27,6 +27,15 @@ const asvsThen = (text: string): string => {
 
 /** One requirement per accepted or needs_human threat. Agent-suggested text wins; otherwise a template from the threat's ASVS requirements. */
 export function requirementsFor(threats: Threat[], issue: { issueId: string; issueKey: string }): Requirement[] {
+  // M10: the id is stable per (issue, STRIDE, title); a second threat with the same pair (a carried-over twin) gets an
+  // id that also includes its threat id, so every blocking threat has a requirement someone can close.
+  const used = new Set<string>();
+  const idFor = (t: Threat) => {
+    const stable = `req_${sha256Hex(`${issue.issueId}|${t.stride}|${t.title.toLowerCase()}`).slice(0, 16)}`;
+    const id = used.has(stable) ? `req_${sha256Hex(`${issue.issueId}|${t.stride}|${t.title.toLowerCase()}|${t.id}`).slice(0, 16)}` : stable;
+    used.add(id);
+    return id;
+  };
   return threats
     .filter((t) => t.state === 'accepted' || t.state === 'needs_human')
     .map((t) => {
@@ -50,7 +59,7 @@ export function requirementsFor(threats: Threat[], issue: { issueId: string; iss
       const hintText = `${t.title} ${t.component}`;
       const fileHints = [...new Set(FILE_HINTS.filter((h) => h.re.test(hintText)).flatMap((h) => h.globs))];
       return {
-        id: `req_${sha256Hex(`${issue.issueId}|${t.stride}|${t.title.toLowerCase()}`).slice(0, 16)}`,
+        id: idFor(t),
         threatId: t.id,
         issueId: issue.issueId,
         issueKey: issue.issueKey,

@@ -2,7 +2,7 @@
 
 ![tests](https://img.shields.io/badge/tests-950%2B%20passing-brightgreen)
 ![coverage](https://img.shields.io/badge/line%20coverage-92.9%25-brightgreen)
-![eval F1](https://img.shields.io/badge/eval%20F1-44.8%25-blue)
+![eval F1](https://img.shields.io/badge/eval%20F1-43.8%25-blue)
 ![injection resistance](https://img.shields.io/badge/injection%20resistance-6%2F6-blue)
 ![runs on Atlassian](https://img.shields.io/badge/egress-none-informational)
 
@@ -43,19 +43,19 @@ _Scored offline with Claude Code on claude-sonnet-4-5 (tools and MCP off, Redlin
 
 | Metric | Value | Target |
 | --- | --- | --- |
-| High-severity recall | 94.6% | ≥ 85% |
-| Recall | 87.0% | |
+| High-severity recall | 91.9% | ≥ 85% |
+| Recall | 85.2% | |
 | Injection resistance | 6 of 6 | all |
 | Citation grounding | 99.8% | 100% |
-| Precision, judged: threats the model proposed | 73.7% | ≥ 70% |
-| Precision, judged: all threats shown | 58.3% | |
-| Precision, strict (vs the must-find list only) | 30.1% | lower bound |
-| F1 (strict) | 44.8% | |
+| Precision, judged: threats the model proposed | 75.4% | ≥ 70% |
+| Precision, judged: all threats shown | 59.6% | |
+| Precision, strict (vs the must-find list only) | 29.5% | lower bound |
+| F1 (strict) | 43.8% | |
 
 Each case lists only 2 to 3 must-find threats, while Redline shows about 6 per case, so strict precision counts every
 other threat as wrong. A separate `claude -p` call (same model, tools off, a strict rubric: follows from the design,
-specific, not a duplicate) graded each threat outside the list: 43 of the 74 the model proposed are valid, against 1 of
-the 35 from Redline's rule-based floor. The floor is deliberate: it always runs and the agent can never remove its
+specific, not a duplicate) graded each threat outside the list: 45 of the 74 the model proposed are valid, against 2 of
+the 36 from Redline's rule-based floor. The floor is deliberate: it always runs and the agent can never remove its
 threats, so a failed or poisoned agent run still leaves a fail-closed review. A judge from the same model family may
 be lenient to its own outputs; its verdicts are recorded in `evals/results/judged/` so you can read every one.
 

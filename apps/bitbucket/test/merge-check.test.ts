@@ -135,6 +135,15 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
     expect(await multi(`${token()}\n${token({ issueKey: 'PAY-6', nonce: 'n0nce3', commitSha: OLD, iat: NOW - 120 })}`)).toMatchObject({ success: false, outcome: 'fail_other_issue' });
   });
 
+  it('M9: an attestation for a review made with partial context says so in the check message', async () => {
+    expect(await run(token({ partial: true }))).toMatchObject({ success: true, outcome: 'pass_attested', message: expect.stringMatching(/reviewed with partial context/) });
+  });
+
+  it('M8: a project key with an underscore (allowed by Jira and the attestation schema) is recognised in the title', async () => {
+    const r = await evaluateMergeCheck({ pr: { ...pr(token({ issueKey: 'MY_PROJ-12' })), title: 'MY_PROJ-12 harden webhook', branch: 'feature/x' }, files: AUTH, repoPolicyYaml: null, settings: settings(), nowSec: NOW });
+    expect(r).toMatchObject({ success: true, outcome: 'pass_attested' });
+  });
+
   it('security: a PR that names no work item cannot pass on an attestation', async () => {
     const r = await evaluateMergeCheck({ pr: { ...pr(token()), title: 'Tidy', branch: 'tidy' }, files: AUTH, repoPolicyYaml: null, settings: settings(), nowSec: NOW });
     expect(r).toMatchObject({ success: false, outcome: 'fail_other_issue', message: expect.stringMatching(/Put the work item key \(PAY-7\) in the pull request title or branch name/) });
@@ -178,13 +187,14 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
 });
 
 describe('runMergeCheck: reads the PR, its diffstat, the destination policy and repo settings', () => {
-  function client(o: { description: string; diff?: string; policy?: string | null; fail?: 'pr' | 'diff' }) {
+  function client(o: { description: string; diff?: string; policy?: string | null; fail?: 'pr' | 'diff'; patch?: string | null }) {
     const calls: string[] = [];
     const prJson = JSON.parse(fixture('pr/auth-change.json').replace('{{ATTESTATION}}', o.description.replace(/\n/g, '\\n')));
     const c: BitbucketClient = {
       pullRequest: async (_ws, _repo, id) => (calls.push(`pr:${id}`), o.fail === 'pr' ? { ok: false, error: { code: 'upstream', message: '500' } } : { ok: true, value: prJson }),
       diffstat: async (_ws, _repo, id) => (calls.push(`diff:${id}`), o.fail === 'diff' ? { ok: false, error: { code: 'upstream', message: '500' } } : { ok: true, value: JSON.parse(o.diff ?? fixture('diffstat/auth-change.json')).values }),
       fileAt: async (_ws, _repo, commit, path) => (calls.push(`file:${commit}:${path}`), { ok: true, value: o.policy ?? null }),
+      diff: async (_ws, _repo, id) => (calls.push(`patch:${id}`), o.patch === null ? { ok: false, error: { code: 'upstream', message: '500' } } : { ok: true, value: o.patch ?? '' }),
     };
     return { c, calls };
   }
@@ -208,6 +218,30 @@ describe('runMergeCheck: reads the PR, its diffstat, the destination policy and 
     expect(r.success).toBe(false);
     expect(r.message).toMatch(/could not read this pull request/);
     expect((await runMergeCheck(event, { client: c, settings: async () => settings({ mode: 'warn', warnUntil: new Date((NOW + 60) * 1000).toISOString() }), nowSec: () => NOW })).success).toBe(true);
+  });
+
+  it('M7: a secret added in a file outside the sensitive paths still needs an attestation (the diff text is read)', async () => {
+    const patch = [
+      'diff --git a/README.md b/README.md',
+      '--- a/README.md',
+      '+++ b/README.md',
+      '@@ -1,2 +1,3 @@',
+      ' # Docs',
+      // nosemgrep: detected-aws-access-key-id-value -- fake key (see .gitleaks.toml)
+      '+aws_access_key_id = AKIAABCDEFGHIJKLMNOP',
+    ].join('\n');
+    const { c, calls } = client({ description: '', diff: fixture('diffstat/docs-only.json'), patch });
+    expect(await runMergeCheck(event, { client: c, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: false, message: expect.stringMatching(/has no attestation/) });
+    expect(calls).toContain('patch:7');
+    // An unreadable diff text keeps today's behaviour (paths only) rather than blocking every pull request.
+    const { c: c2 } = client({ description: '', diff: fixture('diffstat/docs-only.json'), patch: null });
+    expect(await runMergeCheck(event, { client: c2, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: true });
+  });
+
+  it('I2 follow-up: an unreadable pull request blocks once warn mode has ended', async () => {
+    const { c } = client({ description: '', fail: 'diff' });
+    const ended = settings({ mode: 'warn', warnUntil: new Date((NOW - 60) * 1000).toISOString() });
+    expect((await runMergeCheck(event, { client: c, settings: async () => ended, nowSec: () => NOW })).success).toBe(false);
   });
 
   it('a repository with no settings yet uses the defaults: block mode and the built-in sensitive paths', async () => {

@@ -18,7 +18,7 @@ const MAX_ANCESTORS = 5;
  * `unreviewed`: Redline does not review this item (project or issue type not enabled) and no ancestor has a review, so
  * Done passes freely but nothing may be attested on its behalf (a merge needs a reviewed item).
  */
-export type StoredVerdict = Verdict & { panelUrl?: string; message?: string; riskScore?: number; notApplicable?: boolean; unreviewed?: boolean; policyVersion?: number };
+export type StoredVerdict = Verdict & { panelUrl?: string; message?: string; riskScore?: number; notApplicable?: boolean; unreviewed?: boolean; policyVersion?: number; recheckAt?: string };
 
 /**
  * Bumped by the admin page on every policy or warn-only change. A stored verdict computed under an older version is
@@ -69,7 +69,8 @@ export async function readVerdict(deps: CoreDeps, issueId: string): Promise<Resu
   const value = first.value;
   if (typeof value !== 'object' || value === null) return ok((value ?? undefined) as StoredVerdict | undefined);
   const current = await policyVersion(deps);
-  const lapsed = (v: object) => lenient(v) && verdictLapsed(v, now);
+  const due = (v: object) => typeof (v as StoredVerdict).recheckAt === 'string' && Date.parse((v as StoredVerdict).recheckAt!) <= now.getTime();
+  const lapsed = (v: object) => (lenient(v) && verdictLapsed(v, now)) || due(v);
   const outdated = (v: object) => current === null || storedVersion(v) < current;
   if (!lapsed(value) && !outdated(value)) return ok(value as StoredVerdict);
   log(lapsed(value) ? 'verdict.lapsed' : 'verdict.policy_changed', { issueId });
@@ -196,6 +197,15 @@ async function ownVerdict(
   return ok({ verdict, reviewed: review !== null, notApplicable: false, requirements: requirements.value, ...(review ? { riskScore: review.riskScore } : {}) });
 }
 
+/**
+ * M1: the earliest moment an active acceptance this verdict relies on runs out. Readers recompute from then on, so an
+ * expired acceptance blocks at once instead of when the hourly expiry job next runs.
+ */
+function recheckAt(acceptances: Ledgered['acceptances'], reqIds: ReadonlySet<string>, now: Date): string | undefined {
+  const ends = acceptances.filter((a) => a.state === 'active' && reqIds.has(a.requirementId) && new Date(a.expiresAt).getTime() > now.getTime()).map((a) => new Date(a.expiresAt).getTime());
+  return ends.length > 0 ? new Date(Math.min(...ends)).toISOString() : undefined;
+}
+
 /** Fail closed: when the verdict cannot be computed, the gates still read a block that says why and how to retry. */
 async function writeFailClosed(deps: CoreDeps, issueId: string, panelUrl: string, why: string): Promise<void> {
   const policy = await deps.config.site().catch(() => null);
@@ -288,8 +298,12 @@ export async function refreshVerdict(deps: CoreDeps, issueId: string): Promise<R
   const own = await ownVerdict(deps, issue, policy.value, ledgered, panelUrl, now);
   if (!own.ok) return fail(own);
   const keys = new Map<string, string>();
+  const reqIds = new Set<string>();
   const addKeys = (reqs: readonly Requirement[]) => {
-    for (const r of reqs) if (r.subtaskKey) keys.set(r.id, r.subtaskKey);
+    for (const r of reqs) {
+      reqIds.add(r.id);
+      if (r.subtaskKey) keys.set(r.id, r.subtaskKey);
+    }
   };
   addKeys(own.value.requirements);
 
@@ -313,6 +327,7 @@ export async function refreshVerdict(deps: CoreDeps, issueId: string): Promise<R
     ...(own.value.riskScore !== undefined ? { riskScore: own.value.riskScore } : {}),
     ...(own.value.notApplicable && final.state === 'pass' ? { notApplicable: true } : {}),
     ...(own.value.notApplicable && ancestors.length === 0 ? { unreviewed: true } : {}),
+    ...(recheckAt(ledgered.acceptances, reqIds, now) ? { recheckAt: recheckAt(ledgered.acceptances, reqIds, now)! } : {}),
   };
   const w = await write(deps, issue.id, value, version);
   return w.ok ? ok(final) : w;

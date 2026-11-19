@@ -20,6 +20,24 @@ export interface BitbucketClient {
   diffstat(workspace: string, repo: string, id: number): Promise<Result<DiffstatEntry[]>>;
   /** File text at a commit; null when the file does not exist there. */
   fileAt(workspace: string, repo: string, commit: string, path: string): Promise<Result<string | null>>;
+  /** The pull request's unified diff (text, capped), so added lines can be scanned for secrets. Optional. */
+  diff?(workspace: string, repo: string, id: number): Promise<Result<string>>;
+}
+
+/** Diff text Redline scans (2 MB); a bigger diff is scanned up to here. */
+export const MAX_DIFF_TEXT = 2_000_000;
+
+/** Added lines per file from a unified diff (`+++ b/<path>`, then `+` lines), within MAX_DIFF_TEXT. */
+export function addedLines(diff: string): Map<string, string> {
+  const out = new Map<string, string>();
+  let path: string | null = null;
+  for (const line of diff.slice(0, MAX_DIFF_TEXT).split('\n')) {
+    if (line.startsWith('+++ ')) {
+      const p = line.slice(4).trim();
+      path = p === '/dev/null' ? null : p.replace(/^b\//, '');
+    } else if (path && line.startsWith('+')) out.set(path, `${out.get(path) ?? ''}${line.slice(1)}\n`);
+  }
+  return out;
 }
 
 const MAX_PAGES = 10;
@@ -58,6 +76,11 @@ export function forgeBitbucketClient(): BitbucketClient {
       // More files than we page through: report what we have plus a marker so the check treats it as sensitive.
       out.push({ status: 'modified', new: { path: TRUNCATED_PATH } });
       return ok(out);
+    },
+    async diff(ws, repo, id) {
+      const { bb, route } = await api();
+      const r = await bb.requestBitbucket(route`/2.0/repositories/${ws}/${repo}/pullrequests/${id}/diff`);
+      return r.ok ? ok((await r.text()).slice(0, MAX_DIFF_TEXT)) : fail('diff', r.status);
     },
     async fileAt(ws, repo, commit, path) {
       if (!COMMIT.test(commit) || !SAFE_PATH.test(path) || path.split('/').includes('..')) return err(appError('validation', 'fileAt: unsafe commit or path'));

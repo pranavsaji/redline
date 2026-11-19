@@ -170,6 +170,11 @@ describe('baselineThreats', () => {
   it('every evidence quote grounds as supported against the bundle', () => {
     for (const b of base) for (const e of b.evidence) expect(groundQuote(e.quote, facts).grounding, b.title).toBe('supported');
   });
+  it('rule-based scenarios stay generic: no refunds, orders, chat or customers the work item may not have (eval judge finding)', () => {
+    const all = baselineThreats({ ...signals, auth: true, payment: true, fileUpload: true, llmFeatures: true, exposure: 'public', dataClasses: ['pii', 'credentials'], thirdParty: ['stripe'], evidence: new Proxy({}, { get: () => ({ quote: 'q' }) }) as never });
+    expect(all.length).toBeGreaterThanOrEqual(8);
+    for (const t of all) expect(t.scenario, t.title).not.toMatch(/refund|order|chat|customer/i);
+  });
   it('produces nothing for an empty bundle', () => {
     expect(baselineThreats(extractSignals([]))).toEqual([]);
   });

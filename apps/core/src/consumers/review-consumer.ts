@@ -168,6 +168,9 @@ async function assemble(deps: CoreDeps, reviewId: string): Promise<Result<void>>
   if (!policy.ok) return policy;
   const [samples, facts, issue] = await Promise.all([deps.reviews.samples(reviewId), deps.reviews.facts(reviewId), deps.jira.issue(review.issueId)]);
   if (!samples.ok) return samples;
+  // M3: a settled review with no new samples is not assembled again (a redelivered job would overwrite champion triage).
+  const settled = review.status !== 'awaiting_agent' && review.status !== 'agent_timeout';
+  if (settled && samples.value.length <= review.samplesReceived) return refreshVerdict(deps, review.issueId).then((v) => (v.ok ? voidOk() : v));
   if (!facts.ok) return facts;
   const bundle: ContextBundle = {
     issueId: review.issueId,

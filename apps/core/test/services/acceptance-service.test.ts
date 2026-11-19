@@ -5,6 +5,7 @@ import { acceptanceDecide, acceptanceRequest, acceptanceRevoke, breakGlassOverri
 import { ledgerExport, ledgerVerify } from '../../src/resolvers/ledger.js';
 import { panelGet } from '../../src/resolvers/panel.js';
 import { expireAcceptances } from '../../src/services/acceptance-service.js';
+import { validateTransition } from '../../src/validators/validate-transition.js';
 import { coreDeps, jiraIssue } from '../support/core-deps.js';
 import { ADMIN, CHAMP, CHAMPIONS, DEV, ISSUE, LEADS, reviewed } from '../support/reviewed.js';
 
@@ -16,6 +17,16 @@ const commentText = (adf: unknown) => JSON.stringify(adf);
 const reason = 'Ship behind the feature flag; the HMAC check lands next sprint.';
 
 describe('Journey B: risk accepted under time pressure (RL-1, RL-2, RL-5)', () => {
+  it('M1: the Done gate blocks the moment an acceptance expires, before the hourly expiry job has run', async () => {
+    const { t, req } = await reviewed();
+    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: 'Feature flag off', expiryDays: 7 });
+    if ('error' in asked) throw new Error('request failed');
+    await acceptanceDecide(t.deps, as(CHAMP), { acceptanceId: asked.acceptanceId, decision: 'approve' });
+    expect(await validateTransition(t.deps, { issue: { key: 'PAY-7', id: ISSUE } })).toEqual({ result: true });
+    t.clock.advance(7 * DAY + 60_000);
+    expect(await validateTransition(t.deps, { issue: { key: 'PAY-7', id: ISSUE } })).toMatchObject({ result: false });
+  });
+
   it('request → champion approves → verdict passes → expiry reopens the requirement, blocks again and notifies the owner', async () => {
     const { t, req, reqs } = await reviewed();
     expect(req.severity).toBe('High');

@@ -45,6 +45,16 @@ describe('requirementsFor', () => {
     expect(requirementsFor(out.threats, { issueId: '10001', issueKey: ISSUE_KEY }).map((r) => r.id)).toEqual(reqs.map((r) => r.id));
   });
 
+  it('M10: two threats with the same STRIDE and title (one carried over) get distinct requirement ids', () => {
+    const a = { ...out.threats[0]!, state: 'accepted' as const };
+    const b = { ...a, id: `${a.id}_prior` };
+    const rs = requirementsFor([a, b], { issueId: '10001', issueKey: ISSUE_KEY });
+    expect(new Set(rs.map((r) => r.id)).size).toBe(2);
+    expect(rs.map((r) => r.threatId)).toEqual([a.id, b.id]);
+    // The first keeps the stable id, so statuses carry across revisions as before.
+    expect(rs[0]!.id).toBe(requirementsFor([a], { issueId: '10001', issueKey: ISSUE_KEY })[0]!.id);
+  });
+
   it('security: empty agent requirement fields fall back to the ASVS template', () => {
     const t = { ...out.threats[0]!, suggestedRequirement: { title: '  ', given: '', when: 'w', then: '' } };
     const [r] = requirementsFor([t], { issueId: '10001', issueKey: ISSUE_KEY });

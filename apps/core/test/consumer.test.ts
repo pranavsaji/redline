@@ -3,6 +3,7 @@ import type { AgentThreatModel, Verdict } from '@redline/shared';
 import { handleJob, reviewConsumer } from '../src/consumers/review-consumer.js';
 import { refreshVerdict } from '../src/services/verdict-service.js';
 import { coreDeps, drain, jiraIssue, POLICY } from './support/core-deps.js';
+import { ISSUE, reviewed } from './support/reviewed.js';
 
 const sample = (issueKey: string): AgentThreatModel => ({
   schema: 'redline.threatmodel.v1',
@@ -127,6 +128,18 @@ describe('gather job', () => {
     expect(all).toBe(0);
     expect(types.flat()).toEqual(expect.arrayContaining(['acceptance.approved', 'override.breakglass', 'budget.champion_confirmed']));
     expect(types.flat()).not.toContain('attestation.issued');
+  });
+
+  it('M3: a redelivered assemble job on a settled review does not undo a champion\'s triage', async () => {
+    const { t } = await reviewed();
+    const rev = (await t.deps.reviews.latest(ISSUE)) as { ok: true; value: { id: string; status: string } };
+    expect(rev.value.status).toBe('ready');
+    const threats = (await t.deps.reviews.threats(rev.value.id)) as { ok: true; value: Array<{ id: string; title: string }> };
+    const edited = threats.value[0]!;
+    await t.deps.reviews.updateThreat(edited.id, { title: 'Champion-edited title', state: 'dismissed' });
+    await handleJob(t.deps, { kind: 'assemble', reviewId: rev.value.id });
+    const after = (await t.deps.reviews.threats(rev.value.id)) as { ok: true; value: Array<{ id: string; title: string; state: string }> };
+    expect(after.value.find((x) => x.id === edited.id)).toMatchObject({ title: 'Champion-edited title', state: 'dismissed' });
   });
 
   it('a gather failure for a never-reviewed item still writes a blocking verdict', async () => {

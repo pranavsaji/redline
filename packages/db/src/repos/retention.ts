@@ -1,4 +1,4 @@
-import type { SqlExecutor } from '@redline/db';
+import type { SqlExecutor } from '../executor.js';
 import { ok, type Result } from '@redline/shared';
 
 export interface RetentionStore {

@@ -233,7 +233,9 @@ export function restGatherer(d: RestGathererDeps): ContextGatherer {
         facts: normalized,
         partial: reasons.length > 0,
         partialReasons: reasons,
-        contextHash: contextHash([...normalized, ...withheld]),
+        // M4: Redline's own review summary is context for the agent, not a source; it must not change the hash, or a
+        // redelivered "created" event would open a new revision that no Automation run fills.
+        contextHash: contextHash([...normalized.filter((f) => f.sourceType !== 'review'), ...withheld]),
         gatheredAt: d.clock.now().toISOString(),
         components: issue.components.map((c) => c.slice(0, 255)),
       });

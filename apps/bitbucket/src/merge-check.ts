@@ -2,7 +2,7 @@ import { DEFAULT_SITE_POLICY, parseRepoPolicy, scoreDiff, type DiffFile } from '
 import { decodeAttestation, findAttestations, fromB64url, fromUtf8 } from '@redline/crypto';
 import type { AttestationPayload } from '@redline/shared';
 import { log } from '@redline/shared';
-import { TRUNCATED_PATH, type BitbucketClient, type DiffstatEntry } from './bitbucket-client.js';
+import { addedLines, TRUNCATED_PATH, type BitbucketClient, type DiffstatEntry } from './bitbucket-client.js';
 
 export interface RepoSettings {
   /** kid → base64url Ed25519 public key, copied from Redline's admin page. */
@@ -40,8 +40,8 @@ export interface PrFacts {
   branch?: string;
 }
 
-const ISSUE_KEY = /\b([A-Z][A-Z0-9]+-\d+)\b/;
-const ISSUE_KEYS = /\b([A-Z][A-Z0-9]+-\d+)\b/g;
+const ISSUE_KEY = /\b([A-Z][A-Z0-9_]+-\d+)\b/;
+const ISSUE_KEYS = /\b([A-Z][A-Z0-9_]+-\d+)\b/g;
 const MSG_SIGNATURE = 'Redline: attestation signature invalid. Copy a fresh attestation from the Jira issue panel.';
 /** Bitbucket stores descriptions as Markdown and escapes punctuation (`\_`, `\-`); undo that before looking for tokens. */
 export const unescapeMarkdown = (text: string) => text.replace(/\\([\\`*_{}[\]()#+\-.!|~<>])/g, '$1');
@@ -159,12 +159,17 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
       message: `Redline: this pull request also names ${unattested}, which has no valid attestation for this commit. Add one from ${unattested}, or remove ${unattested} from the title and branch name.`,
     };
   const verified = p.requirements.filter((r) => r.status === 'Verified').length;
-  const pass = `Redline: attested by ${p.issueKey}, ${verified} requirements verified.`;
+  const pass = `Redline: attested by ${p.issueKey}, ${verified} requirements verified${p.partial ? ' (reviewed with partial context)' : ''}.`;
   const lenient = p.override === 'break_glass' ? 'Warning: attested under a break-glass override. ' : p.override === 'warn_only' ? 'Warning: attested under warn-only mode. ' : '';
   return { success: true, outcome: 'pass_attested', message: `${lenient}${pass}` };
 }
 
 const STATUS: Record<string, DiffFile['status']> = { added: 'added', removed: 'removed', renamed: 'renamed', modified: 'modified' };
+function withAddedText(files: DiffFile[], added: Map<string, string> | null): DiffFile[] {
+  if (!added) return files;
+  return files.map((f) => (added.has(f.path) ? { ...f, addedText: added.get(f.path)! } : f));
+}
+
 export function toDiffFiles(entries: DiffstatEntry[]): DiffFile[] {
   return entries.flatMap((e) => {
     const path = e.new?.path ?? e.old?.path;
@@ -187,13 +192,18 @@ export async function runMergeCheck(
   deps: { client: BitbucketClient; settings: (repoUuid: string) => Promise<RepoSettings | null>; nowSec: () => number },
 ): Promise<{ success: boolean; message: string }> {
   const settings = (await deps.settings(event.repository.uuid).catch(() => null)) ?? DEFAULT_REPO_SETTINGS;
+  const warnActive = settings.mode === 'warn' && !!settings.warnUntil && Date.parse(settings.warnUntil) / 1000 > deps.nowSec();
   const unreadable = (why: string) => {
     const message = `Redline: could not read this pull request from Bitbucket (${why}), so it cannot be checked. Re-run the check in a minute.`;
-    return settings.mode === 'warn' ? { success: true, message: `Warning: ${message}` } : { success: false, message };
+    return warnActive ? { success: true, message: `Warning: ${message}` } : { success: false, message };
   };
   const ws = event.workspace.uuid;
   const repo = event.repository.uuid;
-  const [pr, diff] = await Promise.all([deps.client.pullRequest(ws, repo, event.pullrequest.id), deps.client.diffstat(ws, repo, event.pullrequest.id)]);
+  const [pr, diff, patch] = await Promise.all([
+    deps.client.pullRequest(ws, repo, event.pullrequest.id),
+    deps.client.diffstat(ws, repo, event.pullrequest.id),
+    deps.client.diff ? deps.client.diff(ws, repo, event.pullrequest.id) : Promise.resolve(null),
+  ]);
   if (!pr.ok) return unreadable('pull request');
   if (!diff.ok) return unreadable('changed files');
   const head = pr.value.source?.commit?.hash ?? '';
@@ -204,7 +214,8 @@ export async function runMergeCheck(
   if (!policy.ok) return unreadable('policy file');
   const r = await evaluateMergeCheck({
     pr: { description: pr.value.description ?? '', headSha: head, destSha: dest, repoFullName: fullName, title: pr.value.title ?? '', branch: pr.value.source?.branch?.name ?? '' },
-    files: toDiffFiles(diff.value),
+    // M7: added lines feed the secret-pattern signal. An unreadable diff text keeps the path-only check.
+    files: withAddedText(toDiffFiles(diff.value), patch?.ok ? addedLines(patch.value) : null),
     repoPolicyYaml: policy.value,
     settings,
     nowSec: deps.nowSec(),

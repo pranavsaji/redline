@@ -31,6 +31,9 @@ export async function sweep(deps: CoreDeps): Promise<void> {
     await trace(deps, r.id, 'agent', 'failed', 'agent_timeout');
     log('review.agent_timeout', { reviewId: r.id, received: r.samplesReceived, expected: r.samplesExpected });
     await refreshVerdict(deps, r.issueId);
-    await deps.queue.push([{ kind: 'propagate', issueId: r.issueId }]);
+    // M5: assemble what did arrive (final mode), so a 2-of-3 review is settled instead of staying blocked.
+    const samples = await deps.reviews.samples(r.id);
+    const jobs = samples.ok && samples.value.length > 0 ? [{ kind: 'assemble' as const, reviewId: r.id }] : [];
+    await deps.queue.push([...jobs, { kind: 'propagate', issueId: r.issueId }]);
   }
 }

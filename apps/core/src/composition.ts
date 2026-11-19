@@ -9,7 +9,7 @@ import { forgeSqlExecutor } from './adapters/forge-sql.js';
 import { jiraClient } from './adapters/jira.js';
 import { defaultsFromEnv, forgeKvs, kvsConfigStore, type KvsPort } from './adapters/kvs-config.js';
 import { restGatherer } from './adapters/rest-gatherer.js';
-import { sqlRetention } from './adapters/retention.js';
+import { sqlRetention } from '@redline/db';
 import { kvsSigningKeys } from './adapters/signing-keys.js';
 import { jiraVerdictSink } from './adapters/verdict-sink.js';
 

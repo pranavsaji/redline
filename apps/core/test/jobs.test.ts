@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { MIGRATIONS } from '@redline/db';
 import { migrate } from '@redline/db';
 import { sqliteExecutor } from '../../../packages/db/test/sqlite-executor.js';
-import { sqlRetention } from '../src/adapters/retention.js';
+import { sqlRetention } from '@redline/db';
 import { handleJob } from '../src/consumers/review-consumer.js';
 import { sweep } from '../src/jobs/sweeper.js';
 import { hourly } from '../src/jobs/hourly.js';
 import { daily } from '../src/jobs/daily.js';
 import { appendLedger } from '@redline/core';
 import { checkRerunLimit } from '../src/services/rate-limit.js';
-import { coreDeps } from './support/core-deps.js';
+import { coreDeps, drain } from './support/core-deps.js';
 
 describe('sweeper', () => {
   it('turns a 20-minute-old awaiting_agent review into agent_timeout and the verdict reason agent_missing', async () => {
@@ -22,6 +22,23 @@ describe('sweeper', () => {
     const v = t.verdicts._written.get('10042') as { reasons: Array<{ code: string; message: string }> };
     const missing = v.reasons.find((r) => r.code === 'agent_missing');
     expect(missing?.message).toMatch(/did not arrive in time/);
+  });
+
+  it('M5: a timed-out review with some agent runs in is assembled from what arrived, instead of staying blocked', async () => {
+    const t = coreDeps();
+    await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
+    const rev = (await t.deps.reviews.latest('10042')) as { ok: true; value: { id: string } };
+    const model = { schema: 'redline.threatmodel.v1' as const, issueKey: 'PAY-7', threats: [{ stride: 'Spoofing' as const, title: 'Forged refund webhooks', scenario: 'An attacker posts a fake refund event.', component: 'webhook endpoint', likelihood: 4, impact: 4, evidence: [{ quote: 'Public webhook that receives refund events' }] }] };
+    for (const n of [1, 2]) await t.deps.reviews.saveSample(rev.value.id, n, model);
+    t.clock.set('2026-11-15T12:20:00Z');
+    t.pushed.length = 0;
+    await sweep(t.deps);
+    expect(t.pushed).toContainEqual({ kind: 'assemble', reviewId: rev.value.id });
+    await drain((job) => handleJob(t.deps, job), t.pushed);
+    const l = (await t.deps.reviews.latest('10042')) as { ok: true; value: { status: string } };
+    expect(l.value.status).not.toBe('awaiting_agent');
+    const threats = (await t.deps.reviews.threats(rev.value.id)) as { ok: true; value: Array<{ title: string; origin: string }> };
+    expect(threats.value.some((x) => x.origin === 'agent' && /Forged refund/.test(x.title))).toBe(true);
   });
 
   it('leaves a 10-minute-old review alone', async () => {

@@ -17,6 +17,8 @@ export function issueAttestation(i: {
   key: KeyPair;
   nowSec: number;
   ttlHours: number;
+  /** The review behind the verdict was made with partial context. */
+  partial?: boolean;
 }): Result<{ token: string; payload: AttestationPayload }> {
   if (i.verdict.state === 'block')
     return err(appError('forbidden', 'this work item has blocking security items', { reasons: i.verdict.reasons.map((r) => ({ code: r.code, message: r.message, requirementIds: r.requirementIds })) }));
@@ -42,6 +44,7 @@ export function issueAttestation(i: {
     exp,
     nonce: randomNonce(),
     ...(override ? { override } : {}),
+    ...(i.partial ? { partial: true as const } : {}),
   };
   try {
     return ok({ token: encodeAttestation(payload, i.key), payload });

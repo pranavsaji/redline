@@ -15,6 +15,8 @@ export const AttestationPayloadSchema = z
     nonce: z.string().min(4).max(64),
     /** Present when issued under warn-only or break-glass, so a verifier can apply its own policy. */
     override: z.enum(['warn_only', 'break_glass']).optional(),
+    /** Present when the review was made with partial context (some sources could not be read). */
+    partial: z.literal(true).optional(),
   })
   .strict();
 export type AttestationPayload = z.infer<typeof AttestationPayloadSchema>;

@@ -15,7 +15,7 @@ import type { Result } from '@redline/shared';
 import type { ConfluenceClient } from './adapters/confluence.js';
 import type { JiraClient } from './adapters/jira.js';
 import type { ConfigStore, KvsPort } from './adapters/kvs-config.js';
-import type { RetentionStore } from './adapters/retention.js';
+import type { RetentionStore } from '@redline/db';
 import type { ReviewJob } from './jobs/types.js';
 
 export interface JobQueue {
