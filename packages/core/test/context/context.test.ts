@@ -61,6 +61,12 @@ describe('htmlToText on hostile pages (final review I3, Review Focus 5)', () => 
     expect(htmlToText('before<script>never closed <p>hidden</p>')).toBe('before');
     expect(htmlToText('a \n \n  b\u00a0\n c')).toBe('a\nb\nc');
   });
+  it('characters whose lowercase is longer (İ) cannot shift where a script is cut (commit security review)', () => {
+    const i4 = '\u0130'.repeat(4);
+    expect(htmlToText(`${i4}<script>secret()</script>visible`)).toBe(`${i4} visible`);
+    expect(htmlToText(`${i4}<SCRIPT>a</script><p>keep me</p>`)).toBe(`${i4} keep me`);
+  });
+
   it('caps the raw page before parsing', () => {
     expect(htmlToText('x'.repeat(5_000_000)).length).toBe(MAX_RAW_PAGE);
   });

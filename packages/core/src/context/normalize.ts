@@ -31,7 +31,8 @@ export const MAX_RAW_PAGE = 2_000_000;
  * An element that is never closed drops the rest of the page, as a browser would treat it.
  */
 function stripScriptsAndStyles(html: string): string {
-  const lower = html.toLowerCase();
+  // ASCII-only lowercase keeps every index identical to `html` (toLowerCase can lengthen text, e.g. İ → i̇).
+  const lower = html.replace(/[A-Z]+/g, (c) => c.toLowerCase());
   const open = /<(script|style)\b/g;
   let out = '';
   let from = 0;
