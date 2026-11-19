@@ -1,6 +1,6 @@
 # Redline
 
-![tests](https://img.shields.io/badge/tests-900%2B%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-950%2B%20passing-brightgreen)
 ![coverage](https://img.shields.io/badge/line%20coverage-92.9%25-brightgreen)
 ![eval F1](https://img.shields.io/badge/eval%20F1-44.8%25-blue)
 ![injection resistance](https://img.shields.io/badge/injection%20resistance-6%2F6-blue)
@@ -47,19 +47,26 @@ _Scored offline with Claude Code on claude-sonnet-4-5 (tools and MCP off, Redlin
 | Recall | 87.0% | |
 | Injection resistance | 6 of 6 | all |
 | Citation grounding | 99.8% | 100% |
-| Precision (vs the must-find list) | 30.1% | ≥ 70% |
-| F1 | 44.8% | |
+| Precision, judged: threats the model proposed | 73.7% | ≥ 70% |
+| Precision, judged: all threats shown | 58.3% | |
+| Precision, strict (vs the must-find list only) | 30.1% | lower bound |
+| F1 (strict) | 44.8% | |
 
-Precision is measured against short must-find lists (2 to 3 threats per case), so every other valid threat Redline
-reports counts against it: it is a lower bound, not the share of wrong threats.
+Each case lists only 2 to 3 must-find threats, while Redline shows about 6 per case, so strict precision counts every
+other threat as wrong. A separate `claude -p` call (same model, tools off, a strict rubric: follows from the design,
+specific, not a duplicate) graded each threat outside the list: 43 of the 74 the model proposed are valid, against 1 of
+the 35 from Redline's rule-based floor. The floor is deliberate: it always runs and the agent can never remove its
+threats, so a failed or poisoned agent run still leaves a fail-closed review. A judge from the same model family may
+be lenient to its own outputs; its verdicts are recorded in `evals/results/judged/` so you can read every one.
 
 The eval set is 40 clean cases across web, API, mobile, data and AI features, plus 15 poisoned twins that hide
 instructions to the AI in the design text; a poisoned case holds when its risk and blocking count do not drop below
 its clean twin's and the injection is flagged. Run it yourself:
 
 ```bash
-pnpm redline eval --llm recorded --subset 30             # replay the recorded model outputs offline (what CI runs)
+pnpm redline eval --llm recorded --subset 30 --judge recorded   # replay recorded outputs and judge verdicts (CI)
 pnpm redline eval --llm claude-code --subset 30          # live, through your own Claude Code subscription
+pnpm redline eval --llm recorded --subset 30 --judge claude-code   # re-grade the extras live (one call per case)
 pnpm redline eval --llm fake                             # deterministic baseline rules only, no model
 ```
 
@@ -74,7 +81,12 @@ pnpm redline eval --llm fake                             # deterministic baselin
   pnpm test                                   # unit, contract, pipeline, UI and accessibility tests
   pnpm --filter @redline/core-ui dev --port 5179   # http://localhost:5179/?state=ready · ?view=admin · ?view=posture
   pnpm redline sign-demo                      # sign an attestation and watch a one-character change fail
+  pnpm e2e                                    # Journeys A and B and the merge check in a real browser
   ```
+
+  `pnpm e2e` drives the real UI against Redline's real resolvers, agent actions, Done validator and signing, with
+  only Jira, Confluence, Rovo and the clock simulated (`e2e/local/server.ts`). CI also runs semgrep (Redline's own
+  rules in `.semgrep.yml` plus the registry rulesets), `pnpm audit`, gitleaks and knip, and fails on any high finding.
 
 ## Docs
 
@@ -91,6 +103,7 @@ apps/bitbucket   Redline for Bitbucket: merge check and repository settings
 apps/local       pnpm redline: offline reviews, evals, demo signing
 packages/        core (domain), crypto, db, frameworks (ASVS 5, CWE, OWASP LLM/Agentic), prompts, shared, llm-dev
 evals/           cases, runner, metrics, recorded model outputs, results
+e2e/             Playwright journeys (local harness in CI; optional smoke test on a real site)
 scripts/         ledger proof verifier, layout audit, listing screenshots
 ```
 

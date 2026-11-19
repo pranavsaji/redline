@@ -22,5 +22,8 @@ export interface SettingsApi {
 
 export async function forgeSettingsApi(): Promise<SettingsApi> {
   const { invoke } = await import('@forge/bridge');
-  return { get: () => invoke('settings.get'), save: (input) => invoke('settings.save', { ...input }) };
+  // @forge/bridge 7 types results as `T | { body: T; metadata }`; it only wraps when invoke metadata is passed, and
+  // Redline never passes any.
+  const call = <T>(key: string, payload?: Record<string, unknown>) => invoke(key, payload) as Promise<T>;
+  return { get: () => call('settings.get'), save: (input) => call('settings.save', { ...input }) };
 }

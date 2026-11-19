@@ -1,0 +1,67 @@
+name: Nightly
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scans:
+    name: Security scans against today's advisories and rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --prod --audit-level high
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: |
+          pip install --quiet semgrep
+          semgrep scan --config .semgrep.yml --config p/default --config p/typescript --config p/react --config p/secrets \
+            --metrics off --severity ERROR --error
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  e2e-local:
+    name: End-to-end journeys (local harness)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @redline/e2e exec playwright install --with-deps chromium
+      - run: pnpm e2e
+
+  e2e-site:
+    name: Smoke test on the demo Jira site
+    # Runs only when the repository has the secrets: E2E_SITE_URL, E2E_ISSUE_KEY, and E2E_SITE_STATE_B64 (a session
+    # saved with `pnpm --filter @redline/e2e login`, base64-encoded). No password is ever stored or typed by CI.
+    if: ${{ vars.E2E_SITE_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @redline/e2e exec playwright install --with-deps chromium
+      - name: Restore the saved session
+        env:
+          STATE: ${{ secrets.E2E_SITE_STATE_B64 }}
+        run: mkdir -p e2e/.auth && printf '%s' "$STATE" | base64 -d > e2e/.auth/site.json
+      - run: pnpm --filter @redline/e2e exec playwright test --project site
+        env:
+          E2E_SITE_URL: ${{ secrets.E2E_SITE_URL }}
+          E2E_ISSUE_KEY: ${{ secrets.E2E_ISSUE_KEY }}
+      - if: always()
+        run: rm -f e2e/.auth/site.json

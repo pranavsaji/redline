@@ -1,6 +1,7 @@
 import { DEFAULT_SITE_POLICY, parseRepoPolicy, scoreDiff, type DiffFile } from '@redline/core';
 import { decodeAttestation, findAttestations, fromB64url, fromUtf8 } from '@redline/crypto';
 import type { AttestationPayload } from '@redline/shared';
+import { log } from '@redline/shared';
 import { TRUNCATED_PATH, type BitbucketClient, type DiffstatEntry } from './bitbucket-client.js';
 
 export interface RepoSettings {
@@ -186,6 +187,6 @@ export async function runMergeCheck(
     settings,
     nowSec: deps.nowSec(),
   });
-  console.log(JSON.stringify({ event: 'merge_check', outcome: r.outcome, files: diff.value.length }));
+  log('merge_check', { outcome: r.outcome, files: diff.value.length });
   return { success: r.success, message: r.message };
 }

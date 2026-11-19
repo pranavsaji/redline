@@ -11,3 +11,6 @@ evals/results/raw/
 .DS_Store
 dist-types/
 apps/core/ui/build/
+e2e/.auth/
+e2e/test-results/
+e2e/playwright-report/

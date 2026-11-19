@@ -8,6 +8,7 @@ describe('scoreDiff', () => {
     const r = scoreDiff(
       [
         { path: 'package.json', status: 'modified', linesAdded: 1 },
+        // nosemgrep: detected-aws-access-key-id-value -- fake key (see .gitleaks.toml)
         { path: 'src/config.ts', status: 'modified', linesAdded: 1, addedText: 'const k = "AKIAABCDEFGHIJKLMNOP";' },
       ],
       policy,

@@ -13,7 +13,7 @@
     "@redline/core": "workspace:*",
     "@redline/crypto": "workspace:*",
     "@redline/shared": "workspace:*",
-    "zod": "^3.25.0"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

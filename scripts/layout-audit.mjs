@@ -59,7 +59,7 @@ function chromePath() {
 
 export async function launch() {
   const profile = join(tmpdir(), `redline-audit-${process.pid}`);
-  const proc = spawn(chromePath(), ['--headless', '--disable-gpu', '--hide-scrollbars', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const proc = spawn(chromePath(), ['--headless', '--disable-gpu', '--hide-scrollbars', '--remote-debugging-port=0', `--user-data-dir=${profile}`, ...(process.platform === 'linux' ? ['--no-sandbox'] : []), 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
   const wsUrl = await new Promise((resolve, reject) => {
     let buf = '';
     proc.stderr.on('data', (d) => {

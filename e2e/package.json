@@ -1,0 +1,17 @@
+{
+  "name": "@redline/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "harness": "tsx local/server.ts",
+    "test": "playwright test",
+    "login": "tsx site/login.ts"
+  },
+  "dependencies": {
+    "@redline/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1"
+  }
+}

@@ -1,7 +1,16 @@
 name: CI
 on: [push, pull_request]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
+    name: Lint, types, tests, eval gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -11,4 +20,60 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
+      - run: pnpm knip
+      # Unit, contract, pipeline, UI and accessibility tests, plus the offline eval gate (evals/runner/gate.test.ts):
+      # the recorded Claude Code outputs are replayed through today's code; F1 may not drop more than 3 points.
       - run: pnpm test:cov
+      - name: Generated agent prompt matches @redline/prompts
+        run: cd apps/core && node build.mjs && git diff --exit-code agent/prompt.md
+
+  security:
+    name: Security scans (zero high findings)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: pnpm audit (production dependencies, high and above)
+        run: pnpm audit --prod --audit-level high
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: semgrep (Redline rules + registry rulesets; --config auto needs metrics on, so the rulesets are named)
+        run: |
+          pip install --quiet semgrep
+          semgrep scan --config .semgrep.yml --config p/default --config p/typescript --config p/react --config p/secrets \
+            --metrics off --severity ERROR --error
+      - name: gitleaks (whole history)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  e2e:
+    name: End-to-end journeys and layout audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @redline/e2e exec playwright install --with-deps chromium
+      # Journey A, Journey B and the merge check: the real UI against the real resolvers, actions, validator and
+      # signing over in-memory Atlassian fakes (e2e/local/server.ts). No account, no network.
+      - run: pnpm e2e
+      - name: Layout audit (every surface at 320 and 1280 px, light and dark)
+        run: |
+          pnpm --filter @redline/core-ui exec vite --port 5179 --strictPort &
+          pnpm --filter @redline/bitbucket-ui exec vite --port 5180 --strictPort &
+          npx --yes wait-on@8.0.3 http://localhost:5179 http://localhost:5180
+          CHROME="$(cd e2e && node -e "import('@playwright/test').then((m) => console.log(m.chromium.executablePath()))")" node scripts/layout-audit.mjs
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 7

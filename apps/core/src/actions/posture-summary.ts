@@ -7,8 +7,6 @@ import { splitVisibleAcceptances } from './visibility.js';
 import { parseInput, SCHEMAS, type ActionError } from './schemas.js';
 import { postureRows, postureScope } from '../services/posture-service.js';
 
-export { POSTURE_MAX_ITEMS } from '../services/posture-service.js';
-
 export const EXPIRING_WITHIN_DAYS = 31;
 
 export interface ExpiringAcceptance {

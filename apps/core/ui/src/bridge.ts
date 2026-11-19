@@ -1,5 +1,18 @@
 import type { AcceptanceState, AdminPolicyDto, ApiError, DataClass, Exposure, ThreatDiffDto, WhatIfDto, DigestConfig, DrillDto, Evidence, FactDto, OpsConfig, PanelDto, PostureDto, ReleaseReadinessResult, Requirement, RequirementStatus, RunDto, Severity, SitePolicy, Threat, ThreatExplanation, UsageDto } from './types.js';
 
+/** Calls a resolver by key: Forge's invoke inside Atlassian, or the local end-to-end harness (e2e/local). */
+export type Invoke = <T>(key: string, payload?: Record<string, unknown>) => Promise<T>;
+
+/**
+ * @forge/bridge 7 types every resolver result as `T | { body: T; metadata }`; it only wraps when the caller passes
+ * invoke metadata, which Redline never does, so the result is the resolver's return value itself.
+ */
+async function bridgeInvoke(): Promise<Invoke> {
+  const { invoke } = await import('@forge/bridge');
+  return <T>(key: string, payload?: Record<string, unknown>) => invoke(key, payload) as Promise<T>;
+}
+
+
 export interface AcceptanceInput {
   requirementId: string;
   reason: string;
@@ -49,7 +62,10 @@ export interface PanelApi {
 }
 
 export async function forgeApi(): Promise<PanelApi> {
-  const { invoke } = await import('@forge/bridge');
+  return panelApiOver(await bridgeInvoke());
+}
+
+export function panelApiOver(invoke: Invoke): PanelApi {
   return {
     get: () => invoke('panel.get'),
     threats: (cursor) => invoke('panel.threats', { cursor }),
@@ -117,7 +133,10 @@ export interface TreeHeadInfo {
 }
 
 export async function forgeAdminApi(): Promise<AdminApi> {
-  const { invoke } = await import('@forge/bridge');
+  return adminApiOver(await bridgeInvoke());
+}
+
+export function adminApiOver(invoke: Invoke): AdminApi {
   return {
     seed: (projectKey, spaceKey) => invoke('admin.seed', { projectKey, spaceKey }),
     setupStatus: () => invoke('admin.setupStatus'),
@@ -155,7 +174,10 @@ export interface PostureApi {
 }
 
 export async function forgePostureApi(): Promise<PostureApi> {
-  const { invoke } = await import('@forge/bridge');
+  return postureApiOver(await bridgeInvoke());
+}
+
+export function postureApiOver(invoke: Invoke): PostureApi {
   return {
     get: (project) => invoke('posture.get', project ? { project } : {}),
     drill: (q) => invoke('posture.drill', { ...q }),

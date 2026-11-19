@@ -3,5 +3,5 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "dependencies": { "@redline/shared": "workspace:*", "@redline/core": "workspace:*", "@redline/crypto": "workspace:*", "@redline/prompts": "workspace:*", "@redline/llm-dev": "workspace:*", "@redline/evals": "workspace:*" }
+  "dependencies": { "@redline/core": "workspace:*", "@redline/crypto": "workspace:*", "@redline/llm-dev": "workspace:*" }
 }

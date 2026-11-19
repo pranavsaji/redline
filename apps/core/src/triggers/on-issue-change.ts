@@ -18,9 +18,8 @@ const EventSchema = z.object({
     }),
   }),
   // Items are read with own-property access: a schema key named `toString` would match Object.prototype.toString.
-  changelog: z.object({ items: z.array(z.record(z.unknown())).nullish() }).nullish(),
+  changelog: z.object({ items: z.array(z.record(z.string(), z.unknown())).nullish() }).nullish(),
 });
-export type IssueEvent = z.input<typeof EventSchema>;
 
 /** Changelog fields whose change can change the threat model (Jira reports them under varying names). */
 const RELEVANT = new Set(['summary', 'description', 'link', 'issuelinks', 'component', 'components', 'labels', 'parent', 'issueparentassociation', 'epic link', 'project', 'key', 'issuekey']);

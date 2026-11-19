@@ -35,7 +35,7 @@ const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const toRegex = (kw: string): RegExp =>
   kw.endsWith('*') ? new RegExp(`\\b${escape(kw.slice(0, -1))}[a-z]*`, 'i') : new RegExp(`\\b${escape(kw)}\\b`, 'i');
 const COMPILED = Object.fromEntries(
-  Object.entries(SIGNAL_KEYWORDS).map(([k, list]) => [k, (list as readonly string[]).map((kw) => ({ kw: kw.replace('*', ''), re: toRegex(kw) }))]),
+  Object.entries(SIGNAL_KEYWORDS).map(([k, list]) => [k, (list as readonly string[]).map((kw) => ({ kw: kw.replace(/\*$/, ''), re: toRegex(kw) }))]),
 ) as Record<keyof typeof SIGNAL_KEYWORDS, Array<{ kw: string; re: RegExp }>>;
 
 /** The sentence around `index`, at most 200 chars, always a verbatim substring of `text`. */

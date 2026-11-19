@@ -12,7 +12,7 @@ const AI_DIRECTIVES: RegExp[] = [
   /\bnew\s+instructions\s*:/i,
 ];
 const HIDDEN_UNICODE = /[​-‏⁠-⁤﻿]|[\u{E0000}-\u{E007F}]/u;
-const BIDI = /[‪-‮⁦-⁩]/;
+const BIDI = /[\u202A-\u202E\u2066-\u2069]/;
 const BASE64_MIN_RUN = 120;
 
 const isB64 = (c: number): boolean =>
@@ -42,7 +42,7 @@ function hasBase64Blob(text: string): boolean {
 }
 const ROLE_MARKER = /^\s*(?:system|assistant|user)\s*:|<\|im_start\|>|<\|im_end\|>|\[INST\]/im;
 
-export const INVISIBLE_CHARS = /[​-‏⁠-⁤﻿‪-‮⁦-⁩]|[\u{E0000}-\u{E007F}]/gu;
+export const INVISIBLE_CHARS = /[\u200B-\u200F\u2060-\u2064\uFEFF\u202A-\u202E\u2066-\u2069]|[\u{E0000}-\u{E007F}]/gu;
 
 export function scanForInjection(text: string): { suspected: boolean; reasons: InjectionReason[] } {
   const reasons: InjectionReason[] = [];

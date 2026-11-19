@@ -9,7 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@atlaskit/badge": "^22.0.0",
     "@atlaskit/button": "^25.8.1",
     "@atlaskit/css-reset": "^8.4.10",
     "@atlaskit/lozenge": "^17.0.8",
@@ -18,7 +17,7 @@
     "@atlaskit/tabs": "^21.3.1",
     "@atlaskit/tokens": "^20.12.0",
     "@atlaskit/tooltip": "^24.4.6",
-    "@forge/bridge": "^5.17.0",
+    "@forge/bridge": "^7.3.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
