@@ -2,16 +2,22 @@
 /**
  * Offline harness: `pnpm redline <command>`.
  *   review <caseId> [--llm fake|claude-code] [--samples 3] [--model m] [--path agent|pipeline] [--yes]
- *   eval [--subset 30|all] [--llm fake|claude-code] [--samples 3] [--model m] [--path agent|pipeline] [--concurrency 1] [--yes]
+ *   eval [--subset 30|all] [--llm fake|claude-code|recorded] [--samples 3] [--model m] [--path agent|pipeline] [--concurrency 1] [--yes]
+ *        [--write-baseline] [--gate evals/results/baseline.json]
+ *     claude-code runs record every raw reply into evals/results/recorded/; `--llm recorded` replays them offline (CI).
  *   sign-demo
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { decodeAttestation, generateKeyPair } from '@redline/crypto';
 import { claudeCodeLlm } from '@redline/llm-dev';
 import { computeVerdict, DEFAULT_SITE_POLICY, issueAttestation, type LlmPort } from '@redline/core';
 import { CLEAN_CASES, POISONED_CASES } from '../../../evals/fixtures/cases.js';
 import { reportMarkdown, runCase, runEval, selectCases, type EvalPath } from '../../../evals/runner/run.js';
+import { gateCheck, loadRecording, replayLlm } from '../../../evals/runner/recorded.js';
+
+const RECORDED = 'evals/results/recorded';
+const BASELINE = 'evals/results/baseline.json';
 
 const argv = process.argv.slice(2);
 const flag = (name: string, def?: string) => {
@@ -63,7 +69,18 @@ async function main() {
     const sel = selectCases(subset);
     const n = sel.clean.length + sel.poisoned.length;
     if (llm && !(await confirm(n * samples * (path === 'pipeline' ? 2 : 1), model))) return;
-    const r = await runEval({ llm, llmName: name, subset, samples, path, concurrency: Number(flag('concurrency', '1')), onProgress: (d, t) => process.stderr.write(`\r${d}/${t}`) });
+    const recorded = flag('llm') === 'recorded';
+    const r = await runEval({
+      llm,
+      llmName: recorded ? 'recorded' : name,
+      subset,
+      samples,
+      path,
+      concurrency: Number(flag('concurrency', '1')),
+      onProgress: (d, t) => process.stderr.write(`\r${d}/${t}`),
+      ...(llm ? { recordDir: RECORDED } : {}),
+      ...(recorded ? { llmFor: (id: string) => { const rec = loadRecording(RECORDED, id); return rec ? replayLlm(rec) : null; } } : {}),
+    });
     process.stderr.write('\n');
     if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
     mkdirSync('evals/results', { recursive: true });
@@ -72,6 +89,16 @@ async function main() {
     writeFileSync(`${base}.md`, reportMarkdown(r.value));
     console.log(reportMarkdown(r.value));
     console.log(`wrote ${base}.json and ${base}.md`);
+    if (has('write-baseline')) {
+      writeFileSync(BASELINE, `${JSON.stringify({ label: r.value.label, promptVersion: r.value.promptVersion, subset, samples, modelIds: r.value.modelIds, summary: r.value.summary }, null, 2)}\n`);
+      console.log(`wrote ${BASELINE}`);
+    }
+    const gate = flag('gate');
+    if (gate) {
+      const g = gateCheck(r.value.summary, (JSON.parse(readFileSync(gate, 'utf8')) as { summary: Parameters<typeof gateCheck>[1] }).summary);
+      console.log(g.message);
+      if (!g.ok || r.value.failures.length > 0) process.exit(1);
+    }
     return;
   }
   if (cmd === 'sign-demo') {

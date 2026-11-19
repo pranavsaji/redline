@@ -52,3 +52,21 @@ describe('requirementsFor', () => {
     for (const c of r!.criteria) expect(c.then.trim().length).toBeGreaterThan(0);
   });
 });
+
+describe('requirement file hints match whole words (Task 33: PAY-15 got **/auth/** from "unauthorised")', () => {
+  const base = out.threats.find((t) => t.state === 'accepted' || t.state === 'needs_human')!;
+  const hintsFor = (title: string, component: string) =>
+    requirementsFor([{ ...base, title, component, state: 'accepted' }], { issueId: '10001', issueKey: ISSUE_KEY })[0]!.fileHints ?? [];
+  it('"unauthorised refunds" through an agent tool hints at agent, tool and refund code, not auth', () => {
+    const h = hintsFor('Agent issues unauthorised refunds through a tool call', 'support agent');
+    expect(h).toEqual(expect.arrayContaining(['**/agent*/**', '**/tools/**', '**/refund*']));
+    expect(h).not.toContain('**/auth/**');
+  });
+  it('"monkey", "profile" and "tokenizer" do not count as key, file or token', () => {
+    expect(hintsFor('Monkey-patched profile tokenizer drifts', 'web')).toEqual([]);
+  });
+  it('real authentication, session and API-key threats still get their hints', () => {
+    expect(hintsFor('Authentication bypass on the login form', 'web')).toContain('**/auth/**');
+    expect(hintsFor('Leaked API key in client bundle', 'web')).toContain('**/secrets/**');
+  });
+});

@@ -99,6 +99,7 @@ export interface AdminApi {
   setPolicy(policy: SitePolicy): Promise<{ policy: SitePolicy } | ApiError>;
   warnOnly(projectKey: string, days: number): Promise<{ projectKey: string; since: string; until: string; entryHash: string } | ApiError>;
   endWarnOnly(projectKey: string): Promise<{ projectKey: string; entryHash: string } | ApiError>;
+  purgeProject(projectKey: string, confirm: string): Promise<{ projectKey: string; reviews: number; requirements: number; entryHash: string } | ApiError>;
   runs(): Promise<{ runs: RunDto[] } | ApiError>;
   usage(): Promise<UsageDto | ApiError>;
   /** Leave a key out to keep it; null turns it off. */
@@ -129,6 +130,7 @@ export async function forgeAdminApi(): Promise<AdminApi> {
     setPolicy: (policy) => invoke('admin.setPolicy', { policy }),
     warnOnly: (projectKey, days) => invoke('admin.warnOnly', { projectKey, days }),
     endWarnOnly: (projectKey) => invoke('admin.warnOnlyEnd', { projectKey }),
+    purgeProject: (projectKey, confirm) => invoke('admin.purgeProject', { projectKey, confirm }),
     runs: () => invoke('admin.runs'),
     usage: () => invoke('admin.usage'),
     setNotifications: (n) => invoke('admin.setNotifications', { ...n }),

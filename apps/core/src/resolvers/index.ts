@@ -6,7 +6,7 @@ import { panelDiff, panelEnrich, panelGet, panelRerun, panelThreats, panelWhatIf
 import { requirementsCreate, requirementsSetStatus } from './requirements.js';
 import { reviewConfirm, threatsTriage } from './threats.js';
 import { confluencePublish } from './confluence.js';
-import { adminGetPolicy, adminProjectStatuses, adminRuns, adminSeed, adminSetNotifications, adminSetPolicy, adminSetupStatus, adminUsage, adminWarnOnly, adminWarnOnlyEnd } from './admin.js';
+import { adminGetPolicy, adminProjectStatuses, adminPurgeProject, adminRuns, adminSeed, adminSetNotifications, adminSetPolicy, adminSetupStatus, adminUsage, adminWarnOnly, adminWarnOnlyEnd } from './admin.js';
 import { acceptanceDecide, acceptanceRequest, acceptanceRevoke, breakGlassOverride } from './acceptances.js';
 import { ledgerExport, ledgerProof, ledgerTreeHead, ledgerVerify } from './ledger.js';
 import { postureDrill, postureGet, releaseReport } from './posture.js';
@@ -104,6 +104,10 @@ resolver.define('admin.warnOnly', async ({ payload, context }) => {
 resolver.define('admin.warnOnlyEnd', async ({ payload, context }) => {
   const { deps, a } = admin(context);
   return adminWarnOnlyEnd(deps, a, payload ?? {});
+});
+resolver.define('admin.purgeProject', async ({ payload, context }) => {
+  const { deps, a } = admin(context);
+  return adminPurgeProject(deps, a, payload ?? {});
 });
 resolver.define('admin.runs', async ({ context }) => {
   const { deps, a } = admin(context);

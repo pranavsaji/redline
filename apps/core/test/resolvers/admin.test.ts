@@ -5,6 +5,7 @@ import type { ConfluenceClient } from '../../src/adapters/confluence.js';
 import {
   adminGetPolicy,
   adminProjectStatuses,
+  adminPurgeProject,
   adminRuns,
   adminSetNotifications,
   adminSetPolicy,
@@ -255,5 +256,33 @@ describe('admin.projectStatuses (for picking the guarded transition)', () => {
     r.t.jira.projectStatuses = async () => ok(['To Do', 'In Progress', 'Done']);
     expect(await adminProjectStatuses(r.t.deps, A, { projectKey: 'PAY' })).toEqual({ projectKey: 'PAY', statuses: ['To Do', 'In Progress', 'Done'] });
     expect(await adminProjectStatuses(r.t.deps, A, { projectKey: 'x y' })).toMatchObject({ error: 'validation' });
+  });
+});
+
+describe('admin.purgeProject (privacy: delete a project’s reviews)', () => {
+  it('is for Jira administrators only', async () => {
+    const r = await reviewed();
+    expect(await adminPurgeProject(r.t.deps, D, { projectKey: 'OLD', confirm: 'OLD' })).toMatchObject({ error: 'forbidden' });
+    expect(r.t.purgedProjects).toEqual([]);
+  });
+  it('needs the project key typed again to confirm', async () => {
+    const r = await reviewed();
+    expect(await adminPurgeProject(r.t.deps, A, { projectKey: 'OLD', confirm: 'old' })).toEqual({ error: 'validation', message: 'Type OLD to confirm. This cannot be undone.' });
+    expect(r.t.purgedProjects).toEqual([]);
+  });
+  it('refuses a project Redline still reviews, because its gate would then block every work item', async () => {
+    const r = await reviewed();
+    const res = await adminPurgeProject(r.t.deps, A, { projectKey: 'PAY', confirm: 'PAY' });
+    expect(res).toEqual({ error: 'validation', message: 'Redline still reviews PAY. Turn it off under Projects and transitions first, then purge.' });
+    expect(r.t.purgedProjects).toEqual([]);
+  });
+  it('ledgers the purge first, then deletes, and reports the counts', async () => {
+    const r = await reviewed();
+    const res = await adminPurgeProject(r.t.deps, A, { projectKey: 'OLD', confirm: 'OLD' });
+    expect(res).toMatchObject({ projectKey: 'OLD', reviews: 3, requirements: 2 });
+    expect(r.t.purgedProjects).toEqual(['OLD']);
+    const last = (await ledger(r)).at(-1)!;
+    expect(last).toMatchObject({ eventType: 'project.purged', actor: ADMIN, payload: { projectKey: 'OLD' } });
+    expect((res as { entryHash: string }).entryHash).toBe(last.entryHash);
   });
 });

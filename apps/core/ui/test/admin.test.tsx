@@ -220,7 +220,7 @@ describe('Admin page layout (Task 30)', () => {
     render(<AdminPage api={mockAdminApi()} />);
     const nav = await screen.findByRole('navigation', { name: 'Admin sections' });
     expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual([
-      'Setup checklist', 'Projects and transitions', 'Severity policy', 'Roles', 'Budgets', 'Warn-only mode', 'Notifications', 'Recent runs', 'Signing keys', 'Risk ledger', 'Demo data',
+      'Setup checklist', 'Projects and transitions', 'Severity policy', 'Roles', 'Budgets', 'Warn-only mode', 'Notifications', 'Recent runs', 'Signing keys', 'Risk ledger', 'Data retention', 'Demo data',
     ]);
   });
 
@@ -267,5 +267,33 @@ describe('Admin: transparency log (R5)', () => {
     await userEvent.click(within(form).getByRole('button', { name: 'Get proof' }));
     expect(ledgerProof).not.toHaveBeenCalled();
     expect(within(form).getByRole('alert').textContent).toBe('Give a ledger entry number (1 or more).');
+  });
+});
+
+describe('Admin: data retention (privacy purge)', () => {
+  it('purges a project only after its key is typed again, and says what was deleted and what was kept', async () => {
+    const api = mockAdminApi();
+    const purgeProject = vi.fn(api.purgeProject);
+    render(<AdminPage api={{ ...api, purgeProject }} />);
+    const form = await screen.findByRole('form', { name: 'Purge a project' });
+    await userEvent.type(within(form).getByRole('textbox', { name: 'Project key' }), 'old');
+    await userEvent.type(within(form).getByRole('textbox', { name: 'Type the key again to confirm' }), 'OL');
+    await userEvent.click(within(form).getByRole('button', { name: 'Purge reviews' }));
+    expect(purgeProject).not.toHaveBeenCalled();
+    expect(within(form).getByRole('alert').textContent).toBe('Type OLD to confirm. This cannot be undone.');
+    await userEvent.type(within(form).getByRole('textbox', { name: 'Type the key again to confirm' }), 'D');
+    await userEvent.click(within(form).getByRole('button', { name: 'Purge reviews' }));
+    expect(purgeProject).toHaveBeenCalledWith('OLD', 'OLD');
+    expect((await within(form).findByRole('status')).textContent).toBe('Purged OLD: 3 reviews and 2 requirements deleted. The risk ledger is kept.');
+  });
+
+  it('shows the server’s reason when the project is still reviewed', async () => {
+    const api = mockAdminApi();
+    render(<AdminPage api={api} />);
+    const form = await screen.findByRole('form', { name: 'Purge a project' });
+    await userEvent.type(within(form).getByRole('textbox', { name: 'Project key' }), 'PAY');
+    await userEvent.type(within(form).getByRole('textbox', { name: 'Type the key again to confirm' }), 'PAY');
+    await userEvent.click(within(form).getByRole('button', { name: 'Purge reviews' }));
+    expect((await within(form).findByRole('alert')).textContent).toBe('Redline still reviews PAY. Turn it off under Projects and transitions first, then purge.');
   });
 });

@@ -12,6 +12,8 @@ export interface RestGathererDeps {
   clock: ClockPort;
   /** Site cloud id, used to build real ARIs (from the Forge invocation context). */
   cloudId: string;
+  /** Site base URL ("https://acme.atlassian.net"), so Jira sources get absolute links; relative ones break in the panel iframe. */
+  siteUrl?: () => Promise<string>;
 }
 
 const MAX_PAGES = 10;
@@ -50,13 +52,20 @@ const hostOf = (url: string): string | null => {
  */
 export function restGatherer(d: RestGathererDeps): ContextGatherer {
   const issueAri = (id: string) => `ari:cloud:jira:${d.cloudId}:issue/${id}`;
-  const raw = (f: Omit<RawFact, 'origin' | 'version'> & { version?: string }): RawFact => ({ ...f, version: f.version ?? versionOf(f.title, f.text, f.url), origin: 'rest' });
-  const browse = (key: string) => `/browse/${key}`;
+  let base = '';
+  /** Versions hash the site-relative path, so adding the site URL never changes a context hash (no reviews go stale). */
+  const raw = (f: Omit<RawFact, 'origin' | 'version'> & { version?: string }): RawFact => ({
+    ...f,
+    version: f.version ?? versionOf(f.title, f.text, base && f.url.startsWith(base) ? f.url.slice(base.length) : f.url),
+    origin: 'rest',
+  });
+  const browse = (key: string) => `${base}/browse/${key}`;
   const issueText = (i: JiraIssue) => `${i.summary}\n${i.description}`.trim();
 
   return {
     async gather(issueId, opts: GatherOptions = {}): Promise<Result<ContextBundle>> {
       const actor = opts.actorAccountId ?? '';
+      base = d.siteUrl ? ((await d.siteUrl().catch(() => '')) ?? '').replace(/\/+$/, '') : '';
       const main = await d.jira.issue(issueId);
       if (!main.ok) return main;
       const issue = main.value;

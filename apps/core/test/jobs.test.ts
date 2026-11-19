@@ -105,6 +105,30 @@ describe('daily', () => {
   });
 });
 
+describe('purge one project (admin, privacy)', () => {
+  const review = (id: string, issueId: string, key: string) =>
+    `INSERT INTO reviews (id, issue_id, issue_key, revision, status, context_hash, risk_score, partial_bundle, prompt_version, model_ids, samples_expected, samples_received, tokens_in, tokens_out, created_at, updated_at) VALUES ('${id}', '${issueId}', '${key}', 1, 'ready', 'h', 0, 0, 'v', '[]', 0, 0, 0, 0, '2026-11-01T00:00:00Z', '2026-11-01T00:00:00Z')`;
+  it('deletes every review, its facts, threats, samples and stages, and the requirements of that project only; keeps the ledger and attestations', async () => {
+    const x = sqliteExecutor();
+    expect((await migrate(x, MIGRATIONS)).ok).toBe(true);
+    await x.exec("INSERT INTO ledger (seq, event_type, payload_json, actor, prev_hash, entry_hash, created_at) VALUES (1, 'key.rotated', '{}', 'a', 'p', 'e', '2020-01-01T00:00:00Z')", []);
+    await x.exec("INSERT INTO attestations (id, issue_key, repo, commit_sha, kid, expires_at, nonce) VALUES ('att1', 'OLD-1', 'a/b', 'c', 'k', 'x', 'n')", []);
+    for (const [id, issue, key] of [['rev_a', '1', 'OLD-1'], ['rev_b', '2', 'OLD-2'], ['rev_keep', '3', 'PAY-1'], ['rev_lookalike', '4', 'OLDER-1']] as const) await x.exec(review(id, issue, key), []);
+    await x.exec("INSERT INTO issues (issue_id, issue_key, project_key) VALUES ('5', 'OLD-5', 'OLD')", []);
+    await x.exec("INSERT INTO context_facts (review_id, id, position, source_ari, trust_level, injection_suspected, fact_json) VALUES ('rev_a', 'f', 0, 'a', 'trusted', 0, '{}'), ('rev_keep', 'f', 0, 'a', 'trusted', 0, '{}')", []);
+    await x.exec("INSERT INTO threats (id, review_id, position, state, severity, threat_json) VALUES ('t1', 'rev_b', 0, 'accepted', 'High', '{}')", []);
+    await x.exec("INSERT INTO requirements (id, issue_id, status, severity, requirement_json) VALUES ('r1', '1', 'Open', 'High', '{}'), ('r5', '5', 'Open', 'High', '{}'), ('r3', '3', 'Open', 'High', '{}')", []);
+    const r = await sqlRetention(x).purgeProject('OLD');
+    expect(r).toEqual({ ok: true, value: { reviews: 2, requirements: 2 } });
+    expect(await x.query('SELECT id FROM reviews ORDER BY id', [])).toEqual({ ok: true, value: [{ id: 'rev_keep' }, { id: 'rev_lookalike' }] });
+    expect(await x.query('SELECT review_id FROM context_facts', [])).toEqual({ ok: true, value: [{ review_id: 'rev_keep' }] });
+    expect(await x.query('SELECT COUNT(*) AS n FROM threats', [])).toEqual({ ok: true, value: [{ n: 0 }] });
+    expect(await x.query('SELECT id FROM requirements', [])).toEqual({ ok: true, value: [{ id: 'r3' }] });
+    expect(await x.query('SELECT COUNT(*) AS n FROM ledger', [])).toEqual({ ok: true, value: [{ n: 1 }] });
+    expect(await x.query('SELECT COUNT(*) AS n FROM attestations', [])).toEqual({ ok: true, value: [{ n: 1 }] });
+  });
+});
+
 describe('posture trend (daily snapshots)', () => {
   it('reads open Critical and High per day from the snapshots since a day, oldest first, skipping unreadable rows', async () => {
     const x = sqliteExecutor();

@@ -107,6 +107,7 @@ export type LedgerEventType =
   | 'budget.champion_confirmed'
   | 'policy.warn_only'
   | 'policy.changed'
+  | 'project.purged'
   | 'key.rotated';
 
 export interface LedgerInsert {

@@ -57,6 +57,12 @@ export function mockAdminApi(state = typeof window === 'undefined' ? 'ready' : (
       dto.policy.warnOnly = [...dto.policy.warnOnly.filter((w) => w.projectKey !== projectKey), { projectKey, since, until }];
       return { projectKey, since, until, entryHash: 'a'.repeat(64) };
     },
+    purgeProject: async (projectKey, confirm) =>
+      confirm !== projectKey
+        ? { error: 'validation' as const, message: `Type ${projectKey} to confirm. This cannot be undone.` }
+        : dto.policy.enabledProjects.includes(projectKey)
+          ? { error: 'validation' as const, message: `Redline still reviews ${projectKey}. Turn it off under Projects and transitions first, then purge.` }
+          : { projectKey, reviews: 3, requirements: 2, entryHash: 'c'.repeat(64) },
     endWarnOnly: async (projectKey) => ((dto.policy.warnOnly = dto.policy.warnOnly.filter((w) => w.projectKey !== projectKey)), { projectKey, entryHash: 'b'.repeat(64) }),
     runs: async () => ({ runs: structuredClone(RUNS_FIXTURE) }),
     usage: async () => structuredClone(USAGE_FIXTURE),

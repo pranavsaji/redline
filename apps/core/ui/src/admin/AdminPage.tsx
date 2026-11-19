@@ -14,6 +14,7 @@ import { Budgets } from './Budgets.js';
 import { WarnOnly } from './WarnOnly.js';
 import { Notifications } from './Notifications.js';
 import { Runs } from './Runs.js';
+import { DataRetention } from './DataRetention.js';
 
 const SECTIONS = [
   { id: 'setup', title: 'Setup checklist', needsPolicy: false },
@@ -26,6 +27,7 @@ const SECTIONS = [
   { id: 'runs', title: 'Recent runs', needsPolicy: false },
   { id: 'keys', title: 'Signing keys', needsPolicy: false },
   { id: 'ledger', title: 'Risk ledger', needsPolicy: false },
+  { id: 'retention', title: 'Data retention', needsPolicy: false },
   { id: 'demo', title: 'Demo data', needsPolicy: false },
 ] as const;
 const anchor = (id: string) => `redline-admin-${id}`;
@@ -90,6 +92,7 @@ export function AdminPage({ api }: { api: AdminApi }) {
       {at('runs', <Runs api={api} />)}
       {at('keys', <Keys api={api} />)}
       {at('ledger', <LedgerVerify api={api} />)}
+      {at('retention', <DataRetention api={api} />)}
       {at('demo', <DemoData api={api} />)}
     </main>
   );

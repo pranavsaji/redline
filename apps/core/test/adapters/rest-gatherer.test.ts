@@ -8,7 +8,7 @@ import { fakeHttp, fixture, noSleep, type Reply } from './fake-http.js';
 const CLOUD = 'c0ffee';
 const ACTOR = { actorAccountId: 'acc-actor' };
 
-function setup(over: { page?: Reply; comments?: Reply; incidents?: Reply; parent?: Reply; pageRead?: Reply; incidentBrowse?: Reply } = {}) {
+function setup(over: { page?: Reply; comments?: Reply; incidents?: Reply; parent?: Reply; pageRead?: Reply; incidentBrowse?: Reply; siteUrl?: () => Promise<string> } = {}) {
   const jiraHttp = fakeHttp([
     [/GET \/rest\/api\/3\/issue\/10042\?/, { status: 200, body: fixture('jira', 'issue') }],
     [/GET \/rest\/api\/3\/issue\/10040\?/, over.parent ?? { status: 200, body: fixture('jira', 'parent') }],
@@ -26,11 +26,26 @@ function setup(over: { page?: Reply; comments?: Reply; incidents?: Reply; parent
   const reviews = memoryReviewRepo();
   const issues = memoryIssueRepo();
   const clock = fixedClock('2026-11-15T12:00:00Z');
-  const g = restGatherer({ jira: createJiraClient(jiraHttp.request, opts), confluence: createConfluenceClient(confHttp.request, opts), reviews, issues, clock, cloudId: CLOUD });
+  const g = restGatherer({ jira: createJiraClient(jiraHttp.request, opts), confluence: createConfluenceClient(confHttp.request, opts), reviews, issues, clock, cloudId: CLOUD, ...(over.siteUrl ? { siteUrl: over.siteUrl } : {}) });
   return { g, reviews, issues, jiraCalls: jiraHttp.calls, confCalls: confHttp.calls };
 }
 
 describe('restGatherer', () => {
+  it('Jira sources link to the site with absolute URLs (relative ones break inside the panel iframe), without changing the context hash', async () => {
+    const plain = await setup().g.gather('10042', ACTOR);
+    const sited = await setup({ siteUrl: async () => 'https://one-atlas-mefc.atlassian.net' }).g.gather('10042', ACTOR);
+    if (!plain.ok || !sited.ok) throw new Error('gather');
+    const jira = sited.value.facts.filter((f) => f.sourceType === 'jira_issue' || f.sourceType === 'jira_comment');
+    expect(jira.length).toBeGreaterThan(0);
+    for (const f of jira) expect(f.url).toMatch(/^https:\/\/one-atlas-mefc\.atlassian\.net\/browse\/[A-Z]+-\d+/);
+    expect(sited.value.contextHash).toBe(plain.value.contextHash);
+  });
+
+  it('if the site URL cannot be read, links stay relative rather than failing the gather', async () => {
+    const r = await setup({ siteUrl: async () => Promise.reject(new Error('down')) }).g.gather('10042', ACTOR);
+    expect(r.ok && r.value.facts.find((f) => f.sourceType === 'jira_issue')!.url).toMatch(/^\/browse\//);
+  });
+
   it('builds a bundle with trusted metadata, untrusted text, links, children, comments, the linked page and incidents', async () => {
     const { g, issues } = setup();
     const r = await g.gather('10042', ACTOR);

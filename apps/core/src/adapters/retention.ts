@@ -4,6 +4,11 @@ import { ok, type Result } from '@redline/shared';
 export interface RetentionStore {
   /** Deletes reviews (and their facts, threats, samples, stages) last updated before `iso`. Never the ledger, never an issue's latest revision. */
   purgeBefore(iso: string): Promise<Result<{ reviews: number }>>;
+  /**
+   * Deletes every review of one Jira project (with its facts, threats, samples and stages) and the project's
+   * requirements. Never the ledger or attestations: they are the audit trail. Callers check the project is turned off.
+   */
+  purgeProject(projectKey: string): Promise<Result<{ reviews: number; requirements: number }>>;
   snapshotPosture(day: string): Promise<Result<void>>;
   /** Open Critical and High requirements per snapshot day from `fromDay` (YYYY-MM-DD) on, oldest first. */
   postureTrend(fromDay: string): Promise<Result<TrendPoint[]>>;
@@ -61,6 +66,36 @@ export function sqlRetention(x: SqlExecutor): RetentionStore {
         if (list.length < BATCH) break;
       }
       return ok({ reviews: total });
+    },
+
+    async purgeProject(projectKey) {
+      // Reviews by key prefix ("OLD-" never matches "OLDER-1"), plus any issue the project row knows about.
+      const ids = await x.query<{ id: string; issue_id: string }>('SELECT id, issue_id FROM reviews WHERE SUBSTR(issue_key, 1, LENGTH(?) + 1) = ?', [projectKey, `${projectKey}-`]);
+      if (!ids.ok) return ids;
+      const known = await x.query<{ issue_id: string }>('SELECT issue_id FROM issues WHERE project_key = ?', [projectKey]);
+      if (!known.ok) return known;
+      const issueIds = [...new Set([...ids.value.map((r) => r.issue_id), ...known.value.map((r) => r.issue_id)])];
+      const reviewIds = ids.value.map((r) => r.id);
+      const marks = (n: number) => Array.from({ length: n }, () => '?').join(', ');
+      for (let i = 0; i < reviewIds.length; i += BATCH) {
+        const list = reviewIds.slice(i, i + BATCH);
+        for (const t of CHILD_TABLES) {
+          const d = await x.exec(`DELETE FROM ${t} WHERE review_id IN (${marks(list.length)})`, list);
+          if (!d.ok) return d;
+        }
+        const d = await x.exec(`DELETE FROM reviews WHERE id IN (${marks(list.length)})`, list);
+        if (!d.ok) return d;
+      }
+      let requirements = 0;
+      for (let i = 0; i < issueIds.length; i += BATCH) {
+        const list = issueIds.slice(i, i + BATCH);
+        const n = await x.query<{ n: number }>(`SELECT COUNT(*) AS n FROM requirements WHERE issue_id IN (${marks(list.length)})`, list);
+        if (!n.ok) return n;
+        requirements += Number(n.value[0]?.n ?? 0);
+        const d = await x.exec(`DELETE FROM requirements WHERE issue_id IN (${marks(list.length)})`, list);
+        if (!d.ok) return d;
+      }
+      return ok({ reviews: reviewIds.length, requirements });
     },
 
     async postureTrend(fromDay) {

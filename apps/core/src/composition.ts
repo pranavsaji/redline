@@ -63,7 +63,7 @@ export function composeCore(ctx?: ForgeContext): CoreDeps {
     keys: kvsSigningKeys(systemClock, state),
     jira,
     confluence,
-    gatherer: restGatherer({ jira, confluence, reviews, issues, clock: systemClock, cloudId: cloudIdOf(ctx) }),
+    gatherer: restGatherer({ jira, confluence, reviews, issues, clock: systemClock, cloudId: cloudIdOf(ctx), siteUrl: siteUrl(state) }),
     verdicts: jiraVerdictSink(jira),
     config: kvsConfigStore(state, defaultsFromEnv(process.env)),
     state,

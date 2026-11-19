@@ -2,15 +2,16 @@ import type { Criterion, Requirement, Threat } from '@redline/shared';
 import { getAsvs } from '@redline/frameworks';
 import { sha256Hex } from '@redline/crypto';
 
+/** Whole words only: "unauthorised" is not auth code, "monkey" not a key, "profile" not a file, "tokenizer" not a token. */
 const FILE_HINTS: Array<{ re: RegExp; globs: string[] }> = [
-  { re: /auth|login|session|credential|password|account takeover/i, globs: ['**/auth/**', '**/session*', '**/login*'] },
-  { re: /payment|refund|billing|checkout|invoice/i, globs: ['**/payment*/**', '**/refund*', '**/billing/**'] },
-  { re: /upload|file/i, globs: ['**/upload*', '**/files/**'] },
-  { re: /agent|tool|prompt|llm|model/i, globs: ['**/agent*/**', '**/tools/**', '**/prompt*'] },
-  { re: /personal data|customer data|pii|transcript|database|records/i, globs: ['**/models/**', '**/repositor*/**', '**/db/**'] },
-  { re: /secret|key|token/i, globs: ['**/config/**', '**/*.env*', '**/secrets/**'] },
-  { re: /endpoint|api|rate|resource exhaustion/i, globs: ['**/routes/**', '**/api/**', '**/middleware/**'] },
-  { re: /third-party|integration|provider/i, globs: ['**/integrations/**', '**/clients/**'] },
+  { re: /\b(auth\w*|log ?in|sign[- ]?in|sessions?|credentials?|passwords?|account takeover)\b/i, globs: ['**/auth/**', '**/session*', '**/login*'] },
+  { re: /\b(payments?|refunds?|billing|checkout|invoices?)\b/i, globs: ['**/payment*/**', '**/refund*', '**/billing/**'] },
+  { re: /\b(uploads?|files?)\b/i, globs: ['**/upload*', '**/files/**'] },
+  { re: /\b(agents?|tools?|tool calls?|prompts?|llms?|models?)\b/i, globs: ['**/agent*/**', '**/tools/**', '**/prompt*'] },
+  { re: /\b(personal data|customer data|pii|transcripts?|databases?|records)\b/i, globs: ['**/models/**', '**/repositor*/**', '**/db/**'] },
+  { re: /\b(secrets?|keys?|api keys?|tokens?)\b/i, globs: ['**/config/**', '**/*.env*', '**/secrets/**'] },
+  { re: /\b(endpoints?|apis?|rate limits?|rate|resource exhaustion)\b/i, globs: ['**/routes/**', '**/api/**', '**/middleware/**'] },
+  { re: /\b(third-party|integrations?|providers?)\b/i, globs: ['**/integrations/**', '**/clients/**'] },
 ];
 
 const firstSentence = (s: string, max = 160): string => {

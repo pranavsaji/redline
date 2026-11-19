@@ -93,3 +93,20 @@ describe('manifest: posture surfaces (Task 29)', () => {
     expect(gadget!.thumbnail).toMatch(/^https:\/\//);
   });
 });
+
+describe('Marketplace readiness (Task 33)', () => {
+  /**
+   * Modules checked as not EAP. EAP modules can only be enabled on development environments, so one here would block
+   * the Marketplace listing; Preview is supported in production. rovo:skill and rovo:mcp were checked on
+   * developer.atlassian.com on 2026-11-18 (both Preview); the rest per docs/research/forge-api-notes.md. A new module
+   * fails this test until its status is checked and added.
+   */
+  const NOT_EAP = new Set(['sql', 'trigger', 'consumer', 'scheduledTrigger', 'jira:issuePanel', 'jira:adminPage', 'jira:globalPage', 'jira:dashboardGadget', 'jira:workflowValidator', 'jira:entityProperty', 'action', 'rovo:skill', 'rovo:mcp', 'rovo:agent', 'function']);
+  it('uses no EAP module, so no separate production manifest is needed', () => {
+    const unknown = Object.keys(m.modules).filter((k) => !NOT_EAP.has(k));
+    expect(unknown).toEqual([]);
+  });
+  it('declares no egress, so the app can qualify for Runs on Atlassian', () => {
+    expect(JSON.stringify((m as unknown as { permissions?: unknown }).permissions ?? {})).not.toMatch(/external|fetch|backend|client/);
+  });
+});

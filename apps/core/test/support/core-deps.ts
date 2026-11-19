@@ -117,6 +117,7 @@ export function coreDeps(o: { issues?: JiraIssue[]; policy?: SitePolicy; now?: s
   const gatherer = fakeGatherer({});
   const verdicts = memoryVerdictSink();
   const purged: string[] = [];
+  const purgedProjects: string[] = [];
   let policy = o.policy ?? POLICY;
   let migrations = 0;
   const deps: CoreDeps = {
@@ -142,13 +143,14 @@ export function coreDeps(o: { issues?: JiraIssue[]; policy?: SitePolicy; now?: s
       },
       snapshotPosture: async () => ok(undefined),
       postureTrend: async () => ok([]),
+      purgeProject: async (key) => (purgedProjects.push(key), ok({ reviews: 3, requirements: 2 })),
     },
     queue: { push: async (jobs) => (pushed.push(...jobs), ok(undefined)) },
     clock,
     migrate: async () => (migrations++, ok({ to: 1 })),
     siteUrl: async () => 'https://one-atlas-mefc.atlassian.net',
   };
-  return { deps, clock, kv, pushed, jira, gatherer, verdicts, purged, migrations: () => migrations };
+  return { deps, clock, kv, pushed, jira, gatherer, verdicts, purged, purgedProjects, migrations: () => migrations };
 }
 
 /** Runs queued jobs (and the jobs they push) until the queue is empty. */

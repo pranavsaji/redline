@@ -236,6 +236,31 @@ export async function adminWarnOnlyEnd(deps: CoreDeps, a: Admin, payload: unknow
   return { projectKey, entryHash: row.value.entryHash };
 }
 
+const PurgeSchema = z.object({ projectKey: z.string().regex(PROJECT_KEY), confirm: z.string() });
+
+/**
+ * `admin.purgeProject` (privacy): deletes every review, gathered fact, threat and requirement of a project Redline no
+ * longer reviews. The ledger and attestations stay (audit trail). Ledgered before anything is deleted.
+ */
+export async function adminPurgeProject(deps: CoreDeps, a: Admin, payload: unknown): Promise<{ projectKey: string; reviews: number; requirements: number; entryHash: string } | ApiError> {
+  const denied = await requireAdmin(deps, a);
+  if (denied) return denied;
+  const p = PurgeSchema.safeParse(payload);
+  if (!p.success) return { error: 'validation', message: 'Give a Jira project key (like PAY).' };
+  const { projectKey, confirm } = p.data;
+  if (confirm !== projectKey) return { error: 'validation', message: `Type ${projectKey} to confirm. This cannot be undone.` };
+  const policy = await deps.config.site();
+  if (!policy.ok) return apiError(policy.error);
+  if (policy.value.enabledProjects.includes(projectKey))
+    return { error: 'validation', message: `Redline still reviews ${projectKey}. Turn it off under Projects and transitions first, then purge.` };
+  const row = await appendLedger(deps.ledger, deps.clock, 'project.purged', { projectKey }, a.accountId);
+  if (!row.ok) return apiError(row.error);
+  const done = await deps.retention.purgeProject(projectKey);
+  if (!done.ok) return apiError(done.error);
+  await opsAlert(deps, `alert:purge:${row.value.entryHash}`, `Redline: an administrator purged ${projectKey}'s reviews (${done.value.reviews} reviews, ${done.value.requirements} requirements). The risk ledger is kept. Recorded in the Redline ledger.`);
+  return { projectKey, ...done.value, entryHash: row.value.entryHash };
+}
+
 export interface RunStage {
   stage: string;
   status: string;

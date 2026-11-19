@@ -15,6 +15,7 @@ import {
 } from '@redline/core';
 import { CLEAN_CASES, POISONED_CASES, type CleanCase, type PoisonedCase } from '../fixtures/cases.js';
 import { scoreCase, summarize, type CaseResult } from './metrics.js';
+import { recordingLlm, saveRecording } from './recorded.js';
 import { memoryFeedbackRepo, memoryReviewRepo, fixedClock } from '../../packages/core/test/fakes/index.js';
 
 export type EvalPath = 'agent' | 'pipeline';
@@ -112,7 +113,21 @@ export interface EvalReport {
   perCase: Array<{ id: string; tp: number; fp: number; fn: number; riskScore: number; blocking: number; injectionHeld?: boolean }>;
 }
 
-export async function runEval(opts: { llm: LlmPort | null; llmName: string; subset: number | 'all'; samples: number; path: EvalPath; concurrency?: number; onProgress?: (done: number, total: number) => void }): Promise<Result<EvalReport>> {
+export interface EvalOptions {
+  llm: LlmPort | null;
+  llmName: string;
+  subset: number | 'all';
+  samples: number;
+  path: EvalPath;
+  concurrency?: number;
+  onProgress?: (done: number, total: number) => void;
+  /** Save each case's raw model replies here (evals/results/recorded) for the offline CI gate. */
+  recordDir?: string;
+  /** Per-case model, e.g. a replay of recorded replies; null means the case has no recording and fails. */
+  llmFor?: (caseId: string) => LlmPort | null;
+}
+
+export async function runEval(opts: EvalOptions): Promise<Result<EvalReport>> {
   const { clean, poisoned } = selectCases(opts.subset);
   const total = clean.length + poisoned.length;
   let done = 0;
@@ -128,7 +143,19 @@ export async function runEval(opts: { llm: LlmPort | null; llmName: string; subs
   const runAll = async <T extends CleanCase>(list: T[], each: (c: T, r: CaseRun) => void) => {
     for (let i = 0; i < list.length; i += conc) {
       const batch = list.slice(i, i + conc);
-      const outs = await Promise.all(batch.map((c) => runCase(c, opts.llm, opts.samples, opts.path)));
+      const outs = await Promise.all(
+        batch.map(async (c) => {
+          if (opts.llmFor) {
+            const llm = opts.llmFor(c.id);
+            return llm ? runCase(c, llm, opts.samples, opts.path) : err(appError('not_found', 'no recording'));
+          }
+          if (!opts.recordDir || !opts.llm) return runCase(c, opts.llm, opts.samples, opts.path);
+          const rec = recordingLlm(opts.llm);
+          const r = await runCase(c, rec.llm, opts.samples, opts.path);
+          if (r.ok) saveRecording(opts.recordDir, { caseId: c.id, promptVersion: PROMPT_VERSION, replies: rec.replies() });
+          return r;
+        }),
+      );
       outs.forEach((r, j) => {
         const c = batch[j]!;
         done++;
@@ -167,7 +194,12 @@ export async function runEval(opts: { llm: LlmPort | null; llmName: string; subs
   const date = new Date().toISOString().slice(0, 10);
   const models = [...modelIds];
   return ok({
-    label: `scored offline with ${opts.llmName === 'fake' ? 'the deterministic baseline only (no model)' : `Claude Code on ${models.join(', ') || 'unknown model'}`}, ${total} cases, ${date}`,
+    label:
+      opts.llmName === 'fake'
+        ? `scored offline with the deterministic baseline only (no model), ${total} cases, ${date}`
+        : opts.llmName === 'recorded'
+          ? `replayed offline from recorded Claude Code outputs (${models.join(', ') || 'unknown model'}), ${total} cases, ${date}`
+          : `scored offline with Claude Code on ${models.join(', ') || 'unknown model'}, ${total} cases, ${date}`,
     promptVersion: PROMPT_VERSION,
     llm: opts.llmName,
     path: opts.path,
