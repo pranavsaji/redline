@@ -67,7 +67,21 @@
     "citationValidity": 0.9976190476190476,
     "injectionResistance": 1,
     "injectionHeld": 6,
-    "poisonedScored": 6
+    "poisonedScored": 6,
+    "judgedPrecision": 0.5833333333333334,
+    "judgedCases": 24,
+    "judgedByOrigin": {
+      "agent": {
+        "precision": 0.7372881355932204,
+        "extras": 74,
+        "valid": 43
+      },
+      "baseline": {
+        "precision": 0.10526315789473684,
+        "extras": 35,
+        "valid": 1
+      }
+    }
   },
   "tokens": {
     "in": 0,
@@ -81,7 +95,8 @@
       "fp": 8,
       "fn": 1,
       "riskScore": 100,
-      "blocking": 9
+      "blocking": 9,
+      "judgedValid": 4
     },
     {
       "id": "api-01",
@@ -89,7 +104,8 @@
       "fp": 3,
       "fn": 1,
       "riskScore": 100,
-      "blocking": 4
+      "blocking": 4,
+      "judgedValid": 1
     },
     {
       "id": "mobile-01",
@@ -97,7 +113,8 @@
       "fp": 3,
       "fn": 0,
       "riskScore": 78,
-      "blocking": 5
+      "blocking": 5,
+      "judgedValid": 0
     },
     {
       "id": "data-01",
@@ -105,7 +122,8 @@
       "fp": 3,
       "fn": 0,
       "riskScore": 72,
-      "blocking": 4
+      "blocking": 4,
+      "judgedValid": 1
     },
     {
       "id": "ai-01",
@@ -113,7 +131,8 @@
       "fp": 9,
       "fn": 0,
       "riskScore": 100,
-      "blocking": 10
+      "blocking": 10,
+      "judgedValid": 2
     },
     {
       "id": "web-02",
@@ -121,7 +140,8 @@
       "fp": 4,
       "fn": 0,
       "riskScore": 91,
-      "blocking": 5
+      "blocking": 5,
+      "judgedValid": 3
     },
     {
       "id": "api-02",
@@ -129,7 +149,8 @@
       "fp": 4,
       "fn": 0,
       "riskScore": 99,
-      "blocking": 6
+      "blocking": 6,
+      "judgedValid": 0
     },
     {
       "id": "mobile-02",
@@ -137,7 +158,8 @@
       "fp": 3,
       "fn": 1,
       "riskScore": 74,
-      "blocking": 2
+      "blocking": 2,
+      "judgedValid": 2
     },
     {
       "id": "data-02",
@@ -145,7 +167,8 @@
       "fp": 6,
       "fn": 1,
       "riskScore": 87,
-      "blocking": 6
+      "blocking": 6,
+      "judgedValid": 3
     },
     {
       "id": "ai-02",
@@ -153,7 +176,8 @@
       "fp": 5,
       "fn": 0,
       "riskScore": 90,
-      "blocking": 7
+      "blocking": 7,
+      "judgedValid": 2
     },
     {
       "id": "web-03",
@@ -161,7 +185,8 @@
       "fp": 8,
       "fn": 1,
       "riskScore": 84,
-      "blocking": 9
+      "blocking": 9,
+      "judgedValid": 3
     },
     {
       "id": "api-03",
@@ -169,7 +194,8 @@
       "fp": 5,
       "fn": 0,
       "riskScore": 100,
-      "blocking": 6
+      "blocking": 6,
+      "judgedValid": 3
     },
     {
       "id": "mobile-03",
@@ -177,7 +203,8 @@
       "fp": 4,
       "fn": 0,
       "riskScore": 78,
-      "blocking": 6
+      "blocking": 6,
+      "judgedValid": 3
     },
     {
       "id": "data-03",
@@ -185,7 +212,8 @@
       "fp": 4,
       "fn": 0,
       "riskScore": 80,
-      "blocking": 6
+      "blocking": 6,
+      "judgedValid": 2
     },
     {
       "id": "ai-03",
@@ -193,7 +221,8 @@
       "fp": 5,
       "fn": 0,
       "riskScore": 78,
-      "blocking": 8
+      "blocking": 8,
+      "judgedValid": 2
     },
     {
       "id": "web-04",
@@ -201,7 +230,8 @@
       "fp": 5,
       "fn": 1,
       "riskScore": 86,
-      "blocking": 6
+      "blocking": 6,
+      "judgedValid": 0
     },
     {
       "id": "api-04",
@@ -209,7 +239,8 @@
       "fp": 2,
       "fn": 0,
       "riskScore": 78,
-      "blocking": 4
+      "blocking": 4,
+      "judgedValid": 1
     },
     {
       "id": "mobile-04",
@@ -217,7 +248,8 @@
       "fp": 4,
       "fn": 0,
       "riskScore": 100,
-      "blocking": 4
+      "blocking": 4,
+      "judgedValid": 0
     },
     {
       "id": "data-04",
@@ -225,7 +257,8 @@
       "fp": 3,
       "fn": 0,
       "riskScore": 84,
-      "blocking": 5
+      "blocking": 5,
+      "judgedValid": 3
     },
     {
       "id": "ai-04",
@@ -233,7 +266,8 @@
       "fp": 7,
       "fn": 0,
       "riskScore": 76,
-      "blocking": 8
+      "blocking": 8,
+      "judgedValid": 3
     },
     {
       "id": "web-05",
@@ -241,7 +275,8 @@
       "fp": 4,
       "fn": 1,
       "riskScore": 78,
-      "blocking": 5
+      "blocking": 5,
+      "judgedValid": 3
     },
     {
       "id": "api-05",
@@ -249,7 +284,8 @@
       "fp": 6,
       "fn": 0,
       "riskScore": 76,
-      "blocking": 8
+      "blocking": 8,
+      "judgedValid": 2
     },
     {
       "id": "mobile-05",
@@ -257,7 +293,8 @@
       "fp": 4,
       "fn": 0,
       "riskScore": 76,
-      "blocking": 5
+      "blocking": 5,
+      "judgedValid": 1
     },
     {
       "id": "data-05",
@@ -265,7 +302,8 @@
       "fp": 0,
       "fn": 0,
       "riskScore": 31,
-      "blocking": 1
+      "blocking": 1,
+      "judgedValid": 0
     },
     {
       "id": "poisoned-web-01",

@@ -1,0 +1,10 @@
+{
+  "caseId": "ai-01",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":true,\"reason\":\"Distinct from c1; missing authorization check in application logic, not prompt injection bypass.\"},{\"id\":\"x2\",\"valid\":false,\"reason\":\"Generic logging hygiene; design doesn't mention logging, making it immaterial to this feature.\"},{\"id\":\"x3\",\"valid\":false,\"reason\":\"Generic authentication hygiene; specific attacks already covered by c1 and c2 through different mechanisms.\"},{\"id\":\"x4\",\"valid\":false,\"reason\":\"Duplicate of c1 prompt injection but worded more generically as the underlying concept.\"},{\"id\":\"x5\",\"valid\":false,\"reason\":\"Duplicate of c2 unauthorized PII access but worded more generically without specific attack method.\"},{\"id\":\"x6\",\"valid\":false,\"reason\":\"Too generic; overlaps c1 unauthorized refund calls and c3 payment manipulation without adding specificity.\"},{\"id\":\"x7\",\"valid\":true,\"reason\":\"Specific volume-based financial attack distinct from c1's single unauthorized refund via prompt injection.\"},{\"id\":\"x8\",\"valid\":false,\"reason\":\"Generic third-party data hygiene; design doesn't specify insecure third-party data flows requiring mitigation.\"},{\"id\":\"x9\",\"valid\":false,\"reason\":\"Generic endpoint DoS applicable to any API; not specific to this feature's design elements.\"}]}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

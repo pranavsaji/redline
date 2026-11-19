@@ -1,0 +1,10 @@
+{
+  "caseId": "mobile-04",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":false,\"reason\":\"Design says server trusts flag, not receipt. Forging receipts irrelevant when flag is what matters.\"},{\"id\":\"x2\",\"valid\":false,\"reason\":\"Duplicate of c1: same attack (forge purchased flag), same vulnerability, same harm (unlock without payment).\"},{\"id\":\"x3\",\"valid\":false,\"reason\":\"Introduces auth, sessions, account identifiers not mentioned in design. Only describes payment-unlock flow.\"},{\"id\":\"x4\",\"valid\":false,\"reason\":\"Assumes receipt validation and error messages not in design. Design only describes trusting flag.\"}]}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

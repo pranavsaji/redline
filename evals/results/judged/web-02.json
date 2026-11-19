@@ -1,0 +1,10 @@
+{
+  "caseId": "web-02",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":true,\"reason\":\"External images in comments enable tracking visitors via image requests - follows from design allowing images.\"},{\"id\":\"x2\",\"valid\":true,\"reason\":\"Automated comment posting floods database and pages - specific to comment feature, not generic rate limiting advice.\"},{\"id\":\"x3\",\"valid\":true,\"reason\":\"Large images in comments exhaust visitor resources - follows from design allowing images in comments.\"},{\"id\":\"x4\",\"valid\":false,\"reason\":\"Too generic - could apply to any endpoint, not specific to comment feature or design described.\"}]}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

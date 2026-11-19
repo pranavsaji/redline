@@ -1,0 +1,10 @@
+{
+  "caseId": "api-04",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":true,\"reason\":\"Feature resizes images; parser exploit is specific attack on that processing component, not duplicate.\"},{\"id\":\"x2\",\"valid\":false,\"reason\":\"Duplicate of c2: same slow HTTP response attack mechanism and same resource exhaustion harm.\"}]}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

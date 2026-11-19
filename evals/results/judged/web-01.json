@@ -1,0 +1,10 @@
+{
+  "caseId": "web-01",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":true,\"reason\":\"Design specifies token in link to public page, which creates URL logs and browser history exposure\"},{\"id\":\"x2\",\"valid\":true,\"reason\":\"Design explicitly states immediate login after reset, turning token compromise into instant session hijacking\"},{\"id\":\"x3\",\"valid\":false,\"reason\":\"Generic credential reuse attack, not specific to password reset feature\"},{\"id\":\"x4\",\"valid\":false,\"reason\":\"Generic secrets management hygiene, not specific to password reset feature\"},{\"id\":\"x5\",\"valid\":true,\"reason\":\"Design requires email input for reset, allowing enumeration through response differences\"},{\"id\":\"x6\",\"valid\":false,\"reason\":\"Generic data exposure, design mentions no customer records or personal data retrieval\"},{\"id\":\"x7\",\"valid\":true,\"reason\":\"Design specifies reset link by email with no notification mechanism mentioned\"},{\"id\":\"x8\",\"valid\":false,\"reason\":\"Too generic endpoint flooding, not specific to password reset versus any public endpoint\"}]}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

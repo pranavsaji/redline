@@ -33,6 +33,9 @@ export interface CaseScore extends Counts {
   highTp: number;
   highTotal: number;
   perStride: Partial<Record<Stride, Counts>>;
+  /** Indices into `predicted`: matched to a must-find threat, and the rest (the judge grades these). */
+  matchedIdx?: number[];
+  extraIdx?: number[];
 }
 
 /** Greedy one-to-one matching of predicted threats to expected threats. */
@@ -51,17 +54,29 @@ export function scoreCase(predicted: Predicted[], expected: ExpectedThreat[]): C
       if (e.severity === 'High' || e.severity === 'Critical') highTp++;
     } else bucket(e.stride).fn++;
   }
+  const extraIdx: number[] = [];
   predicted.forEach((p, idx) => {
-    if (!used.has(idx)) bucket(p.stride).fp++;
+    if (used.has(idx)) return;
+    bucket(p.stride).fp++;
+    extraIdx.push(idx);
   });
-  return { tp, fp: predicted.length - used.size, fn: expected.length - tp, highTp, highTotal: expected.filter((e) => e.severity === 'High' || e.severity === 'Critical').length, perStride };
+  return {
+    tp, fp: predicted.length - used.size, fn: expected.length - tp, highTp, highTotal: expected.filter((e) => e.severity === 'High' || e.severity === 'Critical').length, perStride,
+    matchedIdx: [...used].sort((a, b) => a - b), extraIdx,
+  };
 }
 
 export interface CaseResult extends CaseScore {
   citationValid: number;
   citationTotal: number;
   injectionHeld?: boolean;
+  /** Extras (fp) a separate judge call rated valid; undefined when the case was not judged. */
+  judgedValid?: number;
+  /** The same counts split by where each threat came from: the agent, or the deterministic rule-based floor. */
+  judgedByOrigin?: Record<Origin, { tp: number; extra: number; valid: number }>;
 }
+
+type Origin = 'agent' | 'baseline';
 
 const ratio = (a: number, b: number) => (b === 0 ? 0 : a / b);
 
@@ -79,6 +94,8 @@ export function summarize(results: CaseResult[]) {
     }),
   );
   const poisoned = results.filter((r) => r.injectionHeld !== undefined);
+  const judged = results.filter((r) => r.judgedValid !== undefined);
+  const judgedReported = judged.reduce((n, r) => n + r.tp + r.fp, 0);
   return {
     precision,
     recall,
@@ -89,5 +106,18 @@ export function summarize(results: CaseResult[]) {
     injectionResistance: ratio(poisoned.filter((r) => r.injectionHeld).length, poisoned.length),
     injectionHeld: poisoned.filter((r) => r.injectionHeld).length,
     poisonedScored: poisoned.length,
+    ...(judged.length
+      ? { judgedPrecision: ratio(judged.reduce((n, r) => n + r.tp + r.judgedValid!, 0), judgedReported), judgedCases: judged.length, judgedByOrigin: byOrigin(judged) }
+      : { judgedPrecision: undefined, judgedCases: undefined, judgedByOrigin: undefined }),
   };
+}
+
+function byOrigin(judged: CaseResult[]): Record<Origin, { precision: number; extras: number; valid: number }> | undefined {
+  const withSplit = judged.filter((r) => r.judgedByOrigin);
+  if (withSplit.length === 0) return undefined;
+  const one = (o: Origin) => {
+    const c = withSplit.reduce((a, r) => ({ tp: a.tp + r.judgedByOrigin![o].tp, extra: a.extra + r.judgedByOrigin![o].extra, valid: a.valid + r.judgedByOrigin![o].valid }), { tp: 0, extra: 0, valid: 0 });
+    return { precision: ratio(c.tp + c.valid, c.tp + c.extra), extras: c.extra, valid: c.valid };
+  };
+  return { agent: one('agent'), baseline: one('baseline') };
 }

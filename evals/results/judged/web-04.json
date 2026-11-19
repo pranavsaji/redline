@@ -1,0 +1,10 @@
+{
+  "caseId": "web-04",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"x1\",\n      \"valid\": false,\n      \"reason\": \"Duplicate of c1: same attack (unauthorized invoice access via ID) and harm (PII exposure)\"\n    },\n    {\n      \"id\": \"x2\",\n      \"valid\": false,\n      \"reason\": \"Design is about downloading PDFs, not processing payments or refunds. Out of scope.\"\n    },\n    {\n      \"id\": \"x3\",\n      \"valid\": false,\n      \"reason\": \"Duplicate of c1: same attack (unauthorized record access) and harm (personal data exposure)\"\n    },\n    {\n      \"id\": \"x4\",\n      \"valid\": false,\n      \"reason\": \"Generic audit logging hygiene. Design does not make breach detection or compliance material.\"\n    },\n    {\n      \"id\": \"x5\",\n      \"valid\": false,\n      \"reason\": \"Generic rate limiting hygiene. Design does not make DoS material or mention resource concerns.\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

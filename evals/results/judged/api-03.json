@@ -1,0 +1,10 @@
+{
+  "caseId": "api-03",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"x1\",\n      \"valid\": true,\n      \"reason\": \"Public endpoint without rate limiting enables DoS, blocking legitimate events. Distinct from tampering/spoofing.\"\n    },\n    {\n      \"id\": \"x2\",\n      \"valid\": true,\n      \"reason\": \"Endpoint processes order IDs, plausibly responds differently for valid/invalid, enabling enumeration attack.\"\n    },\n    {\n      \"id\": \"x3\",\n      \"valid\": false,\n      \"reason\": \"Design specifies only order ID and status. Payment amounts, recipients, refunds not mentioned.\"\n    },\n    {\n      \"id\": \"x4\",\n      \"valid\": true,\n      \"reason\": \"Different harm than c2: inability to investigate fraud versus financial loss. Repudiation threat.\"\n    },\n    {\n      \"id\": \"x5\",\n      \"valid\": false,\n      \"reason\": \"Duplicate of x1: same flooding attack causing resource exhaustion and service disruption.\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

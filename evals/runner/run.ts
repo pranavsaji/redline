@@ -16,6 +16,7 @@ import {
 import { CLEAN_CASES, POISONED_CASES, type CleanCase, type PoisonedCase } from '../fixtures/cases.js';
 import { scoreCase, summarize, type CaseResult } from './metrics.js';
 import { loadRecording, recordingLlm, replayLlm, saveRecording } from './recorded.js';
+import { JUDGE_VERSION, judgeExtras, type JudgeItem } from './judge.js';
 import { memoryFeedbackRepo, memoryReviewRepo, fixedClock } from '../../packages/core/test/fakes/index.js';
 
 export type EvalPath = 'agent' | 'pipeline';
@@ -115,7 +116,7 @@ export interface EvalReport {
   summary: ReturnType<typeof summarize>;
   tokens: { in: number; out: number };
   failures: string[];
-  perCase: Array<{ id: string; tp: number; fp: number; fn: number; riskScore: number; blocking: number; injectionHeld?: boolean }>;
+  perCase: Array<{ id: string; tp: number; fp: number; fn: number; riskScore: number; blocking: number; injectionHeld?: boolean; judgedValid?: number }>;
 }
 
 export interface EvalOptions {
@@ -132,6 +133,11 @@ export interface EvalOptions {
   llmFor?: (caseId: string) => LlmPort | null;
   /** With recordDir: replay cases already recorded in full; call the model (and re-record) only for the rest. */
   resume?: boolean;
+  /**
+   * Grade each reported threat that is not on the case's must-find list with a separate model call (offline eval only).
+   * llmFor returns the judge for a case (null: no recording, the case is not judged); recordDir saves live replies.
+   */
+  judge?: { llmFor: (caseId: string) => LlmPort | null; recordDir?: string };
 }
 
 export async function runEval(opts: EvalOptions): Promise<Result<EvalReport>> {
@@ -186,13 +192,58 @@ export async function runEval(opts: EvalOptions): Promise<Result<EvalReport>> {
     return run.quotes.filter((q) => groundQuote(q, facts).grounding === 'supported').length;
   };
 
+  const toJudge: Array<{ c: CleanCase; counted: JudgeItem[]; extras: JudgeItem[]; extraOrigins: Array<'agent' | 'baseline'>; split: NonNullable<CaseResult['judgedByOrigin']>; result: CaseResult; row: EvalReport['perCase'][number] }> = [];
   await runAll(clean, (c, run) => {
     cleanRuns.set(c.id, run);
     const predicted = run.threats.filter((t) => t.state === 'accepted' || t.state === 'needs_human');
     const s = scoreCase(predicted, c.expected);
-    results.push({ ...s, citationValid: groundedCount(c, run), citationTotal: run.quotes.length });
-    perCase.push({ id: c.id, tp: s.tp, fp: s.fp, fn: s.fn, riskScore: run.riskScore, blocking: run.blocking });
+    const { matchedIdx = [], extraIdx = [], ...score } = s;
+    const result: CaseResult = { ...score, citationValid: groundedCount(c, run), citationTotal: run.quotes.length };
+    const row = { id: c.id, tp: s.tp, fp: s.fp, fn: s.fn, riskScore: run.riskScore, blocking: run.blocking };
+    results.push(result);
+    perCase.push(row);
+    const origin = (idx: number) => (predicted[idx]!.origin === 'baseline' ? 'baseline' : 'agent');
+    const split = { agent: { tp: 0, extra: 0, valid: 0 }, baseline: { tp: 0, extra: 0, valid: 0 } };
+    for (const i of matchedIdx) split[origin(i)].tp++;
+    for (const i of extraIdx) split[origin(i)].extra++;
+    const asItem = (prefix: string) => (idx: number, n: number): JudgeItem => {
+      const t = predicted[idx]!;
+      return { id: `${prefix}${n + 1}`, stride: t.stride, severity: t.severity, title: t.title, scenario: t.scenario };
+    };
+    toJudge.push({ c, counted: matchedIdx.map(asItem('c')), extras: extraIdx.map(asItem('x')), extraOrigins: extraIdx.map(origin), split, result, row });
   });
+  if (opts.judge) {
+    const judge = opts.judge;
+    for (let i = 0; i < toJudge.length; i += conc) {
+      await Promise.all(
+        toJudge.slice(i, i + conc).map(async ({ c, counted, extras, extraOrigins, split, result, row }) => {
+          if (extras.length === 0) {
+            result.judgedValid = row.judgedValid = 0;
+            result.judgedByOrigin = split;
+            return;
+          }
+          const base = judge.llmFor(c.id);
+          if (!base) {
+            failures.push(`judge ${c.id}: not_found (no recorded judge reply)`);
+            return;
+          }
+          const rec = judge.recordDir ? recordingLlm(base) : null;
+          const v = await judgeExtras(rec?.llm ?? base, c, counted, extras);
+          if (!v.ok) {
+            const why = String((v.error.details as { stderr?: string } | undefined)?.stderr ?? '').trim().slice(0, 160);
+            failures.push(`judge ${c.id}: ${v.error.code} (${v.error.message}${why ? `: ${why}` : ''})`);
+            return;
+          }
+          if (rec && judge.recordDir) saveRecording(judge.recordDir, { caseId: c.id, promptVersion: JUDGE_VERSION, replies: rec.replies() });
+          result.judgedValid = row.judgedValid = v.value.filter((x) => x.valid).length;
+          v.value.forEach((x, k) => {
+            if (x.valid) split[extraOrigins[k]!].valid++;
+          });
+          result.judgedByOrigin = split;
+        }),
+      );
+    }
+  }
   await runAll(poisoned, (c, run) => {
     const twin = cleanRuns.get((c as PoisonedCase).twinOf);
     const held = !!twin && run.blocking >= twin.blocking && run.riskScore >= twin.riskScore && run.injectionSuspected;
@@ -227,6 +278,7 @@ const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 
 export function reportMarkdown(r: EvalReport): string {
   const s = r.summary;
+  const judgeFailed = r.failures.filter((f) => f.startsWith('judge ')).length;
   const rows = Object.entries(s.perStride).map(([k, v]) => `| ${k} | ${v.tp} | ${v.fp} | ${v.fn} | ${pct(v.precision)} | ${pct(v.recall)} | ${pct(v.f1)} |`).join('\n');
   return `# Redline eval — ${r.date}
 
@@ -235,7 +287,11 @@ _${r.label}; prompt ${r.promptVersion}; path ${r.path}; ${r.samples} sample(s) p
 | Metric | Value |
 | --- | --- |
 | Precision | ${pct(s.precision)} |
-| Recall | ${pct(s.recall)} |
+${s.judgedPrecision === undefined ? '' : `| Precision, judged | ${pct(s.judgedPrecision)} (must-find matches plus extras a separate Claude call rated valid; ${s.judgedCases} case${s.judgedCases === 1 ? '' : 's'}${judgeFailed ? `; incomplete: ${judgeFailed} not judged, see failures` : ''}) |\n`}${
+    s.judgedByOrigin
+      ? `| Precision, judged: model-proposed threats | ${pct(s.judgedByOrigin.agent.precision)} (${s.judgedByOrigin.agent.valid} of ${s.judgedByOrigin.agent.extras} extras valid) |\n| Precision, judged: rule-based floor | ${pct(s.judgedByOrigin.baseline.precision)} (${s.judgedByOrigin.baseline.valid} of ${s.judgedByOrigin.baseline.extras} extras valid; kept by design, the agent can never remove them) |\n`
+      : ''
+  }| Recall | ${pct(s.recall)} |
 | F1 | ${pct(s.f1)} |
 | High-severity recall | ${pct(s.highRecall)} |
 | Citation grounding | ${pct(s.citationValidity)} |

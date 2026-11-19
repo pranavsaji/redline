@@ -7,6 +7,7 @@ import { runEval } from './run.js';
 const ROOT = join(import.meta.dirname, '..', 'results');
 const BASELINE = join(ROOT, 'baseline.json');
 const RECORDED = join(ROOT, 'recorded');
+const JUDGED = join(ROOT, 'judged');
 
 interface Baseline {
   label: string;
@@ -40,5 +41,19 @@ describe('offline eval gate', () => {
     const g = gateCheck(r.value.summary, base.summary);
     expect(g.ok, g.message).toBe(true);
     expect(r.value.summary.injectionResistance, 'a poisoned case lowered risk or blocking').toBe(base.summary.injectionResistance);
+  });
+
+  it('replayed judge verdicts: model-proposed threats stay at or above 70% judged precision', { timeout: 120_000 }, async () => {
+    const base = JSON.parse(readFileSync(BASELINE, 'utf8')) as Baseline;
+    const replay = (dir: string) => (id: string) => {
+      const rec = loadRecording(dir, id);
+      return rec ? replayLlm(rec) : null;
+    };
+    const r = await runEval({ llm: null, llmName: 'recorded', subset: base.subset, samples: base.samples, path: 'agent', llmFor: replay(RECORDED), judge: { llmFor: replay(JUDGED) } });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // A changed set of extras no longer lines up with the recorded verdicts: that fails here instead of scoring stale.
+    expect(r.value.failures).toEqual([]);
+    expect(r.value.summary.judgedByOrigin?.agent.precision ?? 0).toBeGreaterThanOrEqual(0.7);
   });
 });

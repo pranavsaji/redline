@@ -3,7 +3,9 @@
  * Offline harness: `pnpm redline <command>`.
  *   review <caseId> [--llm fake|claude-code] [--samples 3] [--model m] [--path agent|pipeline] [--yes]
  *   eval [--subset 30|all] [--llm fake|claude-code|recorded] [--samples 3] [--model m] [--path agent|pipeline] [--concurrency 1] [--yes]
- *        [--write-baseline] [--gate evals/results/baseline.json] [--resume]
+ *        [--write-baseline] [--gate evals/results/baseline.json] [--resume] [--judge claude-code|recorded]
+ *     --judge grades every reported threat outside a case's must-find list with a separate claude -p call (recorded
+ *     into evals/results/judged/), so the report shows judged precision next to strict precision.
  *     claude-code runs record every raw reply into evals/results/recorded/; `--llm recorded` replays them offline (CI).
  *   sign-demo
  */
@@ -18,6 +20,7 @@ import { gateCheck, loadRecording, replayLlm } from '../../../evals/runner/recor
 
 const RECORDED = 'evals/results/recorded';
 const BASELINE = 'evals/results/baseline.json';
+const JUDGED = 'evals/results/judged';
 
 const argv = process.argv.slice(2);
 const flag = (name: string, def?: string) => {
@@ -70,6 +73,15 @@ async function main() {
     const n = sel.clean.length + sel.poisoned.length;
     if (llm && !(await confirm(n * samples * (path === 'pipeline' ? 2 : 1), model))) return;
     const recorded = flag('llm') === 'recorded';
+    const judgeWith = flag('judge');
+    // The judge always runs on a real model, even when the reviews are replayed (`--llm recorded` has model "none").
+    const judgeModel = flag('model', 'claude-sonnet-4-5')!;
+    const judgeLive = judgeWith === 'claude-code' ? claudeCodeLlm({ model: judgeModel }) : null;
+    if (judgeLive && !(await confirm(sel.clean.length, `${judgeModel} (judge, at most one call per clean case)`))) return;
+    const judgeFor = (id: string) => {
+      const rec = judgeWith === 'recorded' || has('resume') ? loadRecording(JUDGED, id) : null;
+      return rec ? replayLlm(rec) : judgeLive;
+    };
     const r = await runEval({
       llm,
       llmName: recorded ? 'recorded' : name,
@@ -80,6 +92,7 @@ async function main() {
       onProgress: (d, t) => process.stderr.write(`\r${d}/${t}`),
       ...(llm ? { recordDir: RECORDED, resume: has('resume') } : {}),
       ...(recorded ? { llmFor: (id: string) => { const rec = loadRecording(RECORDED, id); return rec ? replayLlm(rec) : null; } } : {}),
+      ...(judgeWith ? { judge: { llmFor: judgeFor, ...(judgeLive ? { recordDir: JUDGED } : {}) } } : {}),
     });
     process.stderr.write('\n');
     if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);

@@ -1,0 +1,10 @@
+{
+  "caseId": "mobile-01",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":false,\"reason\":\"Bundles vague scenarios, overlaps with c1, includes generic password guessing advice\"},{\"id\":\"x2\",\"valid\":false,\"reason\":\"Generic security hygiene not specific to this feature design\"},{\"id\":\"x3\",\"valid\":false,\"reason\":\"Tampering doesn't enable plausible harm; session redirection unsupported by design\"}]}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

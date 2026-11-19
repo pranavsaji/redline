@@ -1,0 +1,10 @@
+{
+  "caseId": "mobile-05",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":false,\"reason\":\"Duplicate of c1: same unauthorized access attack via delivery ID\"},{\"id\":\"x2\",\"valid\":false,\"reason\":\"Too generic: doesn't specify what records or data in this feature\"},{\"id\":\"x3\",\"valid\":true,\"reason\":\"Valid: authorized customer misusing legitimate access to stalk driver\"},{\"id\":\"x4\",\"valid\":false,\"reason\":\"Generic hygiene: rate limiting not made material by this design\"}]}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}
