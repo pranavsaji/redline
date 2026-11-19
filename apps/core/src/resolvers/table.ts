@@ -2,7 +2,7 @@ import { panelDiff, panelEnrich, panelGet, panelRerun, panelThreats, panelWhatIf
 import { requirementsCreate, requirementsSetStatus } from './requirements.js';
 import { reviewConfirm, threatsTriage } from './threats.js';
 import { confluencePublish } from './confluence.js';
-import { adminGetPolicy, adminProjectStatuses, adminPurgeProject, adminRuns, adminSeed, adminSetNotifications, adminSetPolicy, adminSetupStatus, adminUsage, adminWarnOnly, adminWarnOnlyEnd } from './admin.js';
+import { adminGetPolicy, adminProjectStatuses, adminPurgeProject, adminResumeReviews, adminRuns, adminSeed, adminSetNotifications, adminSetPolicy, adminSetupStatus, adminUsage, adminWarnOnly, adminWarnOnlyEnd } from './admin.js';
 import { acceptanceDecide, acceptanceRequest, acceptanceRevoke, breakGlassOverride } from './acceptances.js';
 import { ledgerExport, ledgerProof, ledgerTreeHead, ledgerVerify } from './ledger.js';
 import { postureDrill, postureGet, releaseReport } from './posture.js';
@@ -40,6 +40,7 @@ export function resolverTable(env: { enricher: () => Enricher; signingKeysReady:
     'admin.warnOnly': (deps, v, payload) => adminWarnOnly(deps, { accountId: v.accountId }, payload),
     'admin.warnOnlyEnd': (deps, v, payload) => adminWarnOnlyEnd(deps, { accountId: v.accountId }, payload),
     'admin.purgeProject': (deps, v, payload) => adminPurgeProject(deps, { accountId: v.accountId }, payload),
+    'admin.resumeReviews': (deps, v, payload) => adminResumeReviews(deps, { accountId: v.accountId }, payload),
     'admin.runs': (deps, v) => adminRuns(deps, { accountId: v.accountId }),
     'admin.usage': (deps, v) => adminUsage(deps, { accountId: v.accountId }),
     'admin.setNotifications': (deps, v, payload) => adminSetNotifications(deps, { accountId: v.accountId }, payload),

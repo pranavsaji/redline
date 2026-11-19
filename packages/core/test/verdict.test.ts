@@ -30,10 +30,16 @@ describe('computeVerdict', () => {
     expect(v.state).toBe('block');
     expect(codes(v)).toContain('review_stale');
   });
-  it('5. budget pause blocks until a champion confirms', () => {
-    expect(codes(computeVerdict(input({ budgetPaused: true, threats: [], requirements: [] })))).toEqual(['budget_paused']);
-    const confirmed = computeVerdict(input({ budgetPaused: true, threats: [], requirements: [], championConfirmations: [{ reviewId: 'rev_1', kind: 'budget' }] }));
+  it('5. a review that could not run because reviews were paused blocks as budget_paused until a champion confirms (final review C3)', () => {
+    const paused = review({ status: 'failed', failureReason: 'budget', samplesExpected: 0 });
+    expect(codes(computeVerdict(input({ review: paused, budgetPaused: true, threats: [], requirements: [] })))).toEqual(['budget_paused']);
+    // The pause may already have lifted; the review still never ran, so the champion's confirmation is what releases it.
+    expect(codes(computeVerdict(input({ review: paused, budgetPaused: false, threats: [], requirements: [] })))).toEqual(['budget_paused']);
+    const confirmed = computeVerdict(input({ review: paused, budgetPaused: true, threats: [], requirements: [], championConfirmations: [{ reviewId: 'rev_1', kind: 'budget' }] }));
     expect(confirmed.state).toBe('pass');
+  });
+  it('5b. a later budget pause does not block work whose review already ran (final review C3)', () => {
+    expect(computeVerdict(input({ budgetPaused: true, threats: [], requirements: [] })).state).toBe('pass');
   });
   it('6. needs_human threats at or above threshold block until champion confirmation; injection is called out', () => {
     expect(codes(computeVerdict(input({ threats: [threat({ state: 'needs_human' })] })))).toContain('needs_human');

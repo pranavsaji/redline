@@ -49,5 +49,10 @@ export function sqlLedgerRepo(x: SqlExecutor): LedgerRepo {
       const r = await x.query<Row>(`SELECT ${COLS} FROM ledger ORDER BY seq ASC`, []);
       return r.ok ? list(r.value) : r;
     },
+    async ofTypes(types) {
+      if (types.length === 0) return ok([]);
+      const r = await x.query<Row>(`SELECT ${COLS} FROM ledger WHERE event_type IN (${types.map(() => '?').join(', ')}) ORDER BY seq ASC`, [...types]);
+      return r.ok ? list(r.value) : r;
+    },
   };
 }

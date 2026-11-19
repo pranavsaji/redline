@@ -57,7 +57,9 @@ export function computeVerdict(i: VerdictInput): Verdict {
   if (!r) {
     reasons.push({ code: 'no_review', message: 'Redline has not reviewed this work item yet.', action: { label: 'Run review', href: `${i.panelUrl}?rerun=1` } });
   } else {
-    if (r.status === 'failed') reasons.push({ code: 'review_failed', message: `The security review failed${r.failureReason ? ` (${r.failureReason})` : ''}.`, action: rerun });
+    // A review that never ran because reviews were paused is the budget case (a champion can confirm it), not a failure.
+    const pausedReview = r.status === 'failed' && r.failureReason === 'budget';
+    if (r.status === 'failed' && !pausedReview) reasons.push({ code: 'review_failed', message: `The security review failed${r.failureReason ? ` (${r.failureReason})` : ''}.`, action: rerun });
     else if (r.status === 'agent_timeout') reasons.push({ code: 'agent_missing', message: 'The AI review did not arrive in time, so the review is incomplete.', action: rerun });
     else if (IN_PROGRESS.has(r.status))
       reasons.push({ code: 'agent_missing', message: `Review in progress (${r.samplesReceived} of ${r.samplesExpected} agent runs received).` });
@@ -68,7 +70,8 @@ export function computeVerdict(i: VerdictInput): Verdict {
       reasons.push({ code: 'review_stale', message: 'The design or linked work changed since the last review.', action: rerun });
 
     const confirmed = (kind: 'review' | 'budget') => i.championConfirmations.some((c) => c.reviewId === r.id && c.kind === kind);
-    if (i.budgetPaused && !confirmed('budget'))
+    // Only work whose review could not run is held by a pause; a review that already ran keeps its own verdict.
+    if (pausedReview && !confirmed('budget'))
       reasons.push({ code: 'budget_paused', message: 'Reviews are paused at the AI budget. A security champion can confirm this work item.' });
 
     const atThreshold = (t: Threat) => severityRank(t.severity) >= threshold;

@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react';
+import Button from '@atlaskit/button/new';
 import { token } from '@atlaskit/tokens';
 import { errorText, isError } from '../bridge.js';
 import type { ApiError, UsageDto } from '../types.js';
@@ -20,12 +21,21 @@ export function Budgets(props: PolicySectionProps) {
   const [timeout, setTimeoutMin] = useState(String(policy.agentTimeoutMinutes));
   const s = usePolicySave(props);
 
-  useEffect(() => {
-    void api
+  const loadUsage = () =>
+    api
       .usage()
       .catch((): ApiError => ({ error: 'unavailable' }))
       .then((r) => (isError(r) ? setUsageError(errorText(r)) : setUsage(r)));
+  useEffect(() => {
+    void loadUsage();
   }, [api, policy]);
+
+  const resume = async () => {
+    const r = await api.resumeReviews().catch((): ApiError => ({ error: 'unavailable' }));
+    if (isError(r)) return setUsageError(errorText(r));
+    setUsageError(null);
+    await loadUsage();
+  };
 
   const submit = () => {
     const reviewsPerMonth = intIn(reviews, 1, 1_000_000);
@@ -61,6 +71,12 @@ export function Budgets(props: PolicySectionProps) {
                 ? 'Reviews are paused: the last three agent runs came back empty, so the site may be out of Rovo credits. A security champion can confirm paused work.'
                 : 'Reviews are running.'}
           </p>
+          {usage.paused.credits && !usage.paused.budget && (
+            <div>
+              <Button onClick={() => void resume()}>Resume reviews</Button>
+              <span style={{ ...hint, marginLeft: 8 }}>After topping up Rovo credits. The pause also lifts by itself 6 hours after the last agent run.</span>
+            </div>
+          )}
         </div>
       )}
       <p style={hint}>Each review asks the Rovo agent for this many independent threat models; more samples give steadier results and use more Rovo credits.</p>

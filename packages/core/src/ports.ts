@@ -108,6 +108,8 @@ export type LedgerEventType =
   | 'policy.warn_only'
   | 'policy.changed'
   | 'project.purged'
+  | 'reviews.resumed'
+  | 'review.sample'
   | 'key.rotated';
 
 export interface LedgerInsert {
@@ -127,6 +129,8 @@ export interface LedgerRepo {
   append(e: LedgerInsert): Promise<Result<LedgerRow>>;
   range(fromSeq: number, toSeq: number): Promise<Result<LedgerRow[]>>;
   all(): Promise<Result<LedgerRow[]>>;
+  /** Only rows of these event types, in seq order (indexed): what verdicts and the panel read on every refresh. */
+  ofTypes(types: readonly LedgerEventType[]): Promise<Result<LedgerRow[]>>;
 }
 
 export interface FeedbackRow {

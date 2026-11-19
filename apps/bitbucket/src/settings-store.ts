@@ -22,6 +22,7 @@ const Stored = z
     publicKeys: z.record(z.string().max(64), z.string().max(64)),
     sensitivePaths: z.array(z.string().min(1).max(200)).max(MAX_GLOBS),
     mode: z.enum(['warn', 'block']),
+    warnUntil: z.string().datetime().optional(),
     diffScoreThreshold: z.number().int().min(0).max(100),
   })
   .strict();

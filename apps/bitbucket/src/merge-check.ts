@@ -9,8 +9,11 @@ export interface RepoSettings {
   publicKeys: Record<string, string>;
   sensitivePaths: string[];
   mode: 'warn' | 'block';
+  /** Warn mode ends here (set when an admin saves warn mode, at most 14 days); after it, or without it, the check blocks. */
+  warnUntil?: string;
   diffScoreThreshold: number;
 }
+export const WARN_ONLY_MAX_DAYS = 14;
 export const DEFAULT_REPO_SETTINGS: RepoSettings = { publicKeys: {}, sensitivePaths: [], mode: 'block', diffScoreThreshold: 40 };
 
 export type Outcome =
@@ -77,6 +80,11 @@ function effectivePolicy(settings: RepoSettings, yaml: string | null): { sensiti
 export async function evaluateMergeCheck(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | null; settings: RepoSettings; nowSec: number }): Promise<CheckResult> {
   const r = decide(i);
   if (r.success || i.settings.mode !== 'warn') return r;
+  const until = i.settings.warnUntil ? Date.parse(i.settings.warnUntil) / 1000 : NaN;
+  if (!(until > i.nowSec)) {
+    const ended = Number.isFinite(until) ? `Redline: warn-only mode ended ${utcMinute(until)}, so this check blocks again. ` : 'Redline: warn-only mode has no end date, so this check blocks. ';
+    return { ...r, message: `${ended}${r.message}` };
+  }
   return { success: true, outcome: 'warn', message: `Warning: ${r.message}` };
 }
 
@@ -136,6 +144,20 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
     return { success: false, outcome: 'fail_other_issue', message: `Redline: this pull request names no Jira work item. Put the work item key (${p.issueKey}) in the pull request title or branch name, then re-run the check.` };
   if (!named.includes(p.issueKey))
     return { success: false, outcome: 'fail_other_issue', message: `Redline: the attestation is for ${p.issueKey}, but this pull request is for ${named.join(', ')}. Request an attestation from ${named[0]}.` };
+  // Final review I1: every work item the PR names needs its own valid attestation for this commit; otherwise a passing
+  // item named next to a blocked one ("PAY-6 …, see PAY-7") would carry the blocked change.
+  const attested = (key: string) =>
+    mine.some((x) => {
+      const d = decodeAttestation(x.t, i.settings.publicKeys, i.nowSec);
+      return d.ok && d.value.issueKey === key && d.value.commitSha.startsWith(head);
+    });
+  const unattested = named.find((k) => k !== p.issueKey && !attested(k));
+  if (unattested)
+    return {
+      success: false,
+      outcome: 'fail_other_issue',
+      message: `Redline: this pull request also names ${unattested}, which has no valid attestation for this commit. Add one from ${unattested}, or remove ${unattested} from the title and branch name.`,
+    };
   const verified = p.requirements.filter((r) => r.status === 'Verified').length;
   const pass = `Redline: attested by ${p.issueKey}, ${verified} requirements verified.`;
   const lenient = p.override === 'break_glass' ? 'Warning: attested under a break-glass override. ' : p.override === 'warn_only' ? 'Warning: attested under warn-only mode. ' : '';

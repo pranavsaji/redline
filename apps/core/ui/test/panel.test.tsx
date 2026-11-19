@@ -51,6 +51,18 @@ describe('IssuePanel states render their key text', () => {
   });
 });
 
+describe('final review I4: the header re-run action re-runs the review', () => {
+  it('"Re-run review" next to a stale reason is a button that calls rerun, not a link that reloads the page', async () => {
+    let calls = 0;
+    const base = mockApi('stale');
+    await renderState('stale', { ...base, rerun: async () => (calls++, { ok: true }) });
+    const next = screen.getByRole('list', { name: 'What to do next' });
+    expect(within(next).queryByRole('link', { name: 'Re-run review' })).toBeNull();
+    await userEvent.click(within(next).getByRole('button', { name: 'Re-run review' }));
+    await waitFor(() => expect(calls).toBe(1));
+  });
+});
+
 describe('break-glass override in the header', () => {
   it('says the gate is overridden and until when, and keeps the reasons visible', async () => {
     const base = mockApi('ready');

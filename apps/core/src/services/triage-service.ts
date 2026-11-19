@@ -147,7 +147,7 @@ export async function applyTriage(
  */
 export async function confirmReview(deps: CoreDeps, actor: string, issue: JiraIssue, review: Review, kind: 'review' | 'budget'): Promise<Result<LedgerRow>> {
   const eventType = kind === 'review' ? 'review.champion_confirmed' : 'budget.champion_confirmed';
-  const rows = await deps.ledger.all();
+  const rows = await deps.ledger.ofTypes([eventType]);
   if (!rows.ok) return rows;
   const existing = rows.value.find((r) => r.eventType === eventType && r.payload.reviewId === review.id);
   if (existing) return ok(existing);

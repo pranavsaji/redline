@@ -156,6 +156,19 @@ describe('submit-threat-model (CREATE action) and ingestSample', () => {
     expect(l.ok && l.value).toMatchObject({ revision: 1, status: 'awaiting_agent' });
   });
 
+  it('final review C2: every saved agent run is ledgered with who submitted it, so a self-written review is auditable', async () => {
+    const t = setup();
+    await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
+    await submit(t.deps, KEY, JSON.stringify(MODEL), 'acc-dev');
+    await submit(t.deps, KEY, 'not json', 'acc-agent');
+    const rows = await t.deps.ledger.all();
+    const samples = (rows.ok ? rows.value : []).filter((e) => e.eventType === 'review.sample');
+    expect(samples.map((e) => ({ actor: e.actor, ...e.payload }))).toEqual([
+      { actor: 'acc-dev', issueId: '10042', reviewId: 'rev_10042_1', n: 1, valid: true, threats: 1 },
+      { actor: 'acc-agent', issueId: '10042', reviewId: 'rev_10042_1', n: 2, valid: false, threats: 0 },
+    ]);
+  });
+
   it('a caller who cannot edit the work item cannot submit (and learns nothing about it)', async () => {
     const t = setup({ canEdit: false });
     const r = await submit(t.deps, KEY, JSON.stringify(MODEL));

@@ -66,4 +66,10 @@ export const MIGRATIONS: Migration[] = [
         published_page_id VARCHAR(40), created_at VARCHAR(30) NOT NULL)`,
     ],
   },
+  {
+    version: 3,
+    name: 'ledger_event_type_index',
+    // Final review I5: verdict refreshes read acceptance, confirmation and break-glass events only, not every attestation.
+    statements: [`CREATE INDEX idx_ledger_event_type ON ledger (event_type)`],
+  },
 ];

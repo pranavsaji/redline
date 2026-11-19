@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { rebuildAcceptances, reviewSignals, threatDiff, whatIfScore, type DiscardedThreat, type Role } from '@redline/core';
+import { ACCEPTANCE_EVENTS, rebuildAcceptances, reviewSignals, threatDiff, whatIfScore, type DiscardedThreat, type Role } from '@redline/core';
 import { cweById, getAsvs } from '@redline/frameworks';
 import { DataClassSchema, ExposureSchema, severityRank, type Acceptance, type DataClass, type Exposure, type Severity, type ContextFact, type Requirement, type Review, type Threat, type Verdict } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
@@ -101,7 +101,7 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
     deps.reviews.latest(v.issueId),
     deps.reviews.history(v.issueId),
     deps.requirements.forIssue(v.issueId),
-    deps.ledger.all(),
+    deps.ledger.ofTypes(ACCEPTANCE_EVENTS),
     deps.config.site(),
     readVerdict(deps, v.issueId).then((r) => (r.ok ? r.value : undefined)),
   ]);

@@ -22,9 +22,33 @@ function safeCodePoint(cp: number): string {
   return String.fromCodePoint(cp);
 }
 
+/** Raw page size Redline parses (2 MB of text); anything beyond is dropped before parsing, so no page can stall ingest. */
+export const MAX_RAW_PAGE = 2_000_000;
+
+/**
+ * Drops <script> and <style> elements in one linear pass (final review I3): a regex with a lazy body and a
+ * back-reference rescans to the end of the page for every unclosed opening tag, which is quadratic on hostile input.
+ * An element that is never closed drops the rest of the page, as a browser would treat it.
+ */
+function stripScriptsAndStyles(html: string): string {
+  const lower = html.toLowerCase();
+  const open = /<(script|style)\b/g;
+  let out = '';
+  let from = 0;
+  for (let m = open.exec(lower); m; m = open.exec(lower)) {
+    out += `${html.slice(from, m.index)} `;
+    const close = lower.indexOf(`</${m[1]}`, open.lastIndex);
+    if (close < 0) return out;
+    const end = lower.indexOf('>', close);
+    if (end < 0) return out;
+    from = end + 1;
+    open.lastIndex = from;
+  }
+  return out + html.slice(from);
+}
+
 export function htmlToText(html: string): string {
-  return html
-    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+  return stripScriptsAndStyles(html.length > MAX_RAW_PAGE ? html.slice(0, MAX_RAW_PAGE) : html)
     .replace(/<br\s*\/?>|<\/(p|div|li|h[1-6]|tr)>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&(#\d+|#x[0-9a-f]+|[a-z]+|#39);/gi, (m, e: string) => {
@@ -33,8 +57,9 @@ export function htmlToText(html: string): string {
       if (k.startsWith('#')) return safeCodePoint(k.startsWith('#x') ? parseInt(k.slice(2), 16) : parseInt(k.slice(1), 10));
       return m;
     })
-    .replace(/[ \t\f\v\r]+/g, ' ')
-    .replace(/\s*\n\s*/g, '\n')
+    // Linear on any input: collapse non-newline whitespace first, then one newline per run that contains one.
+    .replace(/[^\S\n]+/g, ' ')
+    .replace(/ ?\n[\n ]*/g, '\n')
     .trim();
 }
 

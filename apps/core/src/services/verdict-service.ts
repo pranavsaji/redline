@@ -1,4 +1,4 @@
-import { combineVerdicts, computeVerdict, rebuildAcceptances, verdictLapsed, type LedgerRow } from '@redline/core';
+import { ACCEPTANCE_EVENTS, combineVerdicts, computeVerdict, rebuildAcceptances, verdictLapsed, type LedgerEventType, type LedgerRow } from '@redline/core';
 import { appError, err, ok, type BlockReason, type Requirement, type Result, type SitePolicy, type Verdict } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
 import type { JiraIssue } from '../adapters/jira.js';
@@ -14,7 +14,11 @@ export const verdictKey = (issueId: string) => `verdict:${issueId}`;
 
 const MAX_ANCESTORS = 5;
 
-export type StoredVerdict = Verdict & { panelUrl?: string; message?: string; riskScore?: number; notApplicable?: boolean; policyVersion?: number };
+/**
+ * `unreviewed`: Redline does not review this item (project or issue type not enabled) and no ancestor has a review, so
+ * Done passes freely but nothing may be attested on its behalf (a merge needs a reviewed item).
+ */
+export type StoredVerdict = Verdict & { panelUrl?: string; message?: string; riskScore?: number; notApplicable?: boolean; unreviewed?: boolean; policyVersion?: number };
 
 /**
  * Bumped by the admin page on every policy or warn-only change. A stored verdict computed under an older version is
@@ -87,6 +91,9 @@ type Ledgered = {
 };
 
 /** Champion confirmations and break-glass overrides are read back from the ledger, never from mutable state. */
+/** Every ledger event a verdict depends on. Attestations and sample records are not among them. */
+const VERDICT_EVENTS: readonly LedgerEventType[] = [...ACCEPTANCE_EVENTS, 'override.breakglass', 'review.champion_confirmed', 'budget.champion_confirmed'];
+
 function fromLedger(rows: readonly LedgerRow[], now: Date): Ledgered {
   const confirmations: Ledgered['confirmations'] = [];
   const breakGlass: Ledgered['breakGlass'] = [];
@@ -115,7 +122,8 @@ function reasonText(r: BlockReason, keys: ReadonlyMap<string, string>): string {
       text += `: ${shown.join(', ')}${more > 0 ? ` and ${more} more` : ''}`;
     }
   }
-  if (r.action) text += ` (${r.action.label}: ${r.action.href})`;
+  // The validator dialog cannot run anything, so a re-run action points at the panel's one-click re-run (final review I4).
+  if (r.action) text += /[?&]rerun=1\b/.test(r.action.href) ? ' (re-run it from the Redline panel)' : ` (${r.action.label}: ${r.action.href})`;
   return text;
 }
 
@@ -255,7 +263,7 @@ export async function refreshVerdict(deps: CoreDeps, issueId: string): Promise<R
   if (!up.ok) return fail(up);
   const policy = await deps.config.site();
   if (!policy.ok) return fail(policy);
-  const rows = await deps.ledger.all();
+  const rows = await deps.ledger.ofTypes(VERDICT_EVENTS);
   if (!rows.ok) return fail(rows);
   const ledgered = fromLedger(rows.value, now);
 
@@ -304,6 +312,7 @@ export async function refreshVerdict(deps: CoreDeps, issueId: string): Promise<R
     message: gateMessage(final, keys, panelUrl, guarded),
     ...(own.value.riskScore !== undefined ? { riskScore: own.value.riskScore } : {}),
     ...(own.value.notApplicable && final.state === 'pass' ? { notApplicable: true } : {}),
+    ...(own.value.notApplicable && ancestors.length === 0 ? { unreviewed: true } : {}),
   };
   const w = await write(deps, issue.id, value, version);
   return w.ok ? ok(final) : w;

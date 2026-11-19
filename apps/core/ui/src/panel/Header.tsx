@@ -22,7 +22,7 @@ function relative(iso: string, now = Date.now()): string {
 }
 
 /** Risk ring, verdict (icon + words, never colour alone), last reviewed time, then the top three actions. */
-export function Header({ dto }: { dto: PanelDto }) {
+export function Header({ dto, onRerun, busy = false }: { dto: PanelDto; onRerun?: () => void; busy?: boolean }) {
   const v = dto.verdict;
   const overridden = v?.state === 'pass' && v.overridden === true;
   const meta = overridden ? OVERRIDDEN : v ? VERDICT[v.state] : null;
@@ -57,9 +57,16 @@ export function Header({ dto }: { dto: PanelDto }) {
               {a.action && (
                 <>
                   {' '}
-                  <a href={a.action.href} target="_top" style={{ color: token('color.link') }}>
-                    {a.action.label}
-                  </a>
+                  {/* Final review I4: a re-run action runs the review here; the `?rerun=1` link would only reload Jira. */}
+                  {onRerun && /[?&]rerun=1\b/.test(a.action.href) ? (
+                    <button type="button" onClick={onRerun} disabled={busy} style={{ background: 'none', border: 0, padding: 0, font: 'inherit', color: token('color.link'), textDecoration: 'underline', cursor: busy ? 'default' : 'pointer' }}>
+                      {a.action.label}
+                    </button>
+                  ) : (
+                    <a href={a.action.href} target="_top" style={{ color: token('color.link') }}>
+                      {a.action.label}
+                    </a>
+                  )}
                 </>
               )}
             </li>

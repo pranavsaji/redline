@@ -66,6 +66,7 @@ export function mockAdminApi(state = typeof window === 'undefined' ? 'ready' : (
     endWarnOnly: async (projectKey) => ((dto.policy.warnOnly = dto.policy.warnOnly.filter((w) => w.projectKey !== projectKey)), { projectKey, entryHash: 'b'.repeat(64) }),
     runs: async () => ({ runs: structuredClone(RUNS_FIXTURE) }),
     usage: async () => structuredClone(USAGE_FIXTURE),
+    resumeReviews: async () => ({ resumed: true, entryHash: 'a'.repeat(64) }),
     setNotifications: async (n) => {
       if (n.ops !== undefined) dto.ops = n.ops;
       if (n.digest !== undefined) dto.digest = n.digest;

@@ -3,7 +3,7 @@ import { appendLedger, WARN_ONLY_MAX_DAYS, warnOnlyUntil } from '@redline/core';
 import { SitePolicySchema, type SitePolicy } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
-import { monthOf, pauseReasons } from '../services/budget.js';
+import { monthOf, pauseReasons, RECENT_INGESTS_KEY } from '../services/budget.js';
 import { DIGEST_CONFIG_KEY } from '../services/digest.js';
 import { OPS_CONFIG_KEY, opsAlert } from '../services/ops-alert.js';
 import { POLICY_VERSION_KEY, policyVersion } from '../services/verdict-service.js';
@@ -234,6 +234,23 @@ export async function adminWarnOnlyEnd(deps: CoreDeps, a: Admin, payload: unknow
   if (!saved.ok) return apiError(saved.error);
   if (!(await bumpPolicyVersion(deps))) return SAVED_UNCHECKED;
   return { projectKey, entryHash: row.value.entryHash };
+}
+
+/**
+ * `admin.resumeReviews` (final review C3): clears the out-of-credits signal (three empty agent runs in a row) so new
+ * reviews run again, for example after credits are topped up. Ledgered. The monthly budget is raised on the policy.
+ */
+export async function adminResumeReviews(deps: CoreDeps, a: Admin, _payload: unknown): Promise<{ resumed: true; entryHash: string } | ApiError> {
+  const denied = await requireAdmin(deps, a);
+  if (denied) return denied;
+  const row = await appendLedger(deps.ledger, deps.clock, 'reviews.resumed', { at: deps.clock.now().toISOString() }, a.accountId);
+  if (!row.ok) return apiError(row.error);
+  try {
+    await deps.state.set(RECENT_INGESTS_KEY, []);
+  } catch {
+    return { error: 'unavailable' };
+  }
+  return { resumed: true, entryHash: row.value.entryHash };
 }
 
 const PurgeSchema = z.object({ projectKey: z.string().regex(PROJECT_KEY), confirm: z.string() });

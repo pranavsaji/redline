@@ -1,4 +1,4 @@
-import { appendLedger, canApprove, rebuildAcceptances, validateAcceptanceRequest, type ApproverNeeded, type LedgerRow } from '@redline/core';
+import { ACCEPTANCE_EVENTS, appendLedger, canApprove, rebuildAcceptances, validateAcceptanceRequest, type ApproverNeeded, type LedgerRow } from '@redline/core';
 import { appError, err, ok, type Acceptance, type AcceptanceState, type Requirement, type Result, type SitePolicy } from '@redline/shared';
 import type { JiraIssue } from '../adapters/jira.js';
 import { log } from '../adapters/log.js';
@@ -22,7 +22,7 @@ const label = (r: Pick<Requirement, 'subtaskKey' | 'severity'>) => r.subtaskKey 
 const byEvents = (rows: readonly LedgerRow[]) => rebuildAcceptances(rows, new Date(0));
 
 async function ledgerRows(deps: CoreDeps): Promise<Result<LedgerRow[]>> {
-  return deps.ledger.all();
+  return deps.ledger.ofTypes(ACCEPTANCE_EVENTS);
 }
 
 async function setStatus(deps: CoreDeps, requirementId: string, from: Requirement['status'][], to: Requirement['status']): Promise<Result<void>> {

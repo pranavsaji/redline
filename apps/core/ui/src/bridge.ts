@@ -118,6 +118,8 @@ export interface AdminApi {
   purgeProject(projectKey: string, confirm: string): Promise<{ projectKey: string; reviews: number; requirements: number; entryHash: string } | ApiError>;
   runs(): Promise<{ runs: RunDto[] } | ApiError>;
   usage(): Promise<UsageDto | ApiError>;
+  /** Clears an out-of-credits pause (ledgered); admins only. */
+  resumeReviews(): Promise<{ resumed: true; entryHash: string } | ApiError>;
   /** Leave a key out to keep it; null turns it off. */
   setNotifications(n: { ops?: OpsConfig | null; digest?: DigestConfig | null }): Promise<{ ops: OpsConfig | null; digest: DigestConfig | null } | ApiError>;
   projectStatuses(projectKey: string): Promise<{ projectKey: string; statuses: string[] } | ApiError>;
@@ -152,6 +154,7 @@ export function adminApiOver(invoke: Invoke): AdminApi {
     purgeProject: (projectKey, confirm) => invoke('admin.purgeProject', { projectKey, confirm }),
     runs: () => invoke('admin.runs'),
     usage: () => invoke('admin.usage'),
+    resumeReviews: () => invoke('admin.resumeReviews'),
     setNotifications: (n) => invoke('admin.setNotifications', { ...n }),
     projectStatuses: (projectKey) => invoke('admin.projectStatuses', { projectKey }),
     ledgerProof: (seq) => invoke('ledger.proof', { seq }),

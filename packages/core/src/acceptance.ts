@@ -55,6 +55,9 @@ export function canApprove(acceptance: Acceptance, approver: { accountId: string
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
 /** Pure fold over the ledger: the acceptances table is a view, the ledger is the source of truth. */
+/** The ledger events rebuildAcceptances reads; callers fetch only these (final review I5). */
+export const ACCEPTANCE_EVENTS = ['acceptance.requested', 'acceptance.approved', 'acceptance.rejected', 'acceptance.revoked', 'acceptance.expired'] as const;
+
 export function rebuildAcceptances(rows: readonly LedgerRow[], now: Date): Acceptance[] {
   const byId = new Map<string, Acceptance>();
   for (const row of rows) {

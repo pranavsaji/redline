@@ -57,4 +57,15 @@ describe('settings resolvers', () => {
     const store = kvsSettingsStore(memory());
     expect(await settingsSave({ store, isRepoAdmin: async () => true }, { accountId: 'acc', workspaceUuid: REPO, repoUuid: 'x/../y' }, input)).toMatchObject({ error: 'validation' });
   });
+  it('final review I2: saving warn mode starts a 14-day window; saving again keeps it; block clears it', async () => {
+    const store = kvsSettingsStore(memory());
+    const now = new Date('2026-11-19T10:00:00Z');
+    const deps = { store, isRepoAdmin: async () => true, now: () => now };
+    const ctx = { accountId: 'acc', workspaceUuid: REPO, repoUuid: REPO };
+    expect(await settingsSave(deps, ctx, { ...input, mode: 'warn' })).toMatchObject({ mode: 'warn', warnUntil: '2026-12-03T10:00:00.000Z' });
+    expect(await settingsSave({ ...deps, now: () => new Date('2026-11-25T10:00:00Z') }, ctx, { ...input, mode: 'warn' })).toMatchObject({ warnUntil: '2026-12-03T10:00:00.000Z' });
+    const blocked = await settingsSave(deps, ctx, { ...input, mode: 'block' });
+    expect(blocked).toMatchObject({ mode: 'block' });
+    expect(blocked).not.toHaveProperty('warnUntil');
+  });
 });

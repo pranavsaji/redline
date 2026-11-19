@@ -15,6 +15,7 @@ export function RepoSettings({ api }: { api: SettingsApi }) {
   const [paths, setPaths] = useState('');
   const [mode, setMode] = useState<'warn' | 'block'>('block');
   const [threshold, setThreshold] = useState(40);
+  const [warnUntil, setWarnUntil] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -28,6 +29,7 @@ export function RepoSettings({ api }: { api: SettingsApi }) {
         setKeys(Object.values(r.publicKeys).join('\n'));
         setPaths(r.sensitivePaths.join('\n'));
         setMode(r.mode);
+        setWarnUntil(r.warnUntil ?? null);
         setThreshold(r.diffScoreThreshold);
         setLoaded(true);
       });
@@ -41,6 +43,7 @@ export function RepoSettings({ api }: { api: SettingsApi }) {
     setSaving(false);
     if (isError(r)) return setError(errorText(r));
     setError(null);
+    setWarnUntil(r.warnUntil ?? null);
     setNotice('Saved.');
   };
 
@@ -65,9 +68,10 @@ export function RepoSettings({ api }: { api: SettingsApi }) {
             <input type="radio" name={`${id}-mode`} checked={mode === 'block'} onChange={() => setMode('block')} /> Block the merge
           </label>
           <label style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-            <input type="radio" name={`${id}-mode`} checked={mode === 'warn'} onChange={() => setMode('warn')} /> Warn only
+            <input type="radio" name={`${id}-mode`} checked={mode === 'warn'} onChange={() => setMode('warn')} /> Warn only (14 days, then block)
           </label>
         </fieldset>
+        {mode === 'warn' && warnUntil && <span style={{ font: token('font.body.small'), color: token('color.text.subtle') }}>{`Warn-only ends ${warnUntil.slice(0, 16).replace('T', ' ')} UTC.`}</span>}
         <label style={label} htmlFor={`${id}-t`}>
           Diff score threshold (0–100; changes scoring this or more need an attestation even outside sensitive paths)
         </label>

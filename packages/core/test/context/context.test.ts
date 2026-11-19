@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contextHash, extractSignals, normalizeFact, redactSecrets, scanForInjection } from '../../src/index.js';
+import { contextHash, extractSignals, htmlToText, MAX_RAW_PAGE, normalizeFact, redactSecrets, scanForInjection } from '../../src/index.js';
 import { poisonedRawFact, rawFacts } from '../fixtures/ai-support-agent.js';
 
 const lorem = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ';
@@ -33,6 +33,36 @@ describe('scanForInjection', () => {
     }
     expect(best).toBeLessThan(50);
     expect(r.suspected).toBe(false);
+  });
+});
+
+describe('htmlToText on hostile pages (final review I3, Review Focus 5)', () => {
+  const cpuMs = (f: () => void) => {
+    let best = Infinity;
+    for (let i = 0; i < 3; i++) {
+      const c0 = process.cpuUsage();
+      f();
+      const c = process.cpuUsage(c0);
+      best = Math.min(best, (c.user + c.system) / 1000);
+    }
+    return best;
+  };
+  it('a 1 MB page of unclosed <script> tags is stripped in linear time', () => {
+    const hostile = '<script>x'.repeat(Math.ceil(1_000_000 / 9));
+    expect(cpuMs(() => htmlToText(hostile))).toBeLessThan(150);
+  });
+  it('a 1 MB run of Unicode spaces with no newline is collapsed in linear time', () => {
+    const spaces = `a${'\u2003'.repeat(1_000_000)}b`;
+    expect(cpuMs(() => htmlToText(spaces))).toBeLessThan(150);
+    expect(htmlToText(spaces)).toBe('a b');
+  });
+  it('keeps the text semantics: script and style dropped (an unclosed one drops the rest), whitespace around newlines collapsed', () => {
+    expect(htmlToText('<p>Keep</p><SCRIPT type="x">drop()</script ><style>.a{}</style>after')).toBe('Keep\nafter');
+    expect(htmlToText('before<script>never closed <p>hidden</p>')).toBe('before');
+    expect(htmlToText('a \n \n  b\u00a0\n c')).toBe('a\nb\nc');
+  });
+  it('caps the raw page before parsing', () => {
+    expect(htmlToText('x'.repeat(5_000_000)).length).toBe(MAX_RAW_PAGE);
   });
 });
 

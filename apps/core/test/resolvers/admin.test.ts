@@ -3,6 +3,7 @@ import { DEFAULT_SITE_POLICY } from '@redline/core';
 import { ok, type Review, type SitePolicy } from '@redline/shared';
 import type { ConfluenceClient } from '../../src/adapters/confluence.js';
 import {
+  adminResumeReviews,
   adminGetPolicy,
   adminProjectStatuses,
   adminPurgeProject,
@@ -224,6 +225,19 @@ describe('admin.usage', () => {
     await r.t.deps.config.setSite({ ...(await policyOf(r)), budget: { ...(await policyOf(r)).budget, reviewsPerMonth: 1 } });
     r.t.kv.data.set('ingest:recent', [false, false, false]);
     expect(await adminUsage(r.t.deps, A)).toMatchObject({ paused: { budget: true, credits: true } });
+  });
+});
+
+describe('admin.resumeReviews (final review C3)', () => {
+  it('an admin clears the out-of-credits pause; it is ledgered; a developer cannot', async () => {
+    const r = await reviewed();
+    r.t.kv.data.set('ingest:recent', [false, false, false]);
+    expect(await adminResumeReviews(r.t.deps, D, {})).toMatchObject({ error: 'forbidden' });
+    expect(await adminUsage(r.t.deps, A)).toMatchObject({ paused: { credits: true } });
+    const out = await adminResumeReviews(r.t.deps, A, {});
+    expect(out).toMatchObject({ resumed: true, entryHash: expect.stringMatching(/^[0-9a-f]{64}$/) });
+    expect(await adminUsage(r.t.deps, A)).toMatchObject({ paused: { credits: false } });
+    expect((await ledger(r)).map((e) => e.eventType)).toContain('reviews.resumed');
   });
 });
 

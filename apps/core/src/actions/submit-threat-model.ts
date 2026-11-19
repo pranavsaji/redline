@@ -1,9 +1,9 @@
-import { extractAgentJson, type Sample } from '@redline/core';
+import { appendLedger, extractAgentJson, type Sample } from '@redline/core';
 import { appError, err, ok, type Result } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { handleJob } from '../consumers/review-consumer.js';
-import { RECENT_INGESTS_KEY } from '../services/budget.js';
+import { RECENT_INGESTS_AT_KEY, RECENT_INGESTS_KEY } from '../services/budget.js';
 import { INGEST_LAST_AT_KEY } from '../resolvers/admin.js';
 import { checkRerunLimit } from '../services/rate-limit.js';
 import { consumeSubmissionToken } from '../services/submission-token.js';
@@ -21,6 +21,7 @@ async function recordIngest(deps: CoreDeps, nonEmpty: boolean): Promise<void> {
     const prev = await deps.state.get<unknown>(RECENT_INGESTS_KEY);
     const list = Array.isArray(prev) ? prev.filter((x): x is boolean => typeof x === 'boolean') : [];
     await deps.state.set(RECENT_INGESTS_KEY, [...list, nonEmpty].slice(-10));
+    await deps.state.set(RECENT_INGESTS_AT_KEY, deps.clock.now().toISOString());
     if (nonEmpty) await deps.state.set(INGEST_LAST_AT_KEY, deps.clock.now().toISOString());
   } catch {
     // the budget signal is best-effort
@@ -63,6 +64,11 @@ export async function ingestSample(deps: CoreDeps, issueKey: string, raw: string
   const sample: Sample = extracted.ok ? extracted.value : { failed: extracted.error.code };
   const saved = await deps.reviews.saveSample(review.id, n, sample);
   if (!saved.ok) return saved;
+  // Final review C2: who wrote each agent run is on the record, so a review its own developer steered is visible.
+  if (actor) {
+    const row = await appendLedger(deps.ledger, deps.clock, 'review.sample', { issueId: issue.value.id, reviewId: review.id, n, valid: extracted.ok, threats: extracted.ok ? extracted.value.threats.length : 0 }, actor);
+    if (!row.ok) log('sample.ledger_failed', { reviewId: review.id, code: row.error.code });
+  }
   await recordIngest(deps, raw.trim().length > 0);
   const pushed = await deps.queue.push([{ kind: 'assemble', reviewId: review.id }]);
   if (!pushed.ok) return pushed;

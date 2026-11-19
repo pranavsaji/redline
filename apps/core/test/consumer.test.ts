@@ -94,6 +94,41 @@ describe('gather job', () => {
     expect(l.ok && l.value?.failureReason).toBe('budget');
   });
 
+  it('final review C3: the out-of-credits pause lifts after 6 hours without new agent runs, so it cannot freeze the site', async () => {
+    const t = coreDeps();
+    t.kv.data.set('ingest:recent', [false, false, false]);
+    t.kv.data.set('ingest:recent:at', new Date(t.clock.now().getTime() - 7 * 3_600_000).toISOString());
+    await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
+    const l = await t.deps.reviews.latest('10042');
+    expect(l.ok && l.value?.status).toBe('awaiting_agent');
+  });
+
+  it('final review C3: a work item paused at the budget blocks as budget_paused (which a champion can confirm), not as a failed review', async () => {
+    const t = coreDeps();
+    t.kv.data.set('ingest:recent', [false, false, false]);
+    await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
+    const l = await t.deps.reviews.latest('10042');
+    if (!l.ok || !l.value) throw new Error('no review');
+    // Baseline threats still run while paused (no AI cost), so their requirements stay; the failure itself does not.
+    const codes = verdictOf(t, '10042')!.reasons.map((r) => r.code);
+    expect(codes).toContain('budget_paused');
+    expect(codes).not.toContain('review_failed');
+  });
+
+  it('final review I5: a verdict refresh reads only the ledger events it needs, never the whole ledger', async () => {
+    const t = coreDeps();
+    await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
+    let all = 0;
+    const types: string[][] = [];
+    const real = t.deps.ledger;
+    t.deps.ledger = { ...real, all: async () => (all++, real.all()), ofTypes: async (ts) => (types.push([...ts]), real.ofTypes(ts)) };
+    const v = await refreshVerdict(t.deps, '10042');
+    expect(v.ok).toBe(true);
+    expect(all).toBe(0);
+    expect(types.flat()).toEqual(expect.arrayContaining(['acceptance.approved', 'override.breakglass', 'budget.champion_confirmed']));
+    expect(types.flat()).not.toContain('attestation.issued');
+  });
+
   it('a gather failure for a never-reviewed item still writes a blocking verdict', async () => {
     const t = coreDeps();
     t.deps.gatherer = { gather: async () => ({ ok: false, error: { code: 'upstream', message: 'jira down' } }) };

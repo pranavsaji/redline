@@ -7,6 +7,7 @@ import { attestationCopy, keysCopied, keysPublic, keysRotate } from '../../src/r
 import { requestAttestation } from '../../src/services/attestation-service.js';
 import { verdictKey } from '../../src/services/verdict-service.js';
 import { ADMIN, DEV, ISSUE, reviewed } from '../support/reviewed.js';
+import { jiraIssue } from '../support/core-deps.js';
 
 const SHA = 'a'.repeat(40);
 const REPO = 'acme/payments';
@@ -22,6 +23,24 @@ describe('requestAttestation (AT-1)', () => {
     const { t } = await reviewed({ allVerified: true });
     expect(await requestAttestation(t.deps, { issueKey: 'PAY-7', repo: REPO, commitSha: 'abc123', accountId: DEV })).toMatchObject({ ok: false, error: { code: 'validation' } });
     expect(await requestAttestation(t.deps, { issueKey: 'PAY-7', repo: 'not a repo', commitSha: SHA, accountId: DEV })).toMatchObject({ ok: false, error: { code: 'validation' } });
+    expect(await ledgerTypes(t)).toEqual([]);
+  });
+
+  it('final review C1: an item Redline does not review (a Task, or a project not enabled) gets no attestation', async () => {
+    const { t } = await reviewed({ allVerified: true });
+    const extra = [
+      jiraIssue({ id: '10099', key: 'PAY-99', issueType: { id: '10003', name: 'Task', subtask: false } }),
+      jiraIssue({ id: '20005', key: 'OPS-5', project: { id: '20000', key: 'OPS' } }),
+    ];
+    const base = t.jira.issue;
+    t.jira.issue = async (ref) => {
+      const hit = extra.find((x) => x.id === ref || x.key === ref);
+      return hit ? ok(structuredClone(hit)) : base(ref);
+    };
+    for (const issueKey of ['PAY-99', 'OPS-5']) {
+      const r = await requestAttestation(t.deps, { issueKey, repo: REPO, commitSha: SHA, accountId: DEV });
+      expect(r).toMatchObject({ ok: true, value: { blocking: [expect.objectContaining({ code: 'no_review', message: expect.stringMatching(/does not review/) })] } });
+    }
     expect(await ledgerTypes(t)).toEqual([]);
   });
 

@@ -1,8 +1,8 @@
 import { appendLedger, issueAttestation } from '@redline/core';
-import { appError, err, ok, type BlockReason, type Result, type Verdict } from '@redline/shared';
+import { appError, err, ok, type BlockReason, type Result } from '@redline/shared';
 import { ISSUE_KEY } from '../actions/common.js';
 import type { CoreDeps } from '../deps.js';
-import { refreshVerdict, verdictKey } from './verdict-service.js';
+import { refreshVerdict, verdictKey, type StoredVerdict } from './verdict-service.js';
 
 export const REPO = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
 export const COMMIT_SHA = /^[0-9a-fA-F]{40}$/;
@@ -12,9 +12,9 @@ export type AttestationOutcome = { token: string; expiresAt: string; prDescripti
 const utcMinute = (iso: string) => `${iso.slice(0, 16).replace('T', ' ')} UTC`;
 
 /** What the gates read: app storage only (the issue property is user-editable). Missing or malformed counts as blocked. */
-async function storedVerdict(deps: CoreDeps, issueId: string): Promise<Verdict | null> {
+async function storedVerdict(deps: CoreDeps, issueId: string): Promise<StoredVerdict | null> {
   try {
-    const v = await deps.state.get<Verdict>(verdictKey(issueId));
+    const v = await deps.state.get<StoredVerdict>(verdictKey(issueId));
     return v && typeof v === 'object' && typeof v.state === 'string' && Array.isArray(v.reasons) ? v : null;
   } catch {
     return null;
@@ -45,6 +45,9 @@ export async function requestAttestation(deps: CoreDeps, i: { issueKey: string; 
   const verdict = await storedVerdict(deps, issue.value.id);
   if (!verdict) return ok({ blocking: [{ code: 'review_failed', message: 'Redline could not read this work item’s security verdict. Re-run the review from the Redline panel.' }] });
   if (verdict.state === 'block') return ok({ blocking: verdict.reasons });
+  // Final review C1: an unreviewed item's free pass must not become a merge attestation for sensitive changes.
+  if (verdict.unreviewed)
+    return ok({ blocking: [{ code: 'no_review', message: `Redline does not review ${issue.value.key} (its project or issue type is not enabled), so it cannot attest a merge. Name the reviewed story or epic in the pull request and request the attestation there.` }] });
 
   const [policy, requirements, key] = await Promise.all([deps.config.site(), deps.requirements.forIssue(issue.value.id), deps.keys.active()]);
   if (!policy.ok) return policy;

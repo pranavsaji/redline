@@ -122,13 +122,32 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
     });
   });
 
+  it('final review I1: a PR naming several work items needs a valid attestation for each, not just one of them', async () => {
+    const multi = (description: string) =>
+      evaluateMergeCheck({ pr: { ...pr(description), title: 'PAY-6: harden refunds, see PAY-7', branch: 'feature/PAY-6-webhook' }, files: AUTH, repoPolicyYaml: null, settings: settings(), nowSec: NOW });
+    expect(await multi(token())).toEqual({
+      success: false,
+      outcome: 'fail_other_issue',
+      message: 'Redline: this pull request also names PAY-6, which has no valid attestation for this commit. Add one from PAY-6, or remove PAY-6 from the title and branch name.',
+    });
+    expect(await multi(`${token()}\n${token({ issueKey: 'PAY-6', nonce: 'n0nce2', iat: NOW - 30 })}`)).toMatchObject({ success: true, outcome: 'pass_attested' });
+    // A second token that is for another commit does not count.
+    expect(await multi(`${token()}\n${token({ issueKey: 'PAY-6', nonce: 'n0nce3', commitSha: OLD, iat: NOW - 120 })}`)).toMatchObject({ success: false, outcome: 'fail_other_issue' });
+  });
+
   it('security: a PR that names no work item cannot pass on an attestation', async () => {
     const r = await evaluateMergeCheck({ pr: { ...pr(token()), title: 'Tidy', branch: 'tidy' }, files: AUTH, repoPolicyYaml: null, settings: settings(), nowSec: NOW });
     expect(r).toMatchObject({ success: false, outcome: 'fail_other_issue', message: expect.stringMatching(/Put the work item key \(PAY-7\) in the pull request title or branch name/) });
   });
 
+  it('final review I2: warn mode ends at warnUntil (at most 14 days); an ended or undated warn mode blocks again', async () => {
+    const ended = await run('', { s: settings({ mode: 'warn', warnUntil: new Date((NOW - 60) * 1000).toISOString() }) });
+    expect(ended).toMatchObject({ success: false, outcome: 'fail_missing', message: expect.stringMatching(/^Redline: warn-only mode ended 2025-11-15 11:59 UTC, so this check blocks again\. /) });
+    expect(await run('', { s: settings({ mode: 'warn' }) })).toMatchObject({ success: false, outcome: 'fail_missing' });
+  });
+
   it('warn mode turns a failure into success with a Warning: prefix', async () => {
-    const r = await run('', { s: settings({ mode: 'warn' }) });
+    const r = await run('', { s: settings({ mode: 'warn', warnUntil: new Date((NOW + 86_400) * 1000).toISOString() }) });
     expect(r).toMatchObject({ success: true, outcome: 'warn' });
     expect(r.message).toMatch(/^Warning: Redline: this change touches security-sensitive files/);
   });
@@ -188,7 +207,7 @@ describe('runMergeCheck: reads the PR, its diffstat, the destination policy and 
     const r = await runMergeCheck(event, { client: c, settings: async () => settings(), nowSec: () => NOW });
     expect(r.success).toBe(false);
     expect(r.message).toMatch(/could not read this pull request/);
-    expect((await runMergeCheck(event, { client: c, settings: async () => settings({ mode: 'warn' }), nowSec: () => NOW })).success).toBe(true);
+    expect((await runMergeCheck(event, { client: c, settings: async () => settings({ mode: 'warn', warnUntil: new Date((NOW + 60) * 1000).toISOString() }), nowSec: () => NOW })).success).toBe(true);
   });
 
   it('a repository with no settings yet uses the defaults: block mode and the built-in sensitive paths', async () => {

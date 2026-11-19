@@ -154,6 +154,9 @@ export function memoryLedgerRepo(): LedgerRepo & { _rows: LedgerRow[] } {
     async all() {
       return ok(rows.map(clone));
     },
+    async ofTypes(types) {
+      return ok(rows.filter((r) => types.includes(r.eventType)).map(clone));
+    },
   };
 }
 

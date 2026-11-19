@@ -136,7 +136,7 @@ export function IssuePanel({ api }: { api: PanelApi }) {
         <EmptyState onRun={rerun} canRun={canRun} busy={busy} />
       ) : (
         <>
-          <Header dto={dto} />
+          <Header dto={dto} {...(canRun ? { onRerun: () => void rerun() } : {})} busy={busy} />
           {dto.review && <WhatIf api={api} />}
           {view.state === 'in_progress' && (
             <SectionMessage appearance="information" title="Review in progress">

@@ -144,6 +144,18 @@ export function repoContract(name: string, f: RepoFactory): void {
       expect(all.ok && all.value[0]!.payload).toEqual({ acceptanceId: 'a' });
     });
 
+    it('ledger: ofTypes returns only the named event types, in seq order (final review I5)', async () => {
+      const l = await f.ledger();
+      const clock = fixedClock('2026-11-15T00:00:00Z');
+      await appendLedger(l, clock, 'attestation.issued', { issueKey: 'PAY-1' }, 'u');
+      await appendLedger(l, clock, 'acceptance.requested', { acceptanceId: 'a' }, 'u');
+      await appendLedger(l, clock, 'review.sample', { n: 1 }, 'u');
+      await appendLedger(l, clock, 'override.breakglass', { issueId: '1', until: 'x' }, 'u');
+      const r = await l.ofTypes(['acceptance.requested', 'override.breakglass']);
+      expect(r.ok && r.value.map((x) => [x.seq, x.eventType])).toEqual([[2, 'acceptance.requested'], [4, 'override.breakglass']]);
+      expect((await l.ofTypes([])).ok && (await l.ofTypes([]))).toEqual({ ok: true, value: [] });
+    });
+
     it('feedback: dismissals are returned per component', async () => {
       const fb = await f.feedback();
       await fb.record({ threatId: 't1', component: 'agent', title: 'A', stride: 'Spoofing', actor: 'c', action: 'dismiss', reason: 'false_positive' });

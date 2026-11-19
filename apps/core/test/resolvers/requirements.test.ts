@@ -205,9 +205,11 @@ describe('verdict property message (EN-3)', () => {
     expect(m).toContain('2 open security requirements at High or above (create the subtasks in the Redline panel)');
   });
 
-  it('an out-of-date review puts the one-click re-run link in the message', () => {
+  it('an out-of-date review message points to the one-click re-run in the panel', () => {
     const m = gateMessage(blockWith([{ code: 'review_stale', message: 'The design or linked work changed since the last review.', action: { label: 'Re-run review', href: `${URL}?rerun=1` } }]), new Map(), URL, ['Done']);
-    expect(m).toContain(`Re-run review: ${URL}?rerun=1`);
+    // Final review I4: the validator dialog cannot run anything; it says where the one-click re-run is.
+    expect(m).toContain('(re-run it from the Redline panel)');
+    expect(m).not.toContain('?rerun=1');
   });
 
   it('is at most 1,000 characters and always keeps the panel link', () => {

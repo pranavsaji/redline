@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import './setup-dom.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEventLib from '@testing-library/user-event';
 import axe from 'axe-core';
 import { AdminPage } from '../src/admin/AdminPage.js';
@@ -153,6 +153,17 @@ describe('Admin: budgets (Task 30)', () => {
     const api = mockAdminApi();
     render(<AdminPage api={{ ...api, usage: async () => ({ ...(await api.usage() as Exclude<Awaited<ReturnType<AdminApi['usage']>>, { error: string }>), paused: { budget: false, credits: true } }) }} />);
     expect(await screen.findByText(/Reviews are paused: the last three agent runs came back empty/)).toBeTruthy();
+  });
+
+  it('final review C3: an admin can resume reviews after an out-of-credits pause', async () => {
+    const api = mockAdminApi();
+    const resumeReviews = vi.fn(async () => ({ resumed: true as const, entryHash: 'a'.repeat(64) }));
+    let credits = true;
+    const usage = async () => ({ ...(await api.usage() as Exclude<Awaited<ReturnType<AdminApi['usage']>>, { error: string }>), paused: { budget: false, credits } });
+    render(<AdminPage api={{ ...api, usage, resumeReviews: async () => ((credits = false), resumeReviews()) }} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Resume reviews' }));
+    expect(await screen.findByText('Reviews are running.')).toBeTruthy();
+    expect(resumeReviews).toHaveBeenCalledOnce();
   });
 });
 
