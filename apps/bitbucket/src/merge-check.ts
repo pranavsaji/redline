@@ -2,7 +2,7 @@ import { DEFAULT_SITE_POLICY, parseRepoPolicy, scoreDiff, type DiffFile } from '
 import { decodeAttestation, findAttestations, fromB64url, fromUtf8 } from '@redline/crypto';
 import type { AttestationPayload } from '@redline/shared';
 import { log } from '@redline/shared';
-import { addedLines, TRUNCATED_PATH, type BitbucketClient, type DiffstatEntry } from './bitbucket-client.js';
+import { allAddedText, DIFF_UNREAD_PATH, MAX_DIFF_TEXT, TRUNCATED_PATH, type BitbucketClient, type DiffstatEntry } from './bitbucket-client.js';
 
 export interface RepoSettings {
   /** kid → base64url Ed25519 public key, copied from Redline's admin page. */
@@ -91,9 +91,10 @@ export async function evaluateMergeCheck(i: { pr: PrFacts; files: DiffFile[]; re
 function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | null; settings: RepoSettings; nowSec: number }): CheckResult {
   const policy = effectivePolicy(i.settings, i.repoPolicyYaml);
   const score = scoreDiff(i.files, { sensitivePaths: policy.sensitivePaths });
-  const truncated = i.files.some((f) => f.path === TRUNCATED_PATH);
+  const markers = i.files.filter((f) => f.path === TRUNCATED_PATH || f.path === DIFF_UNREAD_PATH).map((f) => f.path);
+  const truncated = markers.length > 0;
   // An unreadable policy file on the target branch fails closed: every changed file counts as sensitive.
-  const sensitive = policy.invalid ? i.files.map((f) => f.path) : truncated ? [TRUNCATED_PATH, ...score.sensitiveFiles] : score.sensitiveFiles;
+  const sensitive = policy.invalid ? i.files.map((f) => f.path) : truncated ? [...markers, ...score.sensitiveFiles] : score.sensitiveFiles;
   if (sensitive.length === 0 && score.score < policy.threshold) return { success: true, outcome: 'pass_not_sensitive', message: 'Redline: no security-sensitive changes.' };
 
   const key = ISSUE_KEY.exec(i.pr.title ?? '')?.[1] ?? ISSUE_KEY.exec(i.pr.branch ?? '')?.[1] ?? 'the linked issue';
@@ -165,9 +166,10 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
 }
 
 const STATUS: Record<string, DiffFile['status']> = { added: 'added', removed: 'removed', renamed: 'renamed', modified: 'modified' };
-function withAddedText(files: DiffFile[], added: Map<string, string> | null): DiffFile[] {
-  if (!added) return files;
-  return files.map((f) => (added.has(f.path) ? { ...f, addedText: added.get(f.path)! } : f));
+function withAddedText(files: DiffFile[], patch: { ok: true; value: string } | { ok: false } | null): DiffFile[] {
+  if (patch === null) return files; // a client that cannot fetch diff text (tests, older wiring): paths only
+  if (!patch.ok || patch.value.length > MAX_DIFF_TEXT) return [...files, { path: DIFF_UNREAD_PATH, status: 'modified', linesAdded: 0 }];
+  return [...files, { path: '(added lines)', status: 'modified', linesAdded: 0, addedText: allAddedText(patch.value) }];
 }
 
 export function toDiffFiles(entries: DiffstatEntry[]): DiffFile[] {
@@ -214,8 +216,8 @@ export async function runMergeCheck(
   if (!policy.ok) return unreadable('policy file');
   const r = await evaluateMergeCheck({
     pr: { description: pr.value.description ?? '', headSha: head, destSha: dest, repoFullName: fullName, title: pr.value.title ?? '', branch: pr.value.source?.branch?.name ?? '' },
-    // M7: added lines feed the secret-pattern signal. An unreadable diff text keeps the path-only check.
-    files: withAddedText(toDiffFiles(diff.value), patch?.ok ? addedLines(patch.value) : null),
+    // M7: every added line feeds the secret-pattern signal; unreadable or over-long diff text fails closed (sensitive).
+    files: withAddedText(toDiffFiles(diff.value), patch),
     repoPolicyYaml: policy.value,
     settings,
     nowSec: deps.nowSec(),

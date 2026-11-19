@@ -27,16 +27,17 @@ export interface BitbucketClient {
 /** Diff text Redline scans (2 MB); a bigger diff is scanned up to here. */
 export const MAX_DIFF_TEXT = 2_000_000;
 
-/** Added lines per file from a unified diff (`+++ b/<path>`, then `+` lines), within MAX_DIFF_TEXT. */
-export function addedLines(diff: string): Map<string, string> {
-  const out = new Map<string, string>();
-  let path: string | null = null;
-  for (const line of diff.slice(0, MAX_DIFF_TEXT).split('\n')) {
-    if (line.startsWith('+++ ')) {
-      const p = line.slice(4).trim();
-      path = p === '/dev/null' ? null : p.replace(/^b\//, '');
-    } else if (path && line.startsWith('+')) out.set(path, `${out.get(path) ?? ''}${line.slice(1)}\n`);
-  }
+/** Marker file for diff text Redline could not read whole (unreadable, or over MAX_DIFF_TEXT): treated as sensitive. */
+export const DIFF_UNREAD_PATH = '(diff text Redline could not read)';
+
+/**
+ * Every added line in a unified diff, whichever file it belongs to. The secret scan does not need per-file mapping, so
+ * no header parsing is trusted: a line that only looks like a `+++` header inside a hunk cannot move text out of the
+ * scan (security review). File headers themselves are included, which can only add text to scan.
+ */
+export function allAddedText(diff: string): string {
+  let out = '';
+  for (const line of diff.split('\n')) if (line.startsWith('+')) out += `${line.slice(1)}\n`;
   return out;
 }
 
@@ -80,7 +81,8 @@ export function forgeBitbucketClient(): BitbucketClient {
     async diff(ws, repo, id) {
       const { bb, route } = await api();
       const r = await bb.requestBitbucket(route`/2.0/repositories/${ws}/${repo}/pullrequests/${id}/diff`);
-      return r.ok ? ok((await r.text()).slice(0, MAX_DIFF_TEXT)) : fail('diff', r.status);
+      // Over the cap, the caller sees more than MAX_DIFF_TEXT characters and treats the diff as unread (sensitive).
+      return r.ok ? ok((await r.text()).slice(0, MAX_DIFF_TEXT + 1)) : fail('diff', r.status);
     },
     async fileAt(ws, repo, commit, path) {
       if (!COMMIT.test(commit) || !SAFE_PATH.test(path) || path.split('/').includes('..')) return err(appError('validation', 'fileAt: unsafe commit or path'));

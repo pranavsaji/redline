@@ -233,9 +233,26 @@ describe('runMergeCheck: reads the PR, its diffstat, the destination policy and 
     const { c, calls } = client({ description: '', diff: fixture('diffstat/docs-only.json'), patch });
     expect(await runMergeCheck(event, { client: c, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: false, message: expect.stringMatching(/has no attestation/) });
     expect(calls).toContain('patch:7');
-    // An unreadable diff text keeps today's behaviour (paths only) rather than blocking every pull request.
+    // Fail closed: diff text that cannot be read is treated as sensitive, like a file list that is too long to read.
     const { c: c2 } = client({ description: '', diff: fixture('diffstat/docs-only.json'), patch: null });
-    expect(await runMergeCheck(event, { client: c2, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: true });
+    expect(await runMergeCheck(event, { client: c2, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: false, message: expect.stringMatching(/diff text Redline could not read/) });
+  });
+
+  it('security review: a fake file header inside a hunk cannot hide a secret from the scan, and a truncated diff is sensitive', async () => {
+    const patch = [
+      'diff --git a/README.md b/README.md',
+      '--- a/README.md',
+      '+++ b/README.md',
+      '@@ -1,1 +1,3 @@',
+      '++++ b/not-in-this-pr.txt',
+      // nosemgrep: detected-aws-access-key-id-value -- fake key (see .gitleaks.toml)
+      '+aws_access_key_id = AKIAABCDEFGHIJKLMNOP',
+    ].join('\n');
+    const { c } = client({ description: '', diff: fixture('diffstat/docs-only.json'), patch });
+    expect(await runMergeCheck(event, { client: c, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: false, message: expect.stringMatching(/has no attestation/) });
+    const huge = `diff --git a/README.md b/README.md\n+++ b/README.md\n${'+x\n'.repeat(1_100_000)}`;
+    const { c: c3 } = client({ description: '', diff: fixture('diffstat/docs-only.json'), patch: huge });
+    expect(await runMergeCheck(event, { client: c3, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: false });
   });
 
   it('I2 follow-up: an unreadable pull request blocks once warn mode has ended', async () => {
