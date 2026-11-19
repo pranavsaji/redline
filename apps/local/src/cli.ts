@@ -3,7 +3,7 @@
  * Offline harness: `pnpm redline <command>`.
  *   review <caseId> [--llm fake|claude-code] [--samples 3] [--model m] [--path agent|pipeline] [--yes]
  *   eval [--subset 30|all] [--llm fake|claude-code|recorded] [--samples 3] [--model m] [--path agent|pipeline] [--concurrency 1] [--yes]
- *        [--write-baseline] [--gate evals/results/baseline.json]
+ *        [--write-baseline] [--gate evals/results/baseline.json] [--resume]
  *     claude-code runs record every raw reply into evals/results/recorded/; `--llm recorded` replays them offline (CI).
  *   sign-demo
  */
@@ -78,13 +78,13 @@ async function main() {
       path,
       concurrency: Number(flag('concurrency', '1')),
       onProgress: (d, t) => process.stderr.write(`\r${d}/${t}`),
-      ...(llm ? { recordDir: RECORDED } : {}),
+      ...(llm ? { recordDir: RECORDED, resume: has('resume') } : {}),
       ...(recorded ? { llmFor: (id: string) => { const rec = loadRecording(RECORDED, id); return rec ? replayLlm(rec) : null; } } : {}),
     });
     process.stderr.write('\n');
     if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
     mkdirSync('evals/results', { recursive: true });
-    const base = `evals/results/${r.value.date}-${name}-${subset}`;
+    const base = `evals/results/${r.value.date}-${recorded ? 'recorded' : name}-${subset}`;
     writeFileSync(`${base}.json`, JSON.stringify(r.value, null, 2));
     writeFileSync(`${base}.md`, reportMarkdown(r.value));
     console.log(reportMarkdown(r.value));

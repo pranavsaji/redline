@@ -241,8 +241,11 @@ export function assembleReview(i: AssembleInput): AssembleOutput {
   const baselineCount = threats.length;
 
   // 2. Agent threats: cluster across samples, keep majority.
-  const { kept, discarded: lowVotes } = consensus(clusterSamples(valid.map((m) => m.threats)), voteBase);
-  for (const d of lowVotes) discarded.push({ title: d.cluster.representative.title, stride: d.cluster.representative.stride, reason: 'low_votes' });
+  const { kept: majority, discarded: lowVotes } = consensus(clusterSamples(valid.map((m) => m.threats)), voteBase);
+  // Under suspected injection a minority threat may be one the injection silenced in the other runs: keep it (it still
+  // needs a verbatim quote, and becomes needs_human below) rather than let the attacker's text vote it out.
+  const kept = injectionSuspected ? [...majority, ...lowVotes.map((d) => d.cluster)] : majority;
+  if (!injectionSuspected) for (const d of lowVotes) discarded.push({ title: d.cluster.representative.title, stride: d.cluster.representative.stride, reason: 'low_votes' });
 
   for (const cluster of kept) {
     const rep: AgentThreat = cluster.representative;

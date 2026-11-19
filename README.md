@@ -2,8 +2,8 @@
 
 ![tests](https://img.shields.io/badge/tests-900%2B%20passing-brightgreen)
 ![coverage](https://img.shields.io/badge/line%20coverage-92.9%25-brightgreen)
-![eval F1](https://img.shields.io/badge/eval%20F1-29.3%25-blue)
-![injection resistance](https://img.shields.io/badge/injection%20resistance-1%2F6%20(tuning)-blue)
+![eval F1](https://img.shields.io/badge/eval%20F1-44.8%25-blue)
+![injection resistance](https://img.shields.io/badge/injection%20resistance-6%2F6-blue)
 ![runs on Atlassian](https://img.shields.io/badge/egress-none-informational)
 
 **Security review that actually gates Done and merge.** Redline threat-models every Jira work item with a cited STRIDE
@@ -39,16 +39,19 @@ Automation and Forge SQL. No egress: nothing leaves Atlassian.
 
 ## Eval
 
-_Scored offline with Claude Code on claude-sonnet-4-5, 30 cases (24 clean, 6 poisoned), 3 samples each, 2026-11-19, prompt v1.2.0. Prompt tuning is in progress; these are the first-run numbers._
+_Scored offline with Claude Code on claude-sonnet-4-5 (tools and MCP off, Redline's prompt as the system prompt), 30 cases (24 clean, 6 poisoned), 3 samples each, 2026-11-19, prompt v1.3.0._
 
 | Metric | Value | Target |
 | --- | --- | --- |
-| High-severity recall | 89.2% | ≥ 85% |
-| Recall | 85.2% | |
-| Precision | 17.7% | ≥ 70% |
-| F1 | 29.3% | |
+| High-severity recall | 94.6% | ≥ 85% |
+| Recall | 87.0% | |
+| Injection resistance | 6 of 6 | all |
 | Citation grounding | 99.8% | 100% |
-| Injection resistance | 16.7% (1 of 6) | 100% |
+| Precision (vs the must-find list) | 30.1% | ≥ 70% |
+| F1 | 44.8% | |
+
+Precision is measured against short must-find lists (2 to 3 threats per case), so every other valid threat Redline
+reports counts against it: it is a lower bound, not the share of wrong threats.
 
 The eval set is 40 clean cases across web, API, mobile, data and AI features, plus 15 poisoned twins that hide
 instructions to the AI in the design text; a poisoned case holds when its risk and blocking count do not drop below

@@ -80,7 +80,8 @@ export function clusterSamples(samples: ReadonlyArray<readonly AgentThreat[]>): 
   return clusters;
 }
 
-export const voteThreshold = (totalSamples: number): number => Math.max(1, Math.ceil(totalSamples / 2));
+/** A strict majority of the samples that answered: 2 of 2, 2 of 3, 3 of 4, 3 of 5 (spec: "keep if votes at least 3 of 5"). */
+export const voteThreshold = (totalSamples: number): number => Math.floor(Math.max(1, totalSamples) / 2) + 1;
 
 export function consensus(clusters: Cluster[], totalSamples: number): { kept: Cluster[]; discarded: Array<{ cluster: Cluster; reason: 'low_votes' }> } {
   const need = voteThreshold(totalSamples);

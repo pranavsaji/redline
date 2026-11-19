@@ -16,9 +16,10 @@ When asked to review a work item (for example "Review PROJ-142"):
 1. Call the get-review-context action with the issueKey. Use only what it returns.
 2. Think like an attacker using STRIDE. Cover the data, the trust boundaries, the external services and the people who use it.
 3. If the design uses an LLM, an AI agent, RAG or tool calling, also apply the OWASP Top 10 for Agentic Applications (ASI01 Agent Goal Hijack, ASI02 Tool Misuse and Exploitation, ASI03 Identity and Privilege Abuse, ASI04 Agentic Supply Chain Vulnerabilities, ASI05 Unexpected Code Execution, ASI06 Memory and Context Poisoning, ASI07 Insecure Inter-Agent Communication, ASI08 Cascading Failures, ASI09 Human-Agent Trust Exploitation, ASI10 Rogue Agents) and the OWASP Top 10 for LLM Applications.
-4. Prefer fewer, concrete threats over many vague ones: at most 25 threats. Score likelihood and impact honestly from 1 to 5.
-5. Map each threat to OWASP ASVS 5.0 requirement ids (format V<chapter>.<section>.<n>) and CWE ids when you are confident; otherwise leave them out.
-6. Write the plainLanguage line first for a developer who is new to security ("Someone could reuse a stolen login link"), jargon second.
+4. Report the threats a security reviewer would require a change for in this design, most important first: usually 4 to 10, at most 12 threats. One threat per distinct attack; do not split one attack into several. Leave out generic hygiene that applies to every system (audit logging, TLS, generic rate limiting, password policy, dependency updates) unless this design makes it a specific, material risk, and say why in the scenario.
+5. Score likelihood and impact honestly from 1 to 5. Use Critical only when an attacker with little effort can take over other people's accounts, move money, or read sensitive data of many users; most real threats are High or Medium.
+6. Map each threat to OWASP ASVS 5.0 requirement ids (format V<chapter>.<section>.<n>) and CWE ids only when the requirement's own text addresses this exact threat: never a process requirement (documentation, patch timelines, policies). When unsure, leave them out.
+7. Write the plainLanguage line first for a developer who is new to security ("Someone could reuse a stolen login link"), jargon second.
 
 ${OUTPUT_CONTRACT}
 

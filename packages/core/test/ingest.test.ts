@@ -115,6 +115,20 @@ describe('assembleReview', () => {
     expect(out.riskScore).toBeGreaterThanOrEqual(clean.riskScore);
   });
 
+  it('poisoned page: a threat only a minority of runs raised is kept for a champion, not dropped (an injection may have silenced the others)', () => {
+    const poisonedFacts = [...facts, normalizeFact(poisonedRawFact)];
+    const out = assemble([model([refundAbuse, transcriptLeak]), model([refundAbuse]), model([refundAbuse])], { bundle: bundle(poisonedFacts) });
+    const leak = out.threats.find((t) => t.title === transcriptLeak.title);
+    expect(leak?.state).toBe('needs_human');
+    expect(out.discarded.some((d) => d.title === transcriptLeak.title && d.reason === 'low_votes')).toBe(false);
+  });
+
+  it('poisoned page: a minority threat whose quote is not in the sources is still discarded', () => {
+    const poisonedFacts = [...facts, normalizeFact(poisonedRawFact)];
+    const out = assemble([model([refundAbuse, invented]), model([refundAbuse]), model([refundAbuse])], { bundle: bundle(poisonedFacts) });
+    expect(out.threats.some((t) => t.title === invented.title)).toBe(false);
+  });
+
   it('poisoned page: agent threats become needs_human', () => {
     const poisonedFacts = [...facts, normalizeFact(poisonedRawFact)];
     const s = model([refundAbuse]);

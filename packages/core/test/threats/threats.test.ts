@@ -4,6 +4,7 @@ import {
   baselineThreats,
   clusterSamples,
   consensus,
+  voteThreshold,
   extractSignals,
   groundQuote,
   mapThreat,
@@ -181,4 +182,14 @@ describe('plainLanguageFor', () => {
   it('leads with plain words, not jargon', () => {
     expect(plainLanguageFor(t({ stride: 'Spoofing', component: 'login page' }))).toMatch(/pretend/i);
   });
+});
+
+describe('consensus needs a strict majority (spec: "keep if votes at least 3 of 5")', () => {
+  it.each([
+    [1, 1],
+    [2, 2],
+    [3, 2],
+    [4, 3],
+    [5, 3],
+  ])('%i samples need %i votes', (n, need) => expect(voteThreshold(n)).toBe(need));
 });

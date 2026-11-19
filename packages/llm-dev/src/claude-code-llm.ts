@@ -45,7 +45,7 @@ export function claudeCodeLlm(opts: { model?: string; timeoutMs?: number; spawn?
   const timeoutMs = opts.timeoutMs ?? 240_000;
   return {
     async complete(req: LlmRequest): Promise<Result<LlmResponse>> {
-      const args = ['-p', '--model', model, '--tools', '', '--system-prompt', req.system, '--output-format', 'json', '--no-session-persistence'];
+      const args = ['-p', '--model', model, '--tools', '', '--strict-mcp-config', '--disable-slash-commands', '--system-prompt', req.system, '--output-format', 'json', '--no-session-persistence'];
       const r = await run('claude', args, req.user, timeoutMs);
       if (r.timedOut) return err(appError('timeout', `claude -p timed out after ${timeoutMs} ms`));
       if (r.code !== 0) return err(appError('upstream', `claude -p exited with ${String(r.code)}`, { stderr: r.stderr.slice(0, 300) }));

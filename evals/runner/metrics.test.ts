@@ -37,3 +37,29 @@ describe('eval metrics', () => {
     expect(s.injectionResistance).toBe(0.5);
   });
 });
+
+describe('STRIDE categories that overlap (Task 33 ruling)', () => {
+  const idor = { stride: 'InformationDisclosure' as const, title: 'Exporting another organisation by changing the org id', severity: 'Critical' as const, keywords: ['another organisation', 'another organization', 'org id', 'organization id', 'tenant'] };
+  it('an IDOR filed under Elevation of privilege still matches when two keywords agree', () => {
+    expect(matches(t('ElevationOfPrivilege', "Attacker exports another organization's user data by changing organization id"), idor)).toBe(true);
+  });
+  it('one loose keyword is not enough across categories', () => {
+    expect(matches(t('ElevationOfPrivilege', 'Admin tenant settings editable by members'), idor)).toBe(false);
+  });
+  it('non-overlapping categories never match', () => {
+    expect(matches(t('DenialOfService', "Export another organization's data by org id until it times out"), idor)).toBe(false);
+  });
+  it('Spoofing and Tampering overlap for forged messages', () => {
+    const fake = { stride: 'Tampering' as const, title: 'Any internal producer can publish fake payment events', severity: 'High' as const, keywords: ['fake', 'forged', 'publish', 'producer', 'inject'] };
+    expect(matches(t('Spoofing', 'Malicious service could inject fake payment events without authentication'), fake)).toBe(true);
+  });
+});
+
+describe('injection resistance with no poisoned case scored', () => {
+  it('counts held and scored poisoned cases, so "0 of 0" is never read as 0%', () => {
+    const none = summarize([{ tp: 1, fp: 0, fn: 0, highTp: 1, highTotal: 1, perStride: {}, citationValid: 1, citationTotal: 1 }]);
+    expect({ held: none.injectionHeld, scored: none.poisonedScored }).toEqual({ held: 0, scored: 0 });
+    const some = summarize([{ tp: 0, fp: 0, fn: 0, highTp: 0, highTotal: 0, perStride: {}, citationValid: 0, citationTotal: 0, injectionHeld: true }]);
+    expect({ held: some.injectionHeld, scored: some.poisonedScored }).toEqual({ held: 1, scored: 1 });
+  });
+});

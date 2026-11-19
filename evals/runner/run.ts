@@ -15,7 +15,7 @@ import {
 } from '@redline/core';
 import { CLEAN_CASES, POISONED_CASES, type CleanCase, type PoisonedCase } from '../fixtures/cases.js';
 import { scoreCase, summarize, type CaseResult } from './metrics.js';
-import { recordingLlm, saveRecording } from './recorded.js';
+import { loadRecording, recordingLlm, replayLlm, saveRecording } from './recorded.js';
 import { memoryFeedbackRepo, memoryReviewRepo, fixedClock } from '../../packages/core/test/fakes/index.js';
 
 export type EvalPath = 'agent' | 'pipeline';
@@ -71,6 +71,11 @@ export async function runCase(c: CleanCase, llm: LlmPort | null, samples: number
   const runs = llm
     ? await Promise.all(Array.from({ length: samples }, () => agentSample(llm, b)))
     : Array.from({ length: samples }, () => ({ sample: { schema: 'redline.threatmodel.v1', issueKey: b.issueKey, threats: [] } as AgentThreatModel as Sample, tokensIn: 0, tokensOut: 0, quotes: [] as string[], modelId: 'baseline-only' }));
+  // A rate limit or outage is not "the model found nothing": a case with no answer at all fails instead of scoring.
+  if (llm && runs.every((x) => 'failed' in x.sample)) {
+    const code = (runs[0]!.sample as { failed: string }).failed;
+    return err(appError(code === 'timeout' ? 'timeout' : 'upstream', `every sample failed: ${runs.map((x) => (x.sample as { failed: string }).failed).join(', ')}`));
+  }
   const out = assembleReview({ review, bundle: b, samples: runs.map((x) => x.sample), samplesExpected: samples, priorDismissed: [], policy: DEFAULT_SITE_POLICY, promptVersion: PROMPT_VERSION, now: new Date('2026-11-15T00:00:00Z') });
   return ok({
     id: c.id,
@@ -125,6 +130,8 @@ export interface EvalOptions {
   recordDir?: string;
   /** Per-case model, e.g. a replay of recorded replies; null means the case has no recording and fails. */
   llmFor?: (caseId: string) => LlmPort | null;
+  /** With recordDir: replay cases already recorded in full; call the model (and re-record) only for the rest. */
+  resume?: boolean;
 }
 
 export async function runEval(opts: EvalOptions): Promise<Result<EvalReport>> {
@@ -150,6 +157,8 @@ export async function runEval(opts: EvalOptions): Promise<Result<EvalReport>> {
             return llm ? runCase(c, llm, opts.samples, opts.path) : err(appError('not_found', 'no recording'));
           }
           if (!opts.recordDir || !opts.llm) return runCase(c, opts.llm, opts.samples, opts.path);
+          const done = opts.resume ? loadRecording(opts.recordDir, c.id) : null;
+          if (done && done.replies.length >= opts.samples) return runCase(c, replayLlm(done), opts.samples, opts.path);
           const rec = recordingLlm(opts.llm);
           const r = await runCase(c, rec.llm, opts.samples, opts.path);
           if (r.ok) saveRecording(opts.recordDir, { caseId: c.id, promptVersion: PROMPT_VERSION, replies: rec.replies() });
@@ -161,7 +170,7 @@ export async function runEval(opts: EvalOptions): Promise<Result<EvalReport>> {
         done++;
         opts.onProgress?.(done, total);
         if (!r.ok) {
-          failures.push(`${c.id}: ${r.error.code}`);
+          failures.push(`${c.id}: ${r.error.code} (${r.error.message})`);
           return;
         }
         r.value.modelIds.forEach((m) => modelIds.add(m));
@@ -230,7 +239,7 @@ _${r.label}; prompt ${r.promptVersion}; path ${r.path}; ${r.samples} sample(s) p
 | F1 | ${pct(s.f1)} |
 | High-severity recall | ${pct(s.highRecall)} |
 | Citation grounding | ${pct(s.citationValidity)} |
-| Injection resistance | ${pct(s.injectionResistance)} |
+| Injection resistance | ${s.poisonedScored === 0 ? 'no poisoned case scored' : `${pct(s.injectionResistance)} (${s.injectionHeld} of ${s.poisonedScored})`} |
 
 | STRIDE | TP | FP | FN | Precision | Recall | F1 |
 | --- | --- | --- | --- | --- | --- | --- |

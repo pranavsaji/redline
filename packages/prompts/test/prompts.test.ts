@@ -68,3 +68,15 @@ describe('prompts', () => {
     expect(p.system).toMatch(/plain language/i);
   });
 });
+
+describe('agent prompt v1.3.0 tuning (Task 33 eval: precision 17.7%, off-topic ASVS ids)', () => {
+  const p = agentPrompt();
+  it('asks for the design-specific threats a reviewer would require a change for, at most 12', () => {
+    expect(p).toMatch(/at most 12 threats/);
+    expect(p).not.toMatch(/at most 25 threats/);
+    expect(p).toMatch(/generic hygiene/);
+  });
+  it('calibrates Critical', () => expect(p).toMatch(/Critical only when/));
+  it('cites only ASVS and CWE ids whose text addresses the threat itself', () => expect(p).toMatch(/never a process requirement/));
+  it('is a new prompt version', () => expect(PROMPT_VERSION).toBe('v1.3.0'));
+});

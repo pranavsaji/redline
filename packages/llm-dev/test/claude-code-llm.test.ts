@@ -13,7 +13,10 @@ describe('claudeCodeLlm', () => {
     };
     const r = await claudeCodeLlm({ spawn }).complete(req);
     expect(seen!.cmd).toBe('claude');
-    expect(seen!.args).toEqual(['-p', '--model', 'claude-sonnet-4-5', '--tools', '', '--system-prompt', 'SYS PROMPT', '--output-format', 'json', '--no-session-persistence']);
+    // --tools '' only removes built-in tools: MCP servers from the user's config (Redline's own dev MCP server among them)
+    // still load unless --strict-mcp-config is given with no --mcp-config. Skills and commands are off too.
+    expect(seen!.args).toEqual(['-p', '--model', 'claude-sonnet-4-5', '--tools', '', '--strict-mcp-config', '--disable-slash-commands', '--system-prompt', 'SYS PROMPT', '--output-format', 'json', '--no-session-persistence']);
+    expect(seen!.args).not.toContain('--mcp-config');
     expect(seen!.input).toBe('USER PROMPT');
     expect(r).toEqual({ ok: true, value: { text: '{"ok":true}', modelId: 'claude-sonnet-4-5-20250929', tokensIn: 120, tokensOut: 30 } });
   });
