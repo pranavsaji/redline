@@ -196,13 +196,13 @@ describe('verdict property message (EN-3)', () => {
   it('lists at most 5 requirement keys, then "and N more", and links the panel', () => {
     const ids = Array.from({ length: 7 }, (_, i) => `req_${i}`);
     const keys = new Map(ids.map((id, i) => [id, `PAY-${100 + i}`]));
-    const m = gateMessage(blockWith([{ code: 'open_requirement', message: '7 open security requirement(s) at High or above.', requirementIds: ids }]), keys, URL, ['Done']);
-    expect(m).toBe(`Redline blocks Done: 7 open security requirement(s) at High or above: PAY-100, PAY-101, PAY-102, PAY-103, PAY-104 and 2 more. Open the Redline panel: ${URL}`);
+    const m = gateMessage(blockWith([{ code: 'open_requirement', message: '7 open security requirements at High or above.', requirementIds: ids }]), keys, URL, ['Done']);
+    expect(m).toBe(`Redline blocks Done: 7 open security requirements at High or above: PAY-100, PAY-101, PAY-102, PAY-103, PAY-104 and 2 more. Open the Redline panel: ${URL}`);
   });
 
   it('requirements without subtasks are counted, not named, and say how to create them', () => {
-    const m = gateMessage(blockWith([{ code: 'open_requirement', message: '2 open security requirement(s) at High or above.', requirementIds: ['req_a', 'thr_b'] }]), new Map(), URL, ['Done']);
-    expect(m).toContain('2 open security requirement(s) at High or above (create the subtasks in the Redline panel)');
+    const m = gateMessage(blockWith([{ code: 'open_requirement', message: '2 open security requirements at High or above.', requirementIds: ['req_a', 'thr_b'] }]), new Map(), URL, ['Done']);
+    expect(m).toContain('2 open security requirements at High or above (create the subtasks in the Redline panel)');
   });
 
   it('an out-of-date review puts the one-click re-run link in the message', () => {
@@ -219,7 +219,7 @@ describe('verdict property message (EN-3)', () => {
 
   it('pass and warn verdicts get their own wording', () => {
     expect(gateMessage({ ...blockWith([]), state: 'pass', blockingCount: 0 }, new Map(), URL, ['Done'])).toMatch(/^Redline: no security requirements block this work item/);
-    expect(gateMessage({ ...blockWith([{ code: 'needs_human', message: '1 threat(s) need a security champion to confirm them.' }]), state: 'warn', validUntil: '2026-11-30T00:00:00.000Z' }, new Map(), URL, ['Done'])).toMatch(/^Redline warns \(warn-only until 2026-11-30\)/);
+    expect(gateMessage({ ...blockWith([{ code: 'needs_human', message: '1 threat needs a security champion to confirm it.' }]), state: 'warn', validUntil: '2026-11-30T00:00:00.000Z' }, new Map(), URL, ['Done'])).toMatch(/^Redline warns \(warn-only until 2026-11-30\)/);
   });
 
   it('refreshVerdict writes message, panelUrl and riskScore with the verdict', async () => {

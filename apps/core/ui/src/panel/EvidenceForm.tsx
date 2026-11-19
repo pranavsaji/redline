@@ -2,6 +2,7 @@ import { useId, useState, type FormEvent } from 'react';
 import Button from '@atlaskit/button/new';
 import type { Evidence } from '../types.js';
 import { box, errorText, field, label } from './form-styles.js';
+import { useInlineForm } from '../components/inline-form.js';
 
 const KINDS: Array<{ kind: Evidence['kind']; label: string; hint: string }> = [
   { kind: 'pr', label: 'PR link', hint: 'https://bitbucket.org/…/pull-requests/42' },
@@ -17,6 +18,7 @@ export function EvidenceForm({ onSubmit, onCancel }: { onSubmit: (e: Pick<Eviden
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const id = useId();
+  const form = useInlineForm(onCancel);
   const current = KINDS.find((k) => k.kind === kind)!;
 
   const submit = async (e: FormEvent) => {
@@ -29,7 +31,7 @@ export function EvidenceForm({ onSubmit, onCancel }: { onSubmit: (e: Pick<Eviden
   };
 
   return (
-    <form aria-label="Verification evidence" onSubmit={submit} style={box}>
+    <form ref={form.ref} onKeyDown={form.onKeyDown} aria-label="Verification evidence" onSubmit={submit} style={box}>
       <fieldset style={{ border: 0, margin: 0, padding: 0, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <legend style={{ ...label, marginBottom: 4 }}>Evidence that this requirement is met</legend>
         {KINDS.map((k) => (

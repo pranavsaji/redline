@@ -45,7 +45,7 @@ export function RepoSettings({ api }: { api: SettingsApi }) {
   };
 
   return (
-    <main style={{ display: 'grid', gap: 16, maxWidth: 720, color: token('color.text') }}>
+    <main style={{ display: 'grid', gap: 16, padding: 16, maxWidth: 720, minWidth: 0, color: token('color.text') }}>
       <h1 style={{ font: token('font.heading.medium'), margin: 0 }}>Redline</h1>
       <p style={{ margin: 0, color: token('color.text.subtle') }}>
         Pull requests that touch security-sensitive files need a Redline attestation from the linked Jira work item. To block merges, make the Redline check required in the branch restrictions (Bitbucket Premium); without that, failures show as warnings on the pull request.

@@ -333,7 +333,7 @@ describe('caller identity for MCP calls', () => {
 });
 
 describe('a break-glass or warn-only window that has ended is not reported as passing', () => {
-  const lapsed = { state: 'pass', overridden: true, validUntil: '2026-11-15T11:00:00Z', blockingCount: 8, maxOpenSeverity: 'Critical', reasons: [{ code: 'open_requirement', message: '8 open security requirement(s) at High or above.' }], inheritedFrom: [], updatedAt: '2026-11-15T00:00:00Z' };
+  const lapsed = { state: 'pass', overridden: true, validUntil: '2026-11-15T11:00:00Z', blockingCount: 8, maxOpenSeverity: 'Critical', reasons: [{ code: 'open_requirement', message: '8 open security requirements at High or above.' }], inheritedFrom: [], updatedAt: '2026-11-15T00:00:00Z' };
   it('get-review recomputes it: block, matching what the attestation says', async () => {
     const { t } = await reviewed();
     t.kv.data.set(verdictKey(ISSUE), lapsed);

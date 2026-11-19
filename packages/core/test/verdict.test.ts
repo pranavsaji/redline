@@ -153,3 +153,18 @@ describe('verdictLapsed: a lenient verdict stops counting once its window ends',
     expect(verdictLapsed({ state: 'pass', overridden: true, validUntil: 'soon', ...base }, at)).toBe(true);
   });
 });
+
+describe('verdict copy is plain language (Task 32)', () => {
+  const msg = (v: ReturnType<typeof computeVerdict>, code: string) => v.reasons.find((r) => r.code === code)!.message;
+  it('counts read as words, not "requirement(s)"', () => {
+    expect(msg(computeVerdict(input()), 'open_requirement')).toBe('1 open security requirement at High or above.');
+    const two = computeVerdict(input({ threats: [threat(), threat({ id: 'thr_2' })], requirements: [] }));
+    expect(msg(two, 'open_requirement')).toBe('2 open security requirements at High or above.');
+    expect(msg(computeVerdict(input({ threats: [threat({ state: 'needs_human' })] })), 'needs_human')).toBe('1 threat needs a security champion to confirm it.');
+    const twoHuman = computeVerdict(input({ threats: [threat({ state: 'needs_human' }), threat({ id: 'thr_2', state: 'needs_human' })] }));
+    expect(msg(twoHuman, 'needs_human')).toBe('2 threats need a security champion to confirm them.');
+    expect(msg(computeVerdict(input({ threats: [threat({ state: 'needs_human' })], injectionSuspected: true })), 'injection_unconfirmed')).toBe(
+      '1 threat came from content that looked like instructions to the AI. A security champion must confirm it.',
+    );
+  });
+});

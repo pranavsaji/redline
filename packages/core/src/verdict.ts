@@ -11,6 +11,9 @@ import {
 } from '@redline/shared';
 import { warnOnlyUntil } from './policy.js';
 
+/** "1 threat", "2 threats": counts in messages read as words, never "threat(s)". */
+export const count = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? '' : 's'}`;
+
 export interface VerdictInput {
   /** The work item being judged; break-glass overrides match it even before any review exists. */
   issueId?: string;
@@ -76,8 +79,8 @@ export function computeVerdict(i: VerdictInput): Verdict {
       reasons.push({
         code: injected ? 'injection_unconfirmed' : 'needs_human',
         message: injected
-          ? `${humanOpen.length} threat(s) came from content that looked like instructions to the AI. A security champion must confirm them.`
-          : `${humanOpen.length} threat(s) need a security champion to confirm them.`,
+          ? `${count(humanOpen.length, 'threat')} came from content that looked like instructions to the AI. A security champion must confirm ${humanOpen.length === 1 ? 'it' : 'them'}.`
+          : `${count(humanOpen.length, 'threat')} ${humanOpen.length === 1 ? 'needs' : 'need'} a security champion to confirm ${humanOpen.length === 1 ? 'it' : 'them'}.`,
         requirementIds: humanOpen.map((t) => t.id),
       });
       for (const t of humanOpen) bump(t.severity);
@@ -98,7 +101,7 @@ export function computeVerdict(i: VerdictInput): Verdict {
     if (open.length > 0) {
       reasons.push({
         code: 'open_requirement',
-        message: `${open.length} open security requirement(s) at ${i.policy.blockAtOrAbove} or above.`,
+        message: `${count(open.length, 'open security requirement')} at ${i.policy.blockAtOrAbove} or above.`,
         requirementIds: open.map((o) => o.id),
       });
       for (const o of open) bump(o.severity);

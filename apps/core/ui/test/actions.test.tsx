@@ -132,7 +132,7 @@ describe('Threat triage (champions)', () => {
   it('a champion confirms threats that need a human', async () => {
     const confirm = vi.fn(async () => ({ seq: 1 }));
     const dto = { ...structuredClone(FIXTURES.ready!), roles: ['viewer', 'champion'] as PanelDto['roles'] };
-    dto.verdict!.reasons.push({ code: 'needs_human', message: '1 threat(s) need a security champion to confirm them.' });
+    dto.verdict!.reasons.push({ code: 'needs_human', message: '1 threat needs a security champion to confirm it.' });
     await open({ ...mockApi('ready'), get: async () => dto, confirm });
     await userEvent.click(screen.getByRole('button', { name: 'Confirm threats' }));
     expect(confirm).toHaveBeenCalledWith('rev_66405_1', 'review');

@@ -1,9 +1,10 @@
-import { useId, useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
 import type { ApiError } from '../types.js';
 import Button from '@atlaskit/button/new';
 import { errorText as errorTextOf, isError, type PanelApi, type TriageInput } from '../bridge.js';
 import type { Threat } from '../types.js';
 import { box, errorText, field, label } from './form-styles.js';
+import { useFocusReturn, useInlineForm } from '../components/inline-form.js';
 
 type Action = 'accept' | 'dismiss' | 'edit' | 'merge' | 'split';
 const REASONS = [
@@ -27,6 +28,7 @@ export function ThreatEditor({ threat, others, api, onDone, onCancel }: { threat
   const [parts, setParts] = useState(['', '']);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const form = useInlineForm(onCancel);
 
   const build = (): TriageInput | string => {
     const threatId = threat.id;
@@ -78,7 +80,7 @@ export function ThreatEditor({ threat, others, api, onDone, onCancel }: { threat
   );
 
   return (
-    <form aria-label="Triage threat" onSubmit={submit} style={box}>
+    <form ref={form.ref} onKeyDown={form.onKeyDown} aria-label="Triage threat" onSubmit={submit} style={box}>
       {select('Action', action, (v) => setAction(v as Action), [
         ...(threat.state !== 'accepted' ? ([['accept', 'Accept']] as const) : []),
         ['dismiss', 'Dismiss'],
@@ -140,10 +142,12 @@ export function ThreatEditor({ threat, others, api, onDone, onCancel }: { threat
 /** The "Triage" toggle shown on each threat card for champions. */
 export function ThreatTriage(props: { threat: Threat; others: Threat[]; api: PanelApi; onDone: () => void }) {
   const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const returnTo = useFocusReturn(open, root);
   return (
-    <div style={{ display: 'grid', gap: 8 }}>
+    <div ref={root} style={{ display: 'grid', gap: 8 }}>
       <div>
-        <Button appearance="subtle" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Button appearance="subtle" aria-expanded={open} onClick={() => (returnTo('button[aria-expanded]'), setOpen(!open))}>
           Triage
         </Button>
       </div>

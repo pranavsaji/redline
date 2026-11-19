@@ -13,6 +13,15 @@ const GROUNDING: Record<Threat['grounding'], { label: string; appearance: 'succe
   unsupported: { label: 'Unsupported', appearance: 'removed' },
 };
 
+/** Prefix shown before ids that do not already name their framework ("CWE-640" and "LLM01" already do). */
+const PREFIX: Record<string, string> = { ASVS5: 'ASVS', LLM10: 'OWASP', ASI10: 'OWASP' };
+
+/** "ASVS V2.1.1", "OWASP LLM01", "CWE-640". */
+export function standardLabel(m: { framework: string; refId: string }): string {
+  const prefix = PREFIX[m.framework];
+  return prefix && !m.refId.startsWith(prefix) ? `${prefix} ${m.refId}` : m.refId;
+}
+
 export function ThreatCard({
   threat,
   facts,
@@ -55,7 +64,7 @@ export function ThreatCard({
               {threat.mappings.map((m) => (
                 <li key={`${m.framework}-${m.refId}`}>
                   <code style={{ font: token('font.code'), fontSize: 12, lineHeight: '18px', padding: '0 4px', borderRadius: 3, background: token('color.background.neutral'), color: token('color.text.subtle') }}>
-                    {m.refId}
+                    {standardLabel(m)}
                   </code>
                 </li>
               ))}

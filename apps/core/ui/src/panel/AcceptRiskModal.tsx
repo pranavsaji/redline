@@ -5,6 +5,7 @@ import { errorText as errorTextOf, isError, type PanelApi } from '../bridge.js';
 import { SeverityLozenge } from '../components/SeverityLozenge.js';
 import type { ApiError, PanelDto, Requirement, Severity } from '../types.js';
 import { box, errorText, field, label } from './form-styles.js';
+import { useInlineForm } from '../components/inline-form.js';
 
 const RANK: Record<Severity, number> = { Low: 1, Medium: 2, High: 3, Critical: 4 };
 const EXPIRY_CHOICES = [7, 14, 30, 60, 90];
@@ -53,6 +54,7 @@ export function AcceptRiskModal({ requirement, dto, api, onDone, onCancel }: { r
   const [saving, setSaving] = useState(false);
   const [entry, setEntry] = useState<{ hash: string; needsApprover: string } | null>(null);
   const id = useId();
+  const form = useInlineForm(onCancel);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -78,7 +80,7 @@ export function AcceptRiskModal({ requirement, dto, api, onDone, onCancel }: { r
     );
 
   return (
-    <form aria-label="Accept risk" onSubmit={submit} style={box}>
+    <form ref={form.ref} onKeyDown={form.onKeyDown} aria-label="Accept risk" onSubmit={submit} style={box}>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <SeverityLozenge severity={requirement.severity} />
         <strong>{requirement.title}</strong>

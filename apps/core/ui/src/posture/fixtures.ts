@@ -42,7 +42,7 @@ export const RELEASE_FIXTURE = (fixVersion: string): ReleaseReadinessResult => (
   answer: 'No-go',
   items: 3,
   outOfScope: 1,
-  blockers: [{ issueKey: 'PAY-7', reasons: ['8 open security requirement(s) at High or above.'] }],
+  blockers: [{ issueKey: 'PAY-7', reasons: ['8 open security requirements at High or above.'] }],
   conditions: [],
   expiringSoon: [],
   truncated: false,

@@ -22,7 +22,7 @@ const PATHS: Record<Stride, string> = {
 
 export function StrideIcon({ stride, size = 20 }: { stride: Stride; size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false" style={{ flexShrink: 0 }}>
+    <svg data-stride={stride} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false" style={{ flexShrink: 0 }}>
       <path d={PATHS[stride]} fill="none" stroke={token('color.icon.subtle')} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );

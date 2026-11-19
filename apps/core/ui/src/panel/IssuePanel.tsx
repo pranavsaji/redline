@@ -10,6 +10,7 @@ import { errorText, isError, type PanelApi } from '../bridge.js';
 import type { PanelDto, Threat } from '../types.js';
 import { EmptyState } from './EmptyState.js';
 import { Header } from './Header.js';
+import { count } from '../text.js';
 import { ThreatDiff } from './ThreatDiff.js';
 import { WhatIf } from './WhatIf.js';
 import { StatusSteps } from './StatusSteps.js';
@@ -121,7 +122,15 @@ export function IssuePanel({ api }: { api: PanelApi }) {
   const injected = dto.facts.filter((f) => f.injectionSuspected);
 
   return (
-    <main style={{ display: 'grid', gap: 12, padding: 4, color: token('color.text') }}>
+    <main
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1fr)',
+        gap: 12,
+        padding: 4,
+        color: token('color.text'),
+      }}
+    >
       <div aria-live="polite">{notice && <SectionMessage appearance="information">{notice}</SectionMessage>}</div>
       {view.state === 'not_reviewed' ? (
         <EmptyState onRun={rerun} canRun={canRun} busy={busy} />
@@ -233,12 +242,15 @@ export function IssuePanel({ api }: { api: PanelApi }) {
             </SectionMessage>
           )}
           <Tabs id="redline-tabs">
-            <TabList>
-              <Tab>Threats ({dto.threatsTotal})</Tab>
-              <Tab>Requirements ({dto.requirements.length})</Tab>
-              <Tab>Acceptances ({dto.acceptances.length})</Tab>
-              <Tab>History</Tab>
-            </TabList>
+            {/* A narrow panel scrolls the tab row itself rather than the whole page sideways. */}
+            <div style={{ overflowX: 'auto', minWidth: 0 }}>
+              <TabList>
+                <Tab>Threats ({dto.threatsTotal})</Tab>
+                <Tab>Requirements ({dto.requirements.length})</Tab>
+                <Tab>Acceptances ({dto.acceptances.length})</Tab>
+                <Tab>History</Tab>
+              </TabList>
+            </div>
             <TabPanel>
               <div style={{ display: 'grid', gap: 8, paddingTop: 8, width: '100%' }}>
                 {dto.history.length >= 2 && <ThreatDiff api={api} revisions={dto.history.map((h) => h.revision)} />}
@@ -268,7 +280,7 @@ export function IssuePanel({ api }: { api: PanelApi }) {
                 ))}
                 {dto.hiddenThreats > 0 && (
                   <p style={{ color: token('color.text.subtlest'), font: token('font.body.small') }}>
-                    {dto.hiddenThreats} threat(s) cite sources you cannot open and are not shown.
+                    {count(dto.hiddenThreats, 'threat')} {dto.hiddenThreats === 1 ? 'cites a source' : 'cite sources'} you cannot open and {dto.hiddenThreats === 1 ? 'is' : 'are'} not shown.
                   </p>
                 )}
                 {cursor !== null && (
@@ -319,38 +331,46 @@ export function IssuePanel({ api }: { api: PanelApi }) {
             <TabPanel>
               <div style={{ display: 'grid', width: '100%' }}>
                 <ThreatModelPage dto={dto} api={api} />
-                <table style={{ borderCollapse: 'collapse', marginTop: 8, width: '100%' }}>
-                  <caption
-                    style={{ textAlign: 'left', font: token('font.body.small'), color: token('color.text.subtle') }}
-                  >
-                    Review history
-                  </caption>
-                  <thead>
-                    <tr>
-                      {['Revision', 'When', 'Risk', 'Status', 'Added', 'Removed'].map((h) => (
-                        <th
-                          key={h}
-                          scope="col"
-                          style={{ textAlign: 'left', padding: 4, borderBottom: `1px solid ${token('color.border')}` }}
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dto.history.map((h) => (
-                      <tr key={h.revision}>
-                        <td style={{ padding: 4 }}>{h.revision}</td>
-                        <td style={{ padding: 4 }}>{new Date(h.createdAt).toLocaleString()}</td>
-                        <td style={{ padding: 4 }}>{h.riskScore}</td>
-                        <td style={{ padding: 4 }}>{h.status.replace('_', ' ')}</td>
-                        <td style={{ padding: 4 }}>+{h.added}</td>
-                        <td style={{ padding: 4 }}>−{h.removed}</td>
+                <div style={{ overflowX: 'auto' }} tabIndex={0} role="region" aria-label="Review history">
+                  <table style={{ borderCollapse: 'collapse', marginTop: 8, width: '100%' }}>
+                    <caption
+                      style={{ textAlign: 'left', font: token('font.body.small'), color: token('color.text.subtle') }}
+                    >
+                      Review history
+                    </caption>
+                    <thead>
+                      <tr>
+                        {['Revision', 'When', 'Risk', 'Status', 'Added', 'Removed'].map((h) => (
+                          <th
+                            key={h}
+                            scope="col"
+                            style={{
+                              textAlign: 'left',
+                              padding: 4,
+                              borderBottom: `1px solid ${token('color.border')}`,
+                            }}
+                          >
+                            {h}
+                          </th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {dto.history.map((h) => (
+                        <tr key={h.revision}>
+                          <td style={{ padding: 4 }}>{h.revision}</td>
+                          <td style={{ padding: 4, whiteSpace: 'nowrap' }}>
+                            {h.createdAt.slice(0, 16).replace('T', ' ')} UTC
+                          </td>
+                          <td style={{ padding: 4 }}>{h.riskScore}</td>
+                          <td style={{ padding: 4 }}>{h.status.replace('_', ' ')}</td>
+                          <td style={{ padding: 4 }}>+{h.added}</td>
+                          <td style={{ padding: 4 }}>−{h.removed}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </TabPanel>
           </Tabs>

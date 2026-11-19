@@ -47,12 +47,12 @@ describe('Copy merge attestation (AT-1)', () => {
   });
 
   it('lists what blocks when the work item is not ready', async () => {
-    const attestation = vi.fn(async () => ({ blocking: [{ code: 'open_requirement' as const, message: '2 open security requirement(s) at High or above.' }] }));
+    const attestation = vi.fn(async () => ({ blocking: [{ code: 'open_requirement' as const, message: '2 open security requirements at High or above.' }] }));
     await openRequirements(api(['viewer', 'developer'], { attestation }));
     const form = screen.getByRole('form', { name: 'Merge attestation' });
     await fill(form, 'acme/payments', SHA);
     expect(await within(form).findByText(/Redline blocks this merge/)).toBeTruthy();
-    expect(within(form).getByText('2 open security requirement(s) at High or above.')).toBeTruthy();
+    expect(within(form).getByText('2 open security requirements at High or above.')).toBeTruthy();
   });
 
   it('checks the inputs before asking the server', async () => {

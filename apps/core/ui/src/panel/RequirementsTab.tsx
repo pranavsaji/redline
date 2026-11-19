@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { ApiError } from '../types.js';
 import Button from '@atlaskit/button/new';
 import Lozenge from '@atlaskit/lozenge';
@@ -9,6 +9,8 @@ import type { PanelDto, Requirement, RequirementStatus } from '../types.js';
 import { AcceptRiskModal } from './AcceptRiskModal.js';
 import { CopyAttestation } from './CopyAttestation.js';
 import { EvidenceForm } from './EvidenceForm.js';
+import { count } from '../text.js';
+import { useFocusReturn } from '../components/inline-form.js';
 import { field } from './form-styles.js';
 
 const STATUS_LABEL: Record<RequirementStatus, string> = {
@@ -43,6 +45,8 @@ export function RequirementsTab({ dto, api, onChanged }: { dto: PanelDto; api: P
   const [notice, setNotice] = useState<string | null>(null);
   const [verifying, setVerifying] = useState<string | null>(null);
   const [accepting, setAccepting] = useState<string | null>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const returnTo = useFocusReturn(accepting !== null || verifying !== null, root);
   const [busy, setBusy] = useState(false);
   const canEdit = dto.roles.includes('developer');
   const champion = dto.roles.includes('champion');
@@ -61,7 +65,7 @@ export function RequirementsTab({ dto, api, onChanged }: { dto: PanelDto; api: P
   };
 
   const change = async (r: Requirement, status: RequirementStatus) => {
-    if (status === 'Verified') return setVerifying(r.id);
+    if (status === 'Verified') return (returnTo(`[data-status="${r.id}"]`), setVerifying(r.id));
     setVerifying(null);
     const out = await api.setStatus(r.id, status).catch((): ApiError => ({ error: 'unavailable' }));
     if (isError(out)) setNotice(errorTextOf(out));
@@ -69,7 +73,7 @@ export function RequirementsTab({ dto, api, onChanged }: { dto: PanelDto; api: P
   };
 
   return (
-    <div style={{ display: 'grid', gap: 8, paddingTop: 8, width: '100%' }}>
+    <div ref={root} style={{ display: 'grid', gap: 8, paddingTop: 8, width: '100%' }}>
       <p role="status" style={{ margin: 0, minHeight: 0 }}>
         {notice}
       </p>
@@ -83,7 +87,7 @@ export function RequirementsTab({ dto, api, onChanged }: { dto: PanelDto; api: P
       <ul aria-label="Security requirements" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
         {dto.requirements.length === 0 && <li style={{ color: token('color.text.subtle') }}>No requirements yet.</li>}
         {dto.hiddenRequirements > 0 && (
-          <li style={{ color: token('color.text.subtlest'), font: token('font.body.small') }}>{dto.hiddenRequirements} requirement(s) come from sources you cannot open and are not shown.</li>
+          <li style={{ color: token('color.text.subtlest'), font: token('font.body.small') }}>{count(dto.hiddenRequirements, 'requirement')} {dto.hiddenRequirements === 1 ? 'comes from a source' : 'come from sources'} you cannot open and {dto.hiddenRequirements === 1 ? 'is' : 'are'} not shown.</li>
         )}
         {dto.requirements.map((r) => (
           <li key={r.id} style={{ border: `1px solid ${token('color.border')}`, borderRadius: 6, padding: 10, display: 'grid', gap: 6 }}>
@@ -106,7 +110,7 @@ export function RequirementsTab({ dto, api, onChanged }: { dto: PanelDto; api: P
             {canEdit && r.status !== 'AcceptedRisk' && (
               <label style={{ display: 'flex', gap: 6, alignItems: 'center', font: token('font.body.small') }}>
                 Status
-                <select aria-label="Status" value={verifying === r.id ? 'Verified' : r.status} onChange={(e) => void change(r, e.target.value as RequirementStatus)} style={field}>
+                <select aria-label="Status" data-status={r.id} value={verifying === r.id ? 'Verified' : r.status} onChange={(e) => void change(r, e.target.value as RequirementStatus)} style={field}>
                   <option value="Open">Open</option>
                   <option value="InProgress">In progress</option>
                   <option value="Verified">Verified</option>
@@ -116,7 +120,7 @@ export function RequirementsTab({ dto, api, onChanged }: { dto: PanelDto; api: P
             )}
             {canEdit && (r.status === 'Open' || r.status === 'InProgress') && !openAcceptance.has(r.id) && accepting !== r.id && (
               <div>
-                <Button spacing="compact" onClick={() => (setVerifying(null), setAccepting(r.id))}>
+                <Button spacing="compact" testId={`accept-${r.id}`} onClick={() => (returnTo(`[data-testid="accept-${r.id}"]`), setVerifying(null), setAccepting(r.id))}>
                   Accept risk
                 </Button>
               </div>
