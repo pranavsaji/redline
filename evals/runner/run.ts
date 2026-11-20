@@ -78,7 +78,7 @@ export async function runCase(c: CleanCase, llm: LlmPort | null, samples: number
     if (!r.value.injectionSuspected) {
       const usage = { tokensIn: 0, tokensOut: 0, modelIds: new Set<string>() };
       const v = await engineVerify({ llm, policy: DEFAULT_SITE_POLICY }, threats, usage, `eval${c.id.replace(/\W/g, '')}`);
-      if (v.ok) threats = applyVerification(threats, v.value, { injectionSuspected: false, taintedFacts: tainted }).threats;
+      if (v.ok) threats = applyVerification(threats, v.value, { injectionSuspected: false, taintedFacts: tainted, blockAtOrAbove: DEFAULT_SITE_POLICY.blockAtOrAbove }).threats;
     }
     const score = riskScore(threats, r.value.signals);
     const rev = await reviews.get(review.id);

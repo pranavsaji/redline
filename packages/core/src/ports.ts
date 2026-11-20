@@ -65,8 +65,13 @@ export interface ReviewRepo {
   byStatus(status: ReviewStatus, olderThan?: string): Promise<Result<Review[]>>;
   create(r: Review): Promise<Result<Review>>;
   update(id: string, patch: Partial<Review>): Promise<Result<void>>;
-  /** Atomically adds token counts (and merges model ids): parallel engine stages each record their own calls. */
+  /** Atomically adds token counts (negative to settle a reservation) and merges model ids. */
   addUsage(id: string, delta: { tokensIn: number; tokensOut: number; modelIds: readonly string[] }): Promise<Result<void>>;
+  /**
+   * Security: reserves tokens for one model call atomically, only while the review's totals stay within the caps; false
+   * when they would not. Parallel engine stages cannot together overshoot the per-review budget.
+   */
+  reserveUsage(id: string, est: { tokensIn: number; tokensOut: number }, cap: { tokensIn: number; tokensOut: number }): Promise<Result<boolean>>;
   saveFacts(reviewId: string, facts: ContextFact[]): Promise<Result<void>>;
   facts(reviewId: string): Promise<Result<ContextFact[]>>;
   saveThreats(reviewId: string, threats: Threat[], discarded: DiscardedThreat[]): Promise<Result<void>>;

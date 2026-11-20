@@ -20,12 +20,12 @@ async function bundleOf(deps: CoreDeps, review: Review): Promise<Result<ContextB
   });
 }
 
-/** Records what one stage's calls used, on the review (atomically) and in the month's usage. Best effort. */
+/** Records what one stage's calls used: models on the review (tokens are settled per call), tokens in the month's usage. */
 async function record(deps: CoreDeps, review: Review, before: { tokensIn: number; tokensOut: number }, usage: Usage): Promise<void> {
   const tokensIn = usage.tokensIn - before.tokensIn;
   const tokensOut = usage.tokensOut - before.tokensOut;
   if (tokensIn <= 0 && tokensOut <= 0 && usage.modelIds.size === 0) return;
-  const a = await deps.reviews.addUsage(review.id, { tokensIn, tokensOut, modelIds: [...usage.modelIds] });
+  const a = await deps.reviews.addUsage(review.id, { tokensIn: 0, tokensOut: 0, modelIds: [...usage.modelIds] });
   if (!a.ok) log('engine.usage_failed', { reviewId: review.id, code: a.error.code });
   const m = await deps.usage.add(monthOf(deps.clock.now()), { tokensIn, tokensOut, reviews: 0 });
   if (!m.ok) log('engine.usage_failed', { reviewId: review.id, code: m.error.code });
@@ -56,7 +56,19 @@ export async function engineJob(deps: CoreDeps, job: EngineJob): Promise<Result<
   if (!policy.ok) return policy;
   const usage: Usage = { tokensIn: review.tokensIn, tokensOut: review.tokensOut, modelIds: new Set() };
   const before = { tokensIn: usage.tokensIn, tokensOut: usage.tokensOut };
-  const stageDeps = { llm: deps.llm, reviews: deps.reviews, policy: policy.value };
+  const cap = { tokensIn: policy.value.budget.tokensInPerReview, tokensOut: policy.value.budget.tokensOutPerReview };
+  // Security: each call reserves its tokens atomically on the review row, so parallel stages cannot overshoot the cap.
+  const budget = {
+    reserve: async (tokensIn: number, tokensOut: number) => {
+      const r = await deps.reviews.reserveUsage(review.id, { tokensIn, tokensOut }, cap);
+      return r.ok && r.value;
+    },
+    settle: async (reserved: { tokensIn: number; tokensOut: number }, actual: { tokensIn: number; tokensOut: number }) => {
+      const r = await deps.reviews.addUsage(review.id, { tokensIn: actual.tokensIn - reserved.tokensIn, tokensOut: actual.tokensOut - reserved.tokensOut, modelIds: [] });
+      if (!r.ok) log('engine.usage_failed', { reviewId: review.id, code: r.error.code });
+    },
+  };
+  const stageDeps = { llm: deps.llm, reviews: deps.reviews, policy: policy.value, budget };
 
   if (job.stage === 'verify') return verify(deps, review, stageDeps, usage, before);
   // A stale job (the review settled or timed out meanwhile) does nothing.
@@ -116,7 +128,9 @@ async function applyAndStore(deps: CoreDeps, review: Review, verdicts: Verdicts)
   if (!threats.ok) return threats;
   if (!facts.ok) return facts;
   const tainted = new Set(facts.value.filter((f) => f.injectionSuspected).map((f) => f.id));
-  const applied = applyVerification(threats.value, verdicts, { injectionSuspected: false, taintedFacts: tainted });
+  const policy = await deps.config.site();
+  const blockAtOrAbove = policy.ok ? policy.value.blockAtOrAbove : 'Low';
+  const applied = applyVerification(threats.value, verdicts, { injectionSuspected: false, taintedFacts: tainted, blockAtOrAbove });
   for (const t of applied.changed) {
     const u = await deps.reviews.updateThreat(t.id, { state: t.state, verification: t.verification, coveredBy: t.coveredBy, ...(t.dismissReason ? { dismissReason: t.dismissReason } : {}) });
     if (!u.ok) return u;

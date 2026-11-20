@@ -1,4 +1,4 @@
-import { severityRank, type Result, type Threat } from '@redline/shared';
+import { severityRank, type Result, type Severity, type Threat } from '@redline/shared';
 import { verifyPrompt, VerifySchema } from '@redline/prompts';
 import { appError, err, ok } from '@redline/shared';
 import { callStage, type PipelineDeps, type Usage } from './pipeline.js';
@@ -32,15 +32,16 @@ export async function engineVerify(deps: Pick<PipelineDeps, 'llm' | 'policy'>, t
 }
 
 /**
- * Deterministic: what the verifier's verdicts do. Kept threats are marked verified. A rejected Medium or Low threat is
- * dismissed (reason recorded); a rejected High or Critical threat goes to a security champion instead of disappearing.
+ * Deterministic: what the verifier's verdicts do. Kept threats are marked verified. A rejected threat below the site's
+ * blocking threshold is dismissed (reason recorded); one at or above it goes to a security champion instead, so the
+ * verifier (which reads untrusted quotes) can never remove anything that gates Done or merge.
  * A rule-based threat covered by a threat that is no longer accepted is active again. Under suspected injection, or for
  * a threat that cites a flagged source, nothing is demoted: attacker text must not steer what is dropped.
  */
 export function applyVerification(
   threats: readonly Threat[],
   verdicts: readonly Verdict4[],
-  opts: { injectionSuspected: boolean; taintedFacts?: ReadonlySet<string> },
+  opts: { injectionSuspected: boolean; taintedFacts?: ReadonlySet<string>; blockAtOrAbove?: Severity },
 ): { threats: Threat[]; changed: Threat[] } {
   if (opts.injectionSuspected) return { threats: [...threats], changed: [] };
   const byId = new Map(verdicts.map((v) => [v.threatId, v]));
@@ -52,7 +53,8 @@ export function applyVerification(
     let u: Threat;
     if (v.keep) u = { ...t, verification };
     else if (t.citations.some((c) => opts.taintedFacts?.has(c.factId))) u = { ...t, verification };
-    else if (severityRank(t.severity) >= severityRank('High')) u = { ...t, state: 'needs_human', verification };
+    // Security: the verifier reads untrusted quotes, so it may never remove anything that would gate Done or merge.
+    else if (severityRank(t.severity) >= severityRank(opts.blockAtOrAbove ?? 'High')) u = { ...t, state: 'needs_human', verification };
     else u = { ...t, state: 'dismissed', dismissReason: 'false_positive', verification };
     changed.set(u.id, u);
     return u;

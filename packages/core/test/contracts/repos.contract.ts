@@ -128,6 +128,19 @@ export function repoContract(name: string, f: RepoFactory): void {
       expect((await r.get('nope')).ok && (await r.get('nope'))).toEqual({ ok: true, value: null });
     });
 
+    it('reviews: reserveUsage reserves atomically only while the total stays under the caps (security: no parallel overshoot)', async () => {
+      const r = await f.reviews();
+      await r.create(review({ tokensIn: 0, tokensOut: 0 }));
+      const cap = { tokensIn: 1000, tokensOut: 100 };
+      const tries = await Promise.all([1, 2, 3].map(() => r.reserveUsage('rev_1', { tokensIn: 300, tokensOut: 40 }, cap)));
+      expect(tries.filter((x) => x.ok && x.value)).toHaveLength(2);
+      const g = await r.get('rev_1');
+      expect(g.ok && g.value).toMatchObject({ tokensIn: 600, tokensOut: 80 });
+      await r.addUsage('rev_1', { tokensIn: -100, tokensOut: -30, modelIds: [] });
+      const h = await r.get('rev_1');
+      expect(h.ok && h.value).toMatchObject({ tokensIn: 500, tokensOut: 50 });
+    });
+
     it('reviews: addUsage increments tokens and merges model ids, and update writes only the patched fields', async () => {
       const r = await f.reviews();
       await r.create(review({ tokensIn: 5, tokensOut: 1, modelIds: ['m1'] }));

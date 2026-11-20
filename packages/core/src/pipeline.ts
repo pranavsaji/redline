@@ -23,8 +23,17 @@ export interface PipelineDeps {
   policy: SitePolicy;
 }
 
+/**
+ * Optional atomic budget (Redline Engine): reserve before each call, settle to the actual use after. Without it, the
+ * per-review caps are checked against the running totals in `usage` (the eval path).
+ */
+export interface StageBudget {
+  reserve(tokensIn: number, tokensOut: number): Promise<boolean>;
+  settle(reserved: { tokensIn: number; tokensOut: number }, actual: { tokensIn: number; tokensOut: number }): Promise<void>;
+}
+
 /** What one engine stage needs: the model, where checkpoints live, and the per-review token budget. */
-export type StageDeps = Pick<PipelineDeps, 'llm' | 'reviews' | 'policy'>;
+export type StageDeps = Pick<PipelineDeps, 'llm' | 'reviews' | 'policy'> & { budget?: StageBudget };
 
 export interface Usage {
   tokensIn: number;
@@ -36,16 +45,21 @@ const estimate = (system: string, user: string) => Math.ceil((system.length + us
 
 /** One stage call with the spec's failure ladder: validate → one repair with the validator error → smaller fallback schema → fail. */
 export async function callStage<T>(
-  deps: Pick<PipelineDeps, 'llm' | 'policy'>,
+  deps: Pick<PipelineDeps, 'llm' | 'policy'> & { budget?: StageBudget },
   usage: Usage,
   req: { system: string; user: string; purpose: LlmPurpose; tier: ModelTier; maxOutputTokens: number },
   schema: z.ZodType<T>,
   fallback: { schema: z.ZodType<T>; instruction: string } | null,
 ): Promise<Result<T>> {
   const call = async (system: string, user: string): Promise<Result<string>> => {
-    if (usage.tokensIn + estimate(system, user) > deps.policy.budget.tokensInPerReview || usage.tokensOut >= deps.policy.budget.tokensOutPerReview)
+    const est = { tokensIn: estimate(system, user), tokensOut: req.maxOutputTokens };
+    if (deps.budget) {
+      if (!(await deps.budget.reserve(est.tokensIn, est.tokensOut))) return err(appError('budget', 'review token budget reached'));
+    } else if (usage.tokensIn + est.tokensIn > deps.policy.budget.tokensInPerReview || usage.tokensOut >= deps.policy.budget.tokensOutPerReview) {
       return err(appError('budget', 'review token budget reached'));
+    }
     const r = await deps.llm.complete({ ...req, system, user });
+    if (deps.budget) await deps.budget.settle(est, r.ok ? { tokensIn: r.value.tokensIn, tokensOut: r.value.tokensOut } : { tokensIn: 0, tokensOut: 0 });
     if (!r.ok) return r;
     usage.tokensIn += r.value.tokensIn;
     usage.tokensOut += r.value.tokensOut;

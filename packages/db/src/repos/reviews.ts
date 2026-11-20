@@ -74,8 +74,14 @@ export function sqlReviewRepo(x: SqlExecutor): ReviewRepo {
       const r = await x.exec(`UPDATE reviews SET ${set.map(([, c]) => `${c} = ?`).join(', ')} WHERE id = ?`, [...set.map(([, , val]) => val), id]);
       return r.ok ? ok(undefined) : r;
     },
+    async reserveUsage(id, est, cap) {
+      const i = Math.max(0, Math.round(est.tokensIn));
+      const o = Math.max(0, Math.round(est.tokensOut));
+      const r = await x.exec('UPDATE reviews SET tokens_in = tokens_in + ?, tokens_out = tokens_out + ? WHERE id = ? AND tokens_in + ? <= ? AND tokens_out + ? <= ?', [i, o, id, i, cap.tokensIn, o, cap.tokensOut]);
+      return r.ok ? ok(r.value.affectedRows > 0) : r;
+    },
     async addUsage(id, delta) {
-      const r = await x.exec('UPDATE reviews SET tokens_in = tokens_in + ?, tokens_out = tokens_out + ? WHERE id = ?', [Math.max(0, Math.round(delta.tokensIn)), Math.max(0, Math.round(delta.tokensOut)), id]);
+      const r = await x.exec('UPDATE reviews SET tokens_in = tokens_in + ?, tokens_out = tokens_out + ? WHERE id = ?', [Math.round(delta.tokensIn), Math.round(delta.tokensOut), id]);
       if (!r.ok) return r;
       if (delta.modelIds.length === 0) return ok(undefined);
       const cur = await one(`SELECT ${COLS} FROM reviews WHERE id = ?`, [id]);

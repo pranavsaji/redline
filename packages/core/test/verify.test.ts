@@ -70,6 +70,14 @@ describe('applyVerification (deterministic: the verifier asks, code decides)', (
     expect(out.threats).toEqual([refund, generic, loud, base]);
   });
 
+  it('security: the verifier can never dismiss a threat at or above the blocking threshold (it goes to a champion)', () => {
+    const medium = { ...generic };
+    const out = applyVerification([medium], [{ threatId: 'thr_generic', keep: false, reason: 'r' }], { injectionSuspected: false, blockAtOrAbove: 'Medium' });
+    expect(out.threats[0]!.state).toBe('needs_human');
+    const low = { ...generic, severity: 'Low' as const };
+    expect(applyVerification([low], [{ threatId: 'thr_generic', keep: false, reason: 'r' }], { injectionSuspected: false, blockAtOrAbove: 'Medium' }).threats[0]!.state).toBe('dismissed');
+  });
+
   it('security: a threat citing a source flagged for injection is never demoted', () => {
     const tainted = { ...generic, citations: [{ factId: 'f-poison', quote: 'x' }] };
     const out = applyVerification([tainted], [{ threatId: 'thr_generic', keep: false, reason: 'r' }], { injectionSuspected: false, taintedFacts: new Set(['f-poison']) });
