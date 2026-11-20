@@ -1,5 +1,6 @@
 import {
   AgentThreatModelSchema,
+  MAX_SKETCH_STRING,
   err,
   ok,
   severityRank,
@@ -400,3 +401,55 @@ function carryOver(threats: Threat[], prior: NonNullable<AssembleInput['prior']>
 
 export const isBlockingSeverity = (t: Pick<Threat, 'severity'>, policy: Pick<SitePolicy, 'blockAtOrAbove'>): boolean =>
   severityRank(t.severity) >= severityRank(policy.blockAtOrAbove);
+
+const AGENT_THREAT_KEYS = ['stride', 'title', 'scenario', 'component', 'likelihood', 'impact', 'evidence', 'asvs', 'cwe', 'plainLanguage', 'requirement'] as const;
+const SKETCH_KEYS = ['components', 'dataStores', 'externalServices', 'trustBoundaries', 'dataClasses', 'exposure', 'llmFeatures'] as const;
+const trimWords = (v: unknown, n: number) => (typeof v === 'string' && v.length > n ? `${v.slice(0, n - 1).trimEnd()}…` : v);
+const toScore = (v: unknown) => {
+  const n = typeof v === 'string' && /^\d+$/.test(v.trim()) ? Number(v) : v;
+  return typeof n === 'number' && Number.isFinite(n) ? Math.min(5, Math.max(1, Math.round(n))) : n;
+};
+
+/**
+ * Redline Engine: fits a strong model's threat model to the contract before validation. The model's own wording is
+ * trimmed to the length limits, lists are capped and unknown keys dropped. A quote is only shortened from the end (no
+ * ellipsis), so it stays a verbatim substring of its source and still has to be found there. Substance is not invented:
+ * a threat without evidence still fails.
+ */
+export function fitAgentModel(raw: unknown): unknown {
+  if (typeof raw !== 'object' || raw === null || !Array.isArray((raw as { threats?: unknown }).threats)) return raw;
+  const o = raw as Record<string, unknown>;
+  const threats = (o.threats as unknown[]).slice(0, 25).map((t) => {
+    if (typeof t !== 'object' || t === null) return t;
+    const x = t as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const k of AGENT_THREAT_KEYS) if (x[k] !== undefined && x[k] !== null) out[k] = x[k];
+    out.title = trimWords(out.title, 120);
+    out.scenario = trimWords(out.scenario, 600);
+    out.component = trimWords(out.component, 80);
+    if ('plainLanguage' in out) out.plainLanguage = trimWords(out.plainLanguage, 200);
+    out.likelihood = toScore(out.likelihood);
+    out.impact = toScore(out.impact);
+    if (Array.isArray(out.evidence))
+      out.evidence = out.evidence
+        .map((e) => (typeof e === 'object' && e !== null && typeof (e as { quote?: unknown }).quote === 'string' ? { quote: (e as { quote: string }).quote.slice(0, 200).trim() } : e))
+        .filter((e) => !(typeof e === 'object' && e !== null && (e as { quote?: string }).quote === ''))
+        .slice(0, 3);
+    for (const k of ['asvs', 'cwe'] as const) if (Array.isArray(out[k])) out[k] = (out[k] as unknown[]).filter((v) => typeof v === 'string' && v.length <= 20).slice(0, 10);
+    const r = out.requirement as Record<string, unknown> | undefined;
+    if (r && typeof r === 'object') out.requirement = { title: trimWords(r.title, 200), given: trimWords(r.given, 300), when: trimWords(r.when, 300), then: trimWords(r.then, 300) };
+    return out;
+  });
+  const result: Record<string, unknown> = { schema: o.schema, issueKey: o.issueKey, threats };
+  if (typeof o.sketch === 'object' && o.sketch !== null) {
+    const sk = o.sketch as Record<string, unknown>;
+    const fitted: Record<string, unknown> = {};
+    for (const k of SKETCH_KEYS) {
+      const v = sk[k];
+      if (v === undefined || v === null) continue;
+      fitted[k] = Array.isArray(v) && k !== 'dataClasses' ? v.filter((x) => typeof x === 'string').map((x) => (x as string).slice(0, MAX_SKETCH_STRING)).slice(0, 30) : v;
+    }
+    result.sketch = fitted;
+  }
+  return result;
+}

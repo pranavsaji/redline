@@ -1,4 +1,4 @@
-import { appError, err, ok, type AgentThreatModel, type ArchitectureSketch, type ContextBundle, type Result, type Review, type SitePolicy } from '@redline/shared';
+import { AgentThreatModelSchema, appError, err, ok, type AgentThreatModel, type ArchitectureSketch, type ContextBundle, type Result, type Review, type SitePolicy } from '@redline/shared';
 import {
   agentPrompt,
   automationPrompt,
@@ -14,7 +14,7 @@ import {
 } from '@redline/prompts';
 import { z } from 'zod';
 import { scanForInjection } from './context/injection.js';
-import { assembleReview, extractAgentJson, parseFirstObject, type AssembleOutput } from './ingest.js';
+import { assembleReview, extractAgentJson, fitAgentModel, parseFirstObject, type AssembleOutput } from './ingest.js';
 import { buildReviewContext, renderReviewContext } from './review-context.js';
 import type { ClockPort, FeedbackRepo, LlmPort, LlmPurpose, ModelTier, ReviewRepo, Sample } from './ports.js';
 
@@ -84,7 +84,11 @@ export async function engineAgentRun(deps: StageDeps, review: Review, bundle: Co
   });
   if (!r.ok) return r.error.code === 'budget' ? r : ok({ failed: r.error.code });
   const m = extractAgentJson(r.value, bundle.issueKey);
-  return ok(m.ok ? m.value : { failed: m.error.code });
+  if (m.ok || m.error.code !== 'schema') return ok(m.ok ? m.value : { failed: m.error.code });
+  // A strong model writes long: fit its wording to the contract (quotes only shortened, so still verbatim), then check.
+  const fitted = AgentThreatModelSchema.safeParse(fitAgentModel(parseFirstObject(r.value)));
+  if (fitted.success && fitted.data.issueKey.toLowerCase() === bundle.issueKey.toLowerCase()) return ok(fitted.data);
+  return ok({ failed: m.error.code });
 }
 
 /** One stage call with the spec's failure ladder: validate → one repair with the validator error → smaller fallback schema → fail. */

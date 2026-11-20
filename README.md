@@ -1,6 +1,6 @@
 # Redline
 
-![tests](https://img.shields.io/badge/tests-950%2B%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-1050%2B%20passing-brightgreen)
 ![coverage](https://img.shields.io/badge/line%20coverage-92.9%25-brightgreen)
 ![eval F1](https://img.shields.io/badge/eval%20F1-50.5%25-blue)
 ![injection resistance](https://img.shields.io/badge/injection%20resistance-6%2F6-blue)

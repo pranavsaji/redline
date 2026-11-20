@@ -227,3 +227,30 @@ describe('assembleReview', () => {
     expect(out.threats.find((t) => t.title === refundAbuse.title)!.state).toBe('needs_human');
   });
 });
+
+describe('fitAgentModel (Redline Engine: strong models write long)', () => {
+  it('trims wording, shortens quotes from the end only, drops unknown keys, and a sound model then validates', async () => {
+    const { fitAgentModel } = await import('../src/index.js');
+    const { AgentThreatModelSchema } = await import('@redline/shared');
+    const raw = {
+      schema: 'redline.threatmodel.v1',
+      issueKey: 'PROJ-1',
+      notes: 'extra',
+      sketch: { components: ['a'.repeat(300)], exposure: 'public', confidence: 0.9 },
+      threats: [{ id: 'T1', stride: 'Tampering', title: 't'.repeat(200), scenario: 's', component: 'c', likelihood: '4', impact: 9, evidence: [{ quote: `${'q'.repeat(250)}` }, { quote: '' }] }],
+    };
+    const v = AgentThreatModelSchema.safeParse(fitAgentModel(raw));
+    expect(v.success).toBe(true);
+    if (!v.success) return;
+    expect(v.data.threats[0]!.evidence).toEqual([{ quote: 'q'.repeat(200) }]);
+    expect(v.data.threats[0]).toMatchObject({ likelihood: 4, impact: 5 });
+    expect(v.data.sketch!.components![0]!.length).toBe(200);
+  });
+
+  it('does not invent evidence', async () => {
+    const { fitAgentModel } = await import('../src/index.js');
+    const { AgentThreatModelSchema } = await import('@redline/shared');
+    const raw = { schema: 'redline.threatmodel.v1', issueKey: 'PROJ-1', threats: [{ stride: 'Tampering', title: 't', scenario: 's', component: 'c', likelihood: 3, impact: 3, evidence: [] }] };
+    expect(AgentThreatModelSchema.safeParse(fitAgentModel(raw)).success).toBe(false);
+  });
+});
