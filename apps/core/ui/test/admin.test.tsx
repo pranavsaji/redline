@@ -46,7 +46,23 @@ describe('Admin: setup checklist (Task 24)', () => {
     expect(within(list).getByText(/Signing keys created/).closest('li')!.textContent).toMatch(/Done/);
     expect(within(list).getByText(/Done gate seen on PAY/)).toBeTruthy();
     expect(within(list).getByText(/No Automation agent run in the last 7 days/).closest('li')!.textContent).toMatch(/To do/);
+    // Feature: the item points sites without Rovo to rule-based review.
+    expect(within(list).getByText(/No Rovo on this site\? Choose rule-based checks under Review mode/)).toBeTruthy();
     expect(within(list).getByText('Allow MCP clients in Rovo settings.')).toBeTruthy();
+  });
+
+  it('feature: in rule-based mode, the agent-run item is done and says no Rovo is needed', async () => {
+    const base = mockAdminApi();
+    const dto = await base.getPolicy();
+    if ('error' in dto) throw new Error('fixture');
+    const api: AdminApi = {
+      ...base,
+      getPolicy: async () => ({ ...dto, policy: { ...dto.policy, reviewMode: 'rules_only' } }),
+      setupStatus: async () => ({ keys: true, sqlVersion: 3, validatorSeenOn: ['PAY'], automationRuleSeen: false, mcpEnabledHint: 'x', bitbucketKeyCopied: false }),
+    };
+    render(<AdminPage api={api} />);
+    const list = await screen.findByRole('list', { name: 'Setup checklist' });
+    expect((await within(list).findByText(/Rule-based checks only: no Rovo or Automation rule needed/)).closest('li')!.textContent).toMatch(/Done/);
   });
 
   it('a non-admin sees a plain message', async () => {
@@ -149,6 +165,16 @@ describe('Admin: budgets (Task 30)', () => {
     expect(setPolicy).toHaveBeenCalledWith(expect.objectContaining({ budget: expect.objectContaining({ reviewsPerMonth: 800 }), agentSamples: 5 }));
   });
 
+  it('feature: an admin can switch to rule-based checks only, for a site without Rovo', async () => {
+    const api = mockAdminApi();
+    const setPolicy = vi.fn(api.setPolicy);
+    render(<AdminPage api={{ ...api, setPolicy }} />);
+    const form = await screen.findByRole('form', { name: 'Review mode' });
+    await userEvent.click(within(form).getByRole('radio', { name: /Rule-based checks only/ }));
+    await userEvent.click(within(form).getByRole('button', { name: 'Save review mode' }));
+    expect(setPolicy).toHaveBeenCalledWith(expect.objectContaining({ reviewMode: 'rules_only' }));
+  });
+
   it('says when reviews are paused, and why', async () => {
     const api = mockAdminApi();
     render(<AdminPage api={{ ...api, usage: async () => ({ ...(await api.usage() as Exclude<Awaited<ReturnType<AdminApi['usage']>>, { error: string }>), paused: { budget: false, credits: true } }) }} />);
@@ -231,7 +257,7 @@ describe('Admin page layout (Task 30)', () => {
     render(<AdminPage api={mockAdminApi()} />);
     const nav = await screen.findByRole('navigation', { name: 'Admin sections' });
     expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual([
-      'Setup checklist', 'Projects and transitions', 'Severity policy', 'Roles', 'Budgets', 'Warn-only mode', 'Notifications', 'Recent runs', 'Signing keys', 'Risk ledger', 'Data retention', 'Demo data',
+      'Setup checklist', 'Projects and transitions', 'Severity policy', 'Roles', 'Review mode', 'Budgets', 'Warn-only mode', 'Notifications', 'Recent runs', 'Signing keys', 'Risk ledger', 'Data retention', 'Demo data',
     ]);
   });
 

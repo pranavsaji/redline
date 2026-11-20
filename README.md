@@ -31,6 +31,8 @@ Automation and Forge SQL. No egress: nothing leaves Atlassian.
   code into the skeleton.
 - **Fix-by dates.** Open requirements are due 7 days (Critical), 30 (High) or 90 (Medium) after Redline raised them;
   the panel shows "Overdue by N days" and the posture page counts what is overdue.
+- **Works without Rovo.** An admin can switch Review mode to rule-based checks only: every review completes at once from
+  Redline's built-in checks, clearly labelled, so the gates work on any Jira site.
 - **Enforcement that fails closed.** A workflow validator blocks Done while anything is open, missing, failed or out of
   date, with a message saying exactly why and a one-click re-run. Paused at the budget? A champion can confirm.
 - **Risk acceptance with teeth.** Reason, compensating controls, an expiry (at most 30 days for Critical), an approver

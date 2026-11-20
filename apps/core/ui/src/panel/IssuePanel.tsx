@@ -137,6 +137,11 @@ export function IssuePanel({ api }: { api: PanelApi }) {
       ) : (
         <>
           <Header dto={dto} {...(canRun ? { onRerun: () => void rerun() } : {})} busy={busy} />
+          {dto.review?.modelIds.includes('redline-rules') && (
+            <SectionMessage appearance="information" title="Rule-based review">
+              AI review is off on this site, so these threats come from Redline's built-in checks only. An admin can turn on AI review under Redline admin → Review mode once Rovo is available.
+            </SectionMessage>
+          )}
           {dto.review && <WhatIf api={api} />}
           {view.state === 'in_progress' && (
             <SectionMessage appearance="information" title="Review in progress">

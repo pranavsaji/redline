@@ -228,6 +228,17 @@ describe('admin.usage', () => {
   });
 });
 
+describe('admin.setPolicy reviewMode (feature: rules-only mode)', () => {
+  it('an admin switches to rule-based checks only; the change is ledgered with the field name', async () => {
+    const r = await reviewed();
+    const out = await adminSetPolicy(r.t.deps, A, { policy: { ...(await policyOf(r)), reviewMode: 'rules_only' } });
+    expect(out).toMatchObject({ policy: { reviewMode: 'rules_only' } });
+    const changed = (await ledger(r)).filter((e) => e.eventType === 'policy.changed').at(-1);
+    expect(changed?.payload).toMatchObject({ fields: expect.arrayContaining(['reviewMode']) });
+    expect(await adminSetPolicy(r.t.deps, A, { policy: { ...(await policyOf(r)), reviewMode: 'llm' } })).toMatchObject({ error: 'validation' });
+  });
+});
+
 describe('admin.resumeReviews (final review C3)', () => {
   it('an admin clears the out-of-credits pause; it is ledgered; a developer cannot', async () => {
     const r = await reviewed();
