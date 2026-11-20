@@ -3,3 +3,5 @@
 # ... plus files that hold the one fake AWS key the redaction tests use on purpose (see .gitleaks.toml).
 .gitleaks.toml
 docs/superpowers/
+# The GitHub Action's generated bundle (third-party code, minified); its source in apps/github-action/src is scanned.
+apps/github-action/dist/

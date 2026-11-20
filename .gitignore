@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# The GitHub Action runs its committed bundle; CI rebuilds it and fails if it differs.
+!apps/github-action/dist/
 build/
 coverage/
 .env

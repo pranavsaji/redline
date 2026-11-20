@@ -118,7 +118,7 @@ modules:
       name: Get Redline merge attestation
       function: getMergeAttestationFn
       actionVerb: CREATE
-      description: Signs a merge attestation for a Jira work item, Bitbucket repository and commit when Redline's verdict allows it, and returns the text to paste into the pull request description. If the work item is blocked, returns what blocks it instead.
+      description: Signs a merge attestation for a Jira work item, Bitbucket or GitHub repository and commit when Redline's verdict allows it, and returns the text to paste into the pull request description. If the work item is blocked, returns what blocks it instead.
       inputs:
         issueKey:
           title: Issue key
@@ -129,7 +129,7 @@ modules:
           title: Repository
           type: string
           required: true
-          description: The Bitbucket repository as workspace/repository, for example acme/payments
+          description: The repository as workspace/repository (Bitbucket) or owner/repository (GitHub), for example acme/payments
         commitSha:
           title: Commit hash
           type: string

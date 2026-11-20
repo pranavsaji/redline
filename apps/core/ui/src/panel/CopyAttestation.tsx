@@ -20,7 +20,7 @@ export function CopyAttestation({ api }: { api: PanelApi }) {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!REPO.test(repo.trim())) return setError('Give the repository as workspace/repository, for example acme/payments.');
+    if (!REPO.test(repo.trim())) return setError('Give the repository as workspace/repository (Bitbucket) or owner/repository (GitHub), for example acme/payments.');
     if (!SHA.test(sha.trim())) return setError('Give the full 40-character commit hash of the pull request’s head commit.');
     setBusy(true);
     const r = await api.attestation(repo.trim(), sha.trim()).catch((): ApiError => ({ error: 'unavailable' }));
@@ -47,7 +47,7 @@ export function CopyAttestation({ api }: { api: PanelApi }) {
     <form aria-label="Merge attestation" onSubmit={submit} style={box}>
       <strong>Merge attestation</strong>
       <span style={{ font: token('font.body.small'), color: token('color.text.subtle') }}>
-        Redline for Bitbucket lets a pull request that touches security-sensitive files merge only with a signed attestation for its head commit.
+        Redline's merge gate (Redline for Bitbucket, or the Redline GitHub Action) lets a pull request that touches security-sensitive files merge only with a signed attestation for its head commit.
       </span>
       <label style={label} htmlFor={`${id}-repo`}>
         Repository

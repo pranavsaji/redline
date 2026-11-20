@@ -40,7 +40,7 @@ export function Keys({ api }: { api: AdminApi }) {
     setBusy(false);
     setConfirming(false);
     if (isError(r)) return setMessage(errorText(r));
-    setMessage(`New key ${r.kid} is active. Paste the new public key into Redline for Bitbucket within 7 days.`);
+    setMessage(`New key ${r.kid} is active. Paste the new public key into Redline for Bitbucket and your GitHub workflows within 7 days.`);
     await load();
   };
 
