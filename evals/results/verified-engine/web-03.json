@@ -1,0 +1,10 @@
+{
+  "caseId": "web-03",
+  "promptVersion": "v1.3.0",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"T1\",\n      \"keep\": true,\n      \"reason\": \"Evidence confirms email change without password. Concrete attack: session theft → email change → account takeover.\"\n    },\n    {\n      \"id\": \"T2\",\n      \"keep\": false,\n      \"reason\": \"Duplicate of T1. Same attack (email change without verification) and same harm (account takeover).\"\n    },\n    {\n      \"id\": \"T3\",\n      \"keep\": false,\n      \"reason\": \"No evidence that HttpOnly/Secure flags are missing. Generic cookie security advice without design support.\"\n    },\n    {\n      \"id\": \"T4\",\n      \"keep\": false,\n      \"reason\": \"No evidence about audit logs in design quotes. Generic security hygiene without link to design.\"\n    },\n    {\n      \"id\": \"T5\",\n      \"keep\": true,\n      \"reason\": \"Evidence supports immediate PII changes. Concrete attack: session access → change shipping/phone → redirect deliveries/intercept 2FA.\"\n    },\n    {\n      \"id\": \"T6\",\n      \"keep\": false,\n      \"reason\": \"No evidence cookie flags are missing. Generic cookie security advice, essentially duplicate of T3.\"\n    },\n    {\n      \"id\": \"T7\",\n      \"keep\": false,\n      \"reason\": \"No evidence about rate limiting in design quotes. Generic security advice without design support.\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

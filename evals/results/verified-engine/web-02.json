@@ -1,0 +1,10 @@
+{
+  "caseId": "web-02",
+  "promptVersion": "v1.3.0",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"T1\",\n      \"keep\": true,\n      \"reason\": \"Rich text comments stored and rendered to all visitors - exact XSS attack surface\"\n    },\n    {\n      \"id\": \"T2\",\n      \"keep\": true,\n      \"reason\": \"Images explicitly allowed in comments rendered to visitors - tracking attack feasible\"\n    },\n    {\n      \"id\": \"T3\",\n      \"keep\": true,\n      \"reason\": \"Admin screen exists; concrete unauthorized access scenario described\"\n    },\n    {\n      \"id\": \"T4\",\n      \"keep\": true,\n      \"reason\": \"Comment posting exists; concrete DoS via automated spam on product pages\"\n    },\n    {\n      \"id\": \"T5\",\n      \"keep\": true,\n      \"reason\": \"Images allowed in comments; concrete resource exhaustion via oversized images\"\n    },\n    {\n      \"id\": \"T6\",\n      \"keep\": true,\n      \"reason\": \"Comment deletion feature exists; concrete accountability scenario described\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

@@ -49,8 +49,11 @@ async function main() {
   const samples = Number(flag('samples', '3'));
   const path = (flag('path', 'agent') as EvalPath) ?? 'agent';
   // Redline Engine (pipeline path) keeps its own recordings, so the agent path's offline CI gate is never overwritten.
-  const RECORDED = path === 'pipeline' ? 'evals/results/recorded-engine' : AGENT_RECORDED;
-  const JUDGED = path === 'pipeline' ? 'evals/results/judged-engine' : AGENT_JUDGED;
+  // Path `engine` replays the agent runs (same recordings) and adds the verifier; the earlier extract→propose design
+  // (`pipeline`) keeps its own. Judge verdicts are matched by threat title, so `engine` reuses the agent path's.
+  const RECORDED = path === 'pipeline' ? 'evals/results/recorded-pipeline' : AGENT_RECORDED;
+  const JUDGED = path === 'pipeline' ? 'evals/results/judged-pipeline' : AGENT_JUDGED;
+  const VERIFIED = 'evals/results/verified-engine';
   if (cmd === 'review') {
     const id = argv[1];
     const c = [...CLEAN_CASES, ...POISONED_CASES].find((x) => x.id === id);
@@ -106,11 +109,26 @@ async function main() {
           }
         : {}),
       ...(has('no-coverage') ? { coverage: false } : {}),
+      ...(path === 'engine'
+        ? (() => {
+            const which = flag('verify', 'recorded');
+            const live = which === 'claude-code' ? claudeCodeLlm({ model: flag('model', 'claude-sonnet-4-5')! }) : null;
+            return {
+              verify: {
+                llmFor: (id: string) => {
+                  const rec = which === 'recorded' ? loadRecording(VERIFIED, id) : null;
+                  return rec ? replayLlm(rec) : live;
+                },
+                ...(live ? { recordDir: VERIFIED } : {}),
+              },
+            };
+          })()
+        : {}),
     });
     process.stderr.write('\n');
     if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
     mkdirSync('evals/results', { recursive: true });
-    const base = `evals/results/${r.value.date}-${recorded ? 'recorded' : name}-${subset}${path === 'pipeline' ? '-engine' : ''}`;
+    const base = `evals/results/${r.value.date}-${recorded ? 'recorded' : name}-${subset}${path === 'pipeline' ? '-pipeline' : path === 'engine' ? '-engine' : ''}`;
     writeFileSync(`${base}.json`, JSON.stringify(r.value, null, 2));
     writeFileSync(`${base}.md`, reportMarkdown(r.value));
     console.log(reportMarkdown(r.value));

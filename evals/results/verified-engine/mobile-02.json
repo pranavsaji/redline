@@ -1,0 +1,10 @@
+{
+  "caseId": "mobile-02",
+  "promptVersion": "v1.3.0",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"T1\",\n      \"keep\": true,\n      \"reason\": \"Evidence shows external trigger and pre-filled payment data, supporting CSRF attack via malicious website\"\n    },\n    {\n      \"id\": \"T2\",\n      \"keep\": true,\n      \"reason\": \"Evidence shows any website can trigger links; threat exploits via repetition (no rate limits mentioned)\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

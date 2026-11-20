@@ -1,5 +1,7 @@
 import { appError, err, ok, type AgentThreatModel, type ArchitectureSketch, type ContextBundle, type Result, type Review, type SitePolicy } from '@redline/shared';
 import {
+  agentPrompt,
+  automationPrompt,
   extractPrompt,
   ExtractFallbackSchema,
   ExtractOutputSchema,
@@ -12,7 +14,8 @@ import {
 } from '@redline/prompts';
 import { z } from 'zod';
 import { scanForInjection } from './context/injection.js';
-import { assembleReview, parseFirstObject, type AssembleOutput } from './ingest.js';
+import { assembleReview, extractAgentJson, parseFirstObject, type AssembleOutput } from './ingest.js';
+import { buildReviewContext, renderReviewContext } from './review-context.js';
 import type { ClockPort, FeedbackRepo, LlmPort, LlmPurpose, ModelTier, ReviewRepo, Sample } from './ports.js';
 
 export interface PipelineDeps {
@@ -43,6 +46,47 @@ export interface Usage {
 
 const estimate = (system: string, user: string) => Math.ceil((system.length + user.length) / 4);
 
+/** One model call within the per-review token budget (atomic reservation when `deps.budget` is set). */
+export async function callText(
+  deps: Pick<PipelineDeps, 'llm' | 'policy'> & { budget?: StageBudget },
+  usage: Usage,
+  req: { system: string; user: string; purpose: LlmPurpose; tier: ModelTier; maxOutputTokens: number },
+): Promise<Result<string>> {
+  const est = { tokensIn: estimate(req.system, req.user), tokensOut: req.maxOutputTokens };
+  if (deps.budget) {
+    if (!(await deps.budget.reserve(est.tokensIn, est.tokensOut))) return err(appError('budget', 'review token budget reached'));
+  } else if (usage.tokensIn + est.tokensIn > deps.policy.budget.tokensInPerReview || usage.tokensOut >= deps.policy.budget.tokensOutPerReview) {
+    return err(appError('budget', 'review token budget reached'));
+  }
+  const r = await deps.llm.complete(req);
+  if (deps.budget) await deps.budget.settle(est, r.ok ? { tokensIn: r.value.tokensIn, tokensOut: r.value.tokensOut } : { tokensIn: 0, tokensOut: 0 });
+  if (!r.ok) return r;
+  usage.tokensIn += r.value.tokensIn;
+  usage.tokensOut += r.value.tokensOut;
+  usage.modelIds.add(r.value.modelId);
+  return ok(r.value.text);
+}
+
+/**
+ * Redline Engine run: the Redline agent prompt over the nonce-fenced review context, exactly what a Rovo agent run
+ * sees (the path the eval measures best), on the deep tier. Its JSON becomes a sample like any agent run, so
+ * consensus, verbatim-quote grounding, injection flags and the rule-based floor apply unchanged. An answer that is not a
+ * valid threat model is a failed run; only the budget is an error.
+ */
+export async function engineAgentRun(deps: StageDeps, review: Review, bundle: ContextBundle, usage: Usage): Promise<Result<Sample>> {
+  const ctx = renderReviewContext(buildReviewContext(bundle, { revision: review.revision }));
+  const r = await callText(deps, usage, {
+    system: agentPrompt(),
+    user: `${automationPrompt(bundle.issueKey)}\n\nResult of get-review-context:\n${ctx}`,
+    tier: 'deep',
+    maxOutputTokens: 16000,
+    purpose: 'propose',
+  });
+  if (!r.ok) return r.error.code === 'budget' ? r : ok({ failed: r.error.code });
+  const m = extractAgentJson(r.value, bundle.issueKey);
+  return ok(m.ok ? m.value : { failed: m.error.code });
+}
+
 /** One stage call with the spec's failure ladder: validate → one repair with the validator error → smaller fallback schema → fail. */
 export async function callStage<T>(
   deps: Pick<PipelineDeps, 'llm' | 'policy'> & { budget?: StageBudget },
@@ -51,21 +95,7 @@ export async function callStage<T>(
   schema: z.ZodType<T>,
   fallback: { schema: z.ZodType<T>; instruction: string } | null,
 ): Promise<Result<T>> {
-  const call = async (system: string, user: string): Promise<Result<string>> => {
-    const est = { tokensIn: estimate(system, user), tokensOut: req.maxOutputTokens };
-    if (deps.budget) {
-      if (!(await deps.budget.reserve(est.tokensIn, est.tokensOut))) return err(appError('budget', 'review token budget reached'));
-    } else if (usage.tokensIn + est.tokensIn > deps.policy.budget.tokensInPerReview || usage.tokensOut >= deps.policy.budget.tokensOutPerReview) {
-      return err(appError('budget', 'review token budget reached'));
-    }
-    const r = await deps.llm.complete({ ...req, system, user });
-    if (deps.budget) await deps.budget.settle(est, r.ok ? { tokensIn: r.value.tokensIn, tokensOut: r.value.tokensOut } : { tokensIn: 0, tokensOut: 0 });
-    if (!r.ok) return r;
-    usage.tokensIn += r.value.tokensIn;
-    usage.tokensOut += r.value.tokensOut;
-    usage.modelIds.add(r.value.modelId);
-    return ok(r.value.text);
-  };
+  const call = (system: string, user: string) => callText(deps, usage, { ...req, system, user });
   const validate = (text: string, s: z.ZodType<T>) => s.safeParse(parseFirstObject(text) ?? undefined);
 
   const first = await call(req.system, req.user);

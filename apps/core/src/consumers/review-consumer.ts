@@ -155,7 +155,9 @@ async function gather(deps: CoreDeps, job: Extract<ReviewJob, { kind: 'gather' }
     if (!u.ok) return u;
   }
   if (engine) {
-    const q = await deps.queue.push([{ kind: 'engine', reviewId: review.id, stage: 'extract' }]);
+    // Marks the review as Redline Engine's, then starts its independent runs in parallel (one job each).
+    await deps.reviews.saveStage(review.id, 'engine', 'done', { runs: review.samplesExpected }, undefined, now.toISOString());
+    const q = await deps.queue.push(Array.from({ length: review.samplesExpected }, (_, n) => ({ kind: 'engine' as const, reviewId: review.id, stage: 'propose' as const, n })));
     if (!q.ok) return q;
   }
   log('review.created', { issueId: job.issueId, revision, reason: job.reason, paused: paused.value, partial: b.partial, engine });

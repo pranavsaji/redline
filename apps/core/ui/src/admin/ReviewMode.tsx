@@ -54,8 +54,8 @@ export function ReviewMode(props: PolicySectionProps & { recentAuthors?: AdminPo
             <input type="radio" name={`${id}-mode`} checked={mode === 'engine'} onChange={() => setMode('engine')} />
             <span>
               <strong>Redline Engine (recommended).</strong> Redline runs every review itself on Atlassian-hosted Claude
-              models: a quarantined extraction, three independent analyses on the strongest model, and an adversarial
-              verifier that drops threats the evidence does not support. No Rovo agent or Automation rule needed, and no
+              models: three independent analyses on the strongest model, which must agree and quote their evidence, and an
+              adversarial verifier that checks each threat against its quotes. No Rovo agent or Automation rule needed, and no
               developer can write their own review.
             </span>
           </label>

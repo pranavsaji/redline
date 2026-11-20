@@ -1,0 +1,10 @@
+{
+  "caseId": "data-03",
+  "promptVersion": "v1.3.0",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"T1\",\n      \"keep\": true,\n      \"reason\": \"Design explicitly allows all services to consume payment card data; threat describes concrete PCI scope expansion risk.\"\n    },\n    {\n      \"id\": \"T2\",\n      \"keep\": false,\n      \"reason\": \"Duplicates T1's compromise scenario; T1 already covers attackers gaining access through compromised services.\"\n    },\n    {\n      \"id\": \"T3\",\n      \"keep\": true,\n      \"reason\": \"Design shows events published to topic; threat addresses producer authentication gap for this payment data flow.\"\n    },\n    {\n      \"id\": \"T4\",\n      \"keep\": false,\n      \"reason\": \"Generic audit logging recommendation; no design evidence showing audit capability is actually missing.\"\n    },\n    {\n      \"id\": \"T5\",\n      \"keep\": false,\n      \"reason\": \"Generic integrity protection recommendation; no design evidence showing integrity controls are actually absent.\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

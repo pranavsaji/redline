@@ -1,0 +1,10 @@
+{
+  "caseId": "web-01",
+  "promptVersion": "v1.3.0",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"T1\",\n      \"keep\": true,\n      \"reason\": \"Evidence confirms token in URL to public page; threat describes concrete log exposure attack\"\n    },\n    {\n      \"id\": \"T2\",\n      \"keep\": false,\n      \"reason\": \"Evidence shows token exists, not that it's predictable or weak; assumes vulnerability not in design\"\n    },\n    {\n      \"id\": \"T3\",\n      \"keep\": true,\n      \"reason\": \"Evidence confirms immediate login after reset; threat describes concrete session hijacking escalation\"\n    },\n    {\n      \"id\": \"T4\",\n      \"keep\": false,\n      \"reason\": \"Evidence shows email-based reset exists, not differential responses; assumes behavior not in design\"\n    },\n    {\n      \"id\": \"T5\",\n      \"keep\": false,\n      \"reason\": \"Evidence shows feature exists, not absence of rate limiting; generic hygiene without design evidence\"\n    },\n    {\n      \"id\": \"T6\",\n      \"keep\": false,\n      \"reason\": \"Evidence shows email reset exists, not lack of notifications; assumes missing control without evidence\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}
