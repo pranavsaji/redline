@@ -57,6 +57,10 @@ describe('parseInputs (GitHub Action inputs)', () => {
 });
 
 describe('runGitHubCheck (the merge gate on GitHub)', () => {
+  it("changing the gate's own configuration is always sensitive (workflows, local actions, .redline)", async () => {
+    for (const filename of ['.github/workflows/redline.yml', '.github/actions/setup/action.yml', '.redline/policy.yml'])
+      expect(await runGitHubCheck({ settings: inputs(), client: client({ files: [{ ...DOCS, filename }] }), nowSec: NOW })).toMatchObject({ success: false, outcome: 'fail_missing' });
+  });
   it('changes that touch no sensitive paths merge freely', async () => {
     expect(await runGitHubCheck({ settings: inputs(), client: client({ files: [DOCS] }), nowSec: NOW })).toMatchObject({ success: true, outcome: 'pass_not_sensitive' });
   });
@@ -120,7 +124,7 @@ describe('the bundled action', () => {
   });
   afterAll(() => new Promise<void>((r) => server.close(() => r())));
 
-  const runDist = (description: string) => {
+  const runDist = (description: string, eventName = 'pull_request_target') => {
     body = description;
     const dir = mkdtempSync(join(tmpdir(), 'redline-action-'));
     const event = join(dir, 'event.json');
@@ -131,7 +135,7 @@ describe('the bundled action', () => {
     writeFileSync(summary, '');
     // Async, so this process can keep serving the stand-in API while the action runs.
     const child = spawn(process.execPath, [dist.pathname], {
-      env: { PATH: process.env.PATH ?? '', GITHUB_EVENT_PATH: event, GITHUB_API_URL: api, GITHUB_OUTPUT: out, GITHUB_STEP_SUMMARY: summary, 'INPUT_GITHUB-TOKEN': 'test-token', 'INPUT_PUBLIC-KEYS': key.publicKey, REDLINE_NOW: String(NOW) },
+      env: { PATH: process.env.PATH ?? '', GITHUB_EVENT_NAME: eventName, GITHUB_EVENT_PATH: event, GITHUB_API_URL: api, GITHUB_OUTPUT: out, GITHUB_STEP_SUMMARY: summary, 'INPUT_GITHUB-TOKEN': 'test-token', 'INPUT_PUBLIC-KEYS': key.publicKey, REDLINE_NOW: String(NOW) },
     });
     let stdout = '';
     child.stdout.on('data', (d: Buffer) => (stdout += d.toString()));
@@ -149,5 +153,10 @@ describe('the bundled action', () => {
     expect(fail.status).toBe(1);
     expect(fail.stdout).toMatch(/::error title=Redline::Redline: this change touches security-sensitive files/);
     expect(fail.outputs).toMatch(/outcome=fail_missing/);
+    expect(fail.stdout).not.toMatch(/::warning/);
+  });
+
+  it.skipIf(!existsSync(dist))('warns when run on pull_request, where the pull request controls its own workflow', async () => {
+    expect((await runDist(token(), 'pull_request')).stdout).toMatch(/::warning title=Redline::.*pull_request_target/);
   });
 });

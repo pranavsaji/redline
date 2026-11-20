@@ -17,6 +17,10 @@ async function main(): Promise<number> {
   const number = event.pull_request?.number;
   const repo = event.repository?.full_name;
   if (!number || !repo) return finish(false, 'config_error', 'Redline: run this action on pull_request events (opened, edited, synchronize, reopened).');
+  // Under pull_request, GitHub runs the workflow file from the pull request itself, so its author could change this
+  // step's inputs or replace it. pull_request_target runs the base branch's workflow, which the PR cannot change.
+  if (env.GITHUB_EVENT_NAME === 'pull_request')
+    say(`::warning title=Redline::${escape('Redline: this workflow runs on pull_request, so a pull request can change its own gate. Use pull_request_target (see docs/GITHUB.md).')}`);
   const token = input('github-token') ?? env.GITHUB_TOKEN ?? '';
   const client = gitHubClient({ api: env.GITHUB_API_URL ?? 'https://api.github.com', token, repo, number });
   const r = await runGitHubCheck({ settings: settings.value, client, nowSec });

@@ -13,7 +13,9 @@ so both platforms give the same answer for the same change.
    ```yaml
    name: Redline
    on:
-     pull_request:
+     # pull_request_target runs this file from the base branch, so a pull request cannot change its own gate.
+     # Safe here: the action never checks out or runs pull request code; it only reads the pull request through the API.
+     pull_request_target:
        types: [opened, edited, synchronize, reopened]
    permissions:
      contents: read
@@ -32,6 +34,14 @@ so both platforms give the same answer for the same change.
 3. In **Settings → Branches** (or Rules), require the **Redline / merge-gate** status check on your main branch.
 
 `edited` is in the trigger list so that pasting an attestation into the description re-runs the check.
+
+**Why `pull_request_target`.** On `pull_request`, GitHub runs the workflow file from the pull request itself, so its
+author could swap in their own key, switch to warn mode, or replace the step. `pull_request_target` runs the base
+branch's workflow. The action warns if it runs on `pull_request`. Do not add a checkout of the pull request's code to
+this job. For organisation-wide enforcement, add the workflow as a required workflow in an organisation ruleset.
+
+Changes to `.github/workflows/**`, `.github/actions/**` and `.redline/**` always count as sensitive, so loosening the
+gate needs an attestation like any other security change.
 
 ## Inputs
 
