@@ -66,6 +66,21 @@ describe('testScaffold (feature: test skeletons from requirements)', () => {
   });
 });
 
+/** What javac does first: \\uXXXX escapes become characters, even in comments (an odd run of backslashes only). */
+const javaUnicode = (src: string) => src.replace(/(\\+)u+([0-9a-fA-F]{4})/g, (m, slashes: string, hex: string) => (slashes.length % 2 === 1 ? slashes.slice(1) + String.fromCharCode(parseInt(hex, 16)) : m));
+
+describe('testScaffold: Java unicode escapes (commit security review)', () => {
+  it('a \\u000a in requirement text cannot start a new Java line inside a comment, or end a string', () => {
+    const java = testScaffold(
+      req({ title: 'Mitigate \\u000a System.exit(1);', criteria: [{ given: 'x \\u000a Runtime.getRuntime().exec("rm");', when: 'w \\u000d\\u000a int a = 1;', then: 't \\u0022); System.exit(2); //' }] }),
+      'java',
+    );
+    const lines = javaUnicode(java).split(/\r\n|\r|\n/);
+    expect(lines.filter((l) => /System\.exit|Runtime\.getRuntime|int a = 1/.test(l)).every((l) => l.trim().startsWith('//') || /^\s*fail\(".*"\);$/.test(l))).toBe(true);
+    for (const l of lines.filter((x) => x.includes('fail('))) expect(l).toMatch(/^\s*fail\("(?:[^"\\]|\\.)*"\);$/);
+  });
+});
+
 describe('fix-by deadlines (feature: requirement SLAs)', () => {
   const now = new Date('2026-11-20T00:00:00.000Z');
   it('Critical 7 days, High 30, Medium 90, Low none, counted from when Redline created the requirement', () => {

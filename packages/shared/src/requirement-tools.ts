@@ -12,6 +12,11 @@ export const TEST_LANGUAGES: readonly TestLanguage[] = ['typescript', 'python', 
 const oneLine = (s: string, max = 200) => s.replace(/[\u0000-\u001f\u007f\u2028\u2029]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
 const singleQuoted = (s: string) => `'${oneLine(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 const doubleQuoted = (s: string) => `"${oneLine(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+/**
+ * Java comment text: javac turns \\uXXXX into characters before it reads comments, so \\u000a would end the comment
+ * line and the rest would be code. Doubling every backslash leaves an even run, which is never an escape.
+ */
+const javaComment = (s: string, max = 200) => oneLine(s, max).replace(/\\/g, '\\\\');
 const words = (s: string) => oneLine(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
 
 function uniqueNames(base: string[], fallback: string): string[] {
@@ -66,18 +71,18 @@ export function testScaffold(r: Requirement, lang: TestLanguage): string {
     '',
     '    @Test',
     `    void ${names[i]}() {`,
-    `        // Given ${oneLine(c.given)}`,
-    `        // When ${oneLine(c.when)}`,
-    `        // Then ${oneLine(c.then)}`,
+    `        // Given ${javaComment(c.given)}`,
+    `        // When ${javaComment(c.when)}`,
+    `        // Then ${javaComment(c.then)}`,
     `        fail(${doubleQuoted(`Write this test (Redline ${r.id})`)});`,
     '    }',
   ]);
   return [
-    ...header(r, '//'),
+    ...header(r, '//').map((l) => l.replace(/\\/g, '\\\\')),
     'import org.junit.jupiter.api.Test;',
     'import static org.junit.jupiter.api.Assertions.fail;',
     '',
-    `// ${oneLine(`${key} ${r.title}`)}`,
+    `// ${javaComment(`${key} ${r.title}`)}`,
     `class ${cls} {`,
     ...tests.slice(1),
     '}',
