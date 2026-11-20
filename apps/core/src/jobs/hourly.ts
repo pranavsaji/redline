@@ -48,7 +48,7 @@ async function failRateAlert(deps: CoreDeps): Promise<void> {
     if (s === 'agent_timeout') silent += recent.filter((x) => x.samplesReceived === 0).length;
   }
   if (total === 0 || bad / total <= FAILURE_RATE) return;
-  const rejected = await deps.ledger.ofTypes(['review.sample_rejected']);
+  const rejected = await deps.ledger.latestOfTypes(['review.sample_rejected'], 500);
   const refused = rejected.ok ? rejected.value.filter((r) => r.createdAt >= since).length : 0;
 
   const sent = await opsAlert(
