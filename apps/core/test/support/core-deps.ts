@@ -1,3 +1,5 @@
+import type { LlmPort } from '@redline/core';
+import { FakeLlm } from '../../../../packages/core/test/fakes/fake-llm.js';
 import {
   fixedClock,
   memoryAttestationRepo,
@@ -21,7 +23,7 @@ import { memoryKvs } from './memory-kvs.js';
 import { kvsSigningKeys } from '../../src/adapters/signing-keys.js';
 import { contextHash } from '@redline/core';
 
-export const POLICY: SitePolicy = { ...DEFAULT_SITE_POLICY, enabledProjects: ['PAY'], reviewIssueTypes: ['Story', 'Epic'], agentSamples: 3, agentTimeoutMinutes: 15 };
+export const POLICY: SitePolicy = { ...DEFAULT_SITE_POLICY, enabledProjects: ['PAY'], reviewIssueTypes: ['Story', 'Epic'], agentSamples: 3, agentTimeoutMinutes: 15, reviewMode: 'agent' };
 
 export function jiraIssue(over: Partial<JiraIssue> & { id: string; key: string }): JiraIssue {
   return {
@@ -109,7 +111,7 @@ export function fakeGatherer(texts: Record<string, string>) {
   };
 }
 
-export function coreDeps(o: { issues?: JiraIssue[]; policy?: SitePolicy; now?: string } = {}) {
+export function coreDeps(o: { issues?: JiraIssue[]; policy?: SitePolicy; now?: string; llm?: LlmPort } = {}) {
   const clock = fixedClock(o.now ?? '2026-11-15T12:00:00Z');
   const kv = memoryKvs();
   const pushed: ReviewJob[] = [];
@@ -130,6 +132,7 @@ export function coreDeps(o: { issues?: JiraIssue[]; policy?: SitePolicy; now?: s
     attestations: memoryAttestationRepo(),
     treeHeads: memoryTreeHeadRepo(),
     keys: kvsSigningKeys(clock, kv),
+    llm: o.llm ?? new FakeLlm({}),
     jira,
     confluence: {} as ConfluenceClient,
     gatherer,

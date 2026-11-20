@@ -18,9 +18,9 @@ import { CLEAN_CASES, POISONED_CASES } from '../../../evals/fixtures/cases.js';
 import { reportMarkdown, runCase, runEval, selectCases, type EvalPath } from '../../../evals/runner/run.js';
 import { gateCheck, loadRecording, replayLlm } from '../../../evals/runner/recorded.js';
 
-const RECORDED = 'evals/results/recorded';
+const AGENT_RECORDED = 'evals/results/recorded';
 const BASELINE = 'evals/results/baseline.json';
-const JUDGED = 'evals/results/judged';
+const AGENT_JUDGED = 'evals/results/judged';
 
 const argv = process.argv.slice(2);
 const flag = (name: string, def?: string) => {
@@ -48,6 +48,9 @@ async function main() {
   const cmd = argv[0];
   const samples = Number(flag('samples', '3'));
   const path = (flag('path', 'agent') as EvalPath) ?? 'agent';
+  // Redline Engine (pipeline path) keeps its own recordings, so the agent path's offline CI gate is never overwritten.
+  const RECORDED = path === 'pipeline' ? 'evals/results/recorded-engine' : AGENT_RECORDED;
+  const JUDGED = path === 'pipeline' ? 'evals/results/judged-engine' : AGENT_JUDGED;
   if (cmd === 'review') {
     const id = argv[1];
     const c = [...CLEAN_CASES, ...POISONED_CASES].find((x) => x.id === id);
@@ -107,7 +110,7 @@ async function main() {
     process.stderr.write('\n');
     if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
     mkdirSync('evals/results', { recursive: true });
-    const base = `evals/results/${r.value.date}-${recorded ? 'recorded' : name}-${subset}`;
+    const base = `evals/results/${r.value.date}-${recorded ? 'recorded' : name}-${subset}${path === 'pipeline' ? '-engine' : ''}`;
     writeFileSync(`${base}.json`, JSON.stringify(r.value, null, 2));
     writeFileSync(`${base}.md`, reportMarkdown(r.value));
     console.log(reportMarkdown(r.value));

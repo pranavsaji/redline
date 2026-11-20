@@ -19,3 +19,4 @@ export * from './review-context.js';
 export * from './render/threat-model-storage.js';
 export * from './transparency.js';
 export * from './merge-gate.js';
+export * from './verify.js';

@@ -130,6 +130,9 @@ importers:
       '@forge/kvs':
         specifier: ^2.1.2
         version: 2.1.2(typescript@5.9.3)
+      '@forge/llm':
+        specifier: 1.0.10
+        version: 1.0.10(typescript@5.9.3)
       '@forge/resolver':
         specifier: ^2.0.2
         version: 2.0.2(typescript@5.9.3)
@@ -1172,6 +1175,14 @@ packages:
 
   '@forge/kvs@2.1.2':
     resolution: {integrity: sha512-/I9ZUj+v6LR3VAqlQqmfIPgjG70cMLt8Pq5GBwR4QkaSI64pa+lTUv/jCWtlqh3OPWXjhIFZsVrAJmVwSeykvg==}
+    peerDependencies:
+      typescript: '>=5.0.0'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
+  '@forge/llm@1.0.10':
+    resolution: {integrity: sha512-ETD3/NpBybBaAV+orMAsuk9lnR0827QL9OJVvdxj403CHmRzpQZLbLIE9Nn8Dix9lSPURifT1zcBH3flLwMC+g==}
     peerDependencies:
       typescript: '>=5.0.0'
     peerDependenciesMeta:
@@ -4313,6 +4324,12 @@ snapshots:
       typescript: 5.9.3
 
   '@forge/kvs@2.1.2(typescript@5.9.3)':
+    dependencies:
+      '@forge/api': 8.5.0(typescript@5.9.3)
+    optionalDependencies:
+      typescript: 5.9.3
+
+  '@forge/llm@1.0.10(typescript@5.9.3)':
     dependencies:
       '@forge/api': 8.5.0(typescript@5.9.3)
     optionalDependencies:

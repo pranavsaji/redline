@@ -49,13 +49,17 @@ async function failRateAlert(deps: CoreDeps): Promise<void> {
   }
   if (total === 0 || bad / total <= FAILURE_RATE) return;
   const rejected = await deps.ledger.latestOfTypes(['review.sample_rejected'], 500);
+  const pol = await deps.config.site();
+  const engine = pol.ok && pol.value.reviewMode === 'engine';
   const refused = rejected.ok ? rejected.value.filter((r) => r.createdAt >= since).length : 0;
 
   const sent = await opsAlert(
     deps,
     alertKey,
     `Redline: ${bad} of ${total} security reviews in the last hour failed or timed out. Work items stay blocked until they are re-run. Check the site's Rovo credits and the Redline admin page.` +
-      (silent > 0
+      (silent > 0 && engine
+        ? ` ${silent} of them got no Redline Engine run at all: Forge LLMs did not answer. Check the app's Forge logs (llm.failed) and the developer console usage; until it recovers, choose Redline admin → Review mode → Rule-based checks only.`
+        : silent > 0
         ? ` ${silent} of them got no agent run at all, so Jira Automation did not run the Redline agent: open Project settings → Automation → the Redline rules → Audit log. If it says the agent is deactivated (this can happen after a Redline update), re-select Redline in each Use agent step and save. If this site has no Rovo, choose Redline admin → Review mode → Rule-based checks only.`
         : '') +
       (refused > 0

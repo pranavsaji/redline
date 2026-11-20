@@ -137,6 +137,12 @@ export function IssuePanel({ api }: { api: PanelApi }) {
       ) : (
         <>
           <Header dto={dto} {...(canRun ? { onRerun: () => void rerun() } : {})} busy={busy} />
+          {dto.review && dto.review.modelIds.some((m) => m.startsWith('claude')) && (
+            <SectionMessage appearance="discovery" title="Redline Engine review">
+              Redline ran this review itself: a quarantined extraction of the work item and its pages, independent analyses that must agree, and a verifier
+              that checks each threat against the quotes it rests on. Models: {dto.review.modelIds.join(', ')}.
+            </SectionMessage>
+          )}
           {dto.review?.modelIds.includes('redline-rules') && (
             <SectionMessage appearance="information" title="Rule-based review">
               AI review is off on this site, so these threats come from Redline's built-in checks only. An admin can turn on AI review under Redline admin → Review mode once Rovo is available.

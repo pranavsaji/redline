@@ -29,6 +29,8 @@ export const ThreatSchema = z
     confidence: z.number().min(0).max(1),
     state: ThreatStateSchema,
     dismissReason: DismissReasonSchema.optional(),
+    /** Redline Engine's verifier on an AI threat: whether the quoted evidence supports it, and why (stage 4). */
+    verification: z.object({ keep: z.boolean(), reason: z.string().max(300) }).strict().optional(),
     /** For a `covered` rule-based threat: the id of the AI threat in the same review that covers it. */
     coveredBy: z.string().min(1).optional(),
     origin: z.enum(['baseline', 'agent', 'pipeline']),

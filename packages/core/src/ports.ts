@@ -65,6 +65,8 @@ export interface ReviewRepo {
   byStatus(status: ReviewStatus, olderThan?: string): Promise<Result<Review[]>>;
   create(r: Review): Promise<Result<Review>>;
   update(id: string, patch: Partial<Review>): Promise<Result<void>>;
+  /** Atomically adds token counts (and merges model ids): parallel engine stages each record their own calls. */
+  addUsage(id: string, delta: { tokensIn: number; tokensOut: number; modelIds: readonly string[] }): Promise<Result<void>>;
   saveFacts(reviewId: string, facts: ContextFact[]): Promise<Result<void>>;
   facts(reviewId: string): Promise<Result<ContextFact[]>>;
   saveThreats(reviewId: string, threats: Threat[], discarded: DiscardedThreat[]): Promise<Result<void>>;

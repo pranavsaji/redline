@@ -6,10 +6,11 @@ import {
   PROMPT_VERSION,
   ProposalFallbackSchema,
   ProposalSchema,
+  fitProposal,
   proposePrompt,
   type EvidenceItem,
 } from '@redline/prompts';
-import type { z } from 'zod';
+import { z } from 'zod';
 import { scanForInjection } from './context/injection.js';
 import { assembleReview, parseFirstObject, type AssembleOutput } from './ingest.js';
 import type { ClockPort, FeedbackRepo, LlmPort, LlmPurpose, ModelTier, ReviewRepo, Sample } from './ports.js';
@@ -22,7 +23,10 @@ export interface PipelineDeps {
   policy: SitePolicy;
 }
 
-interface Usage {
+/** What one engine stage needs: the model, where checkpoints live, and the per-review token budget. */
+export type StageDeps = Pick<PipelineDeps, 'llm' | 'reviews' | 'policy'>;
+
+export interface Usage {
   tokensIn: number;
   tokensOut: number;
   modelIds: Set<string>;
@@ -31,8 +35,8 @@ interface Usage {
 const estimate = (system: string, user: string) => Math.ceil((system.length + user.length) / 4);
 
 /** One stage call with the spec's failure ladder: validate → one repair with the validator error → smaller fallback schema → fail. */
-async function callStage<T>(
-  deps: PipelineDeps,
+export async function callStage<T>(
+  deps: Pick<PipelineDeps, 'llm' | 'policy'>,
   usage: Usage,
   req: { system: string; user: string; purpose: LlmPurpose; tier: ModelTier; maxOutputTokens: number },
   schema: z.ZodType<T>,
@@ -95,9 +99,73 @@ function cleanEvidence(items: EvidenceItem[], bundle: ContextBundle): EvidenceIt
   return items.filter((e) => ids.has(e.factId) && !scanForInjection(e.about).suspected);
 }
 
+export interface Extracted {
+  sketch: ArchitectureSketch;
+  evidence: EvidenceItem[];
+}
+
+/**
+ * Engine stage 2, quarantined extract: the only call that reads untrusted text. Checkpointed, so a redelivered job
+ * reuses the saved result instead of paying for the call again.
+ */
+export async function engineExtract(deps: StageDeps, review: Review, bundle: ContextBundle, usage: Usage): Promise<Result<Extracted>> {
+  const saved = await deps.reviews.stage(review.id, 'extract');
+  if (!saved.ok) return saved;
+  const checkpoint = saved.value?.status === 'done' ? (saved.value.checkpoint as Extracted | undefined) : undefined;
+  if (checkpoint) return ok(checkpoint);
+  await deps.reviews.saveStage(review.id, 'extract', 'running');
+  const p = extractPrompt(bundle.facts);
+  const r = await callStage(deps, usage, { ...p, purpose: 'extract', tier: 'balanced', maxOutputTokens: 6000 }, ExtractOutputSchema, {
+    schema: ExtractFallbackSchema.transform((x) => ({ ...x, evidence: [] as EvidenceItem[] })) as unknown as z.ZodType<z.infer<typeof ExtractOutputSchema>>,
+    instruction: 'Return only {"sketch": {...}} with no evidence list.',
+  });
+  if (!r.ok) {
+    await deps.reviews.saveStage(review.id, 'extract', 'failed', undefined, r.error.code);
+    return r;
+  }
+  const sanitized = sanitizeSketch(r.value.sketch);
+  const out: Extracted = { sketch: { ...sanitized.sketch, injectionSuspected: sanitized.flagged }, evidence: cleanEvidence(r.value.evidence, bundle) };
+  await deps.reviews.saveStage(review.id, 'extract', 'done', out);
+  return ok(out);
+}
+
+/**
+ * Engine stage 3, one independent proposal (lens n): sees only the typed sketch, evidence ids and trusted metadata,
+ * never raw untrusted text. Returns a sample (a failed one when the output never validates), or an error for budget.
+ */
+export async function engineProposal(deps: StageDeps, review: Review, bundle: ContextBundle, extracted: Extracted, n: number, usage: Usage): Promise<Result<Sample>> {
+  const { sketch, evidence } = extracted;
+  const byId = new Map(evidence.map((e) => [e.id, e]));
+  const trusted = bundle.facts.filter((f) => f.trustLevel === 'trusted');
+  const p = proposePrompt(sketch, evidence, trusted, n);
+  const r = await callStage(deps, usage, { ...p, purpose: 'propose', tier: 'deep', maxOutputTokens: 8000 }, z.preprocess(fitProposal, ProposalSchema) as unknown as z.ZodType<z.infer<typeof ProposalSchema>>, {
+    schema: ProposalFallbackSchema.transform((x) => ({
+      threats: x.threats.map((t) => ({ ...t, scenario: t.title, likelihood: 3, impact: 3 })),
+    })) as unknown as z.ZodType<z.infer<typeof ProposalSchema>>,
+    instruction: 'Return only {"threats": [{"stride","title","component","evidenceIds"}]} — titles only.',
+  });
+  if (!r.ok && r.error.code === 'budget') return r;
+  const sample: Sample = r.ok
+    ? ({
+        schema: 'redline.threatmodel.v1',
+        issueKey: bundle.issueKey,
+        sketch: { components: sketch.components, dataStores: sketch.dataStores, externalServices: sketch.externalServices, trustBoundaries: sketch.trustBoundaries, dataClasses: sketch.dataClasses, exposure: sketch.exposure, llmFeatures: sketch.llmFeatures },
+        threats: r.value.threats.flatMap((t) => {
+          const quotes = t.evidenceIds.map((id) => byId.get(id)?.quote).filter((q): q is string => !!q);
+          if (quotes.length === 0) return [];
+          const { evidenceIds: _ids, ...rest } = t;
+          return [{ ...rest, evidence: quotes.slice(0, 3).map((quote) => ({ quote })) }];
+        }),
+      } satisfies AgentThreatModel)
+    : { failed: r.error.code };
+  await deps.reviews.saveStage(review.id, `propose:${n}`, 'failed' in sample ? 'failed' : 'done', sample);
+  return ok(sample);
+}
+
 /**
  * The eval/dev review path (Claude Code or Forge LLMs): quarantined extract → N proposals over typed evidence ids →
- * deterministic assembly. Checkpoints after every stage so a retry resumes rather than restarts.
+ * deterministic assembly. Checkpoints after every stage so a retry resumes rather than restarts. In the product the
+ * same stages run as separate queue jobs (Redline Engine) so each fits a function timeout.
  */
 export async function runPipeline(
   deps: PipelineDeps,
@@ -107,68 +175,26 @@ export async function runPipeline(
 ): Promise<Result<AssembleOutput>> {
   const usage: Usage = { tokensIn: review.tokensIn, tokensOut: review.tokensOut, modelIds: new Set(review.modelIds) };
   const resume = opts.resumeFrom ?? 'extract';
-
-  // Stage 2: quarantined extract.
-  let sketch: ArchitectureSketch;
-  let evidence: EvidenceItem[];
-  const saved = resume !== 'extract' ? await deps.reviews.stage(review.id, 'extract') : ok(null);
-  if (!saved.ok) return saved;
-  const checkpoint = saved.value?.status === 'done' ? (saved.value.checkpoint as { sketch: ArchitectureSketch; evidence: EvidenceItem[] } | undefined) : undefined;
-  if (checkpoint) {
-    ({ sketch, evidence } = checkpoint);
-  } else {
-    await deps.reviews.saveStage(review.id, 'extract', 'running');
-    const p = extractPrompt(bundle.facts);
-    const r = await callStage(deps, usage, { ...p, purpose: 'extract', tier: 'fast', maxOutputTokens: 4000 }, ExtractOutputSchema, {
-      schema: ExtractFallbackSchema.transform((x) => ({ ...x, evidence: [] as EvidenceItem[] })) as unknown as z.ZodType<z.infer<typeof ExtractOutputSchema>>,
-      instruction: 'Return only {"sketch": {...}} with no evidence list.',
-    });
-    if (!r.ok) {
-      await deps.reviews.saveStage(review.id, 'extract', 'failed', undefined, r.error.code);
-      return r;
-    }
-    const sanitized = sanitizeSketch(r.value.sketch);
-    sketch = { ...sanitized.sketch, injectionSuspected: sanitized.flagged };
-    evidence = cleanEvidence(r.value.evidence, bundle);
-    await deps.reviews.saveStage(review.id, 'extract', 'done', { sketch, evidence });
+  if (resume === 'extract') {
+    const s = await deps.reviews.stage(review.id, 'extract');
+    if (s.ok && s.value?.status === 'done') await deps.reviews.saveStage(review.id, 'extract', 'running');
   }
+  const extracted = await engineExtract(deps, review, bundle, usage);
+  if (!extracted.ok) return extracted;
+  const { sketch } = extracted.value;
 
-  // Stage 3: proposals (self-consistency samples).
-  const byId = new Map(evidence.map((e) => [e.id, e]));
-  const trusted = bundle.facts.filter((f) => f.trustLevel === 'trusted');
   const samples: Sample[] = [];
   for (let n = 0; n < opts.samples; n++) {
-    const stageName = `propose:${n}`;
     if (resume === 'assemble') {
-      const s = await deps.reviews.stage(review.id, stageName);
+      const s = await deps.reviews.stage(review.id, `propose:${n}`);
       if (s.ok && s.value?.status === 'done') {
         samples.push(s.value.checkpoint as Sample);
         continue;
       }
     }
-    const p = proposePrompt(sketch, evidence, trusted, n);
-    const r = await callStage(deps, usage, { ...p, purpose: 'propose', tier: 'fast', maxOutputTokens: 4000 }, ProposalSchema, {
-      schema: ProposalFallbackSchema.transform((x) => ({
-        threats: x.threats.map((t) => ({ ...t, scenario: t.title, likelihood: 3, impact: 3 })),
-      })) as unknown as z.ZodType<z.infer<typeof ProposalSchema>>,
-      instruction: 'Return only {"threats": [{"stride","title","component","evidenceIds"}]} — titles only.',
-    });
-    if (!r.ok && r.error.code === 'budget') return r;
-    const sample: Sample = r.ok
-      ? ({
-          schema: 'redline.threatmodel.v1',
-          issueKey: bundle.issueKey,
-          sketch: { components: sketch.components, dataStores: sketch.dataStores, externalServices: sketch.externalServices, trustBoundaries: sketch.trustBoundaries, dataClasses: sketch.dataClasses, exposure: sketch.exposure, llmFeatures: sketch.llmFeatures },
-          threats: r.value.threats.flatMap((t) => {
-            const quotes = t.evidenceIds.map((id) => byId.get(id)?.quote).filter((q): q is string => !!q);
-            if (quotes.length === 0) return [];
-            const { evidenceIds: _ids, ...rest } = t;
-            return [{ ...rest, evidence: quotes.slice(0, 3).map((quote) => ({ quote })) }];
-          }),
-        } satisfies AgentThreatModel)
-      : { failed: r.error.code };
-    samples.push(sample);
-    await deps.reviews.saveStage(review.id, stageName, r.ok ? 'done' : 'failed', sample);
+    const r = await engineProposal(deps, review, bundle, extracted.value, n, usage);
+    if (!r.ok) return r;
+    samples.push(r.value);
   }
   if (samples.every((s) => 'failed' in s)) return err(appError('schema', 'every proposal sample failed validation'));
 

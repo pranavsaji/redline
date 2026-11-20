@@ -11,6 +11,11 @@ app:
     confluence:
       required: false
 modules:
+  # Redline Engine: Redline runs reviews itself on Atlassian-hosted Claude models (billed to the app's developer).
+  llm:
+    - key: redline-engine-llm
+      model:
+        - claude
   sql:
     - key: main
       engine: mysql

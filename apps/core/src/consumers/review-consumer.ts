@@ -1,3 +1,4 @@
+import { engineJob, isEngineReview, reapplyVerification } from '../services/engine.js';
 import { assembleReview, requirementsFor } from '@redline/core';
 import { PROMPT_VERSION } from '@redline/prompts';
 import { appError, err, ok, type ContextBundle, type ContextFact, type Result, type Review, type SitePolicy, type Threat } from '@redline/shared';
@@ -112,6 +113,8 @@ async function gather(deps: CoreDeps, job: Extract<ReviewJob, { kind: 'gather' }
   const revision = (prev?.revision ?? 0) + 1;
   // Rules-only mode (no Rovo on the site): the review is settled now from the rule-based checks; no AI, no budget.
   const rulesOnly = !paused.value && policy.value.reviewMode === 'rules_only';
+  // Redline Engine: Redline runs the review itself on Forge LLMs (no Rovo, no Automation rule).
+  const engine = !paused.value && policy.value.reviewMode === 'engine';
   const review: Review = {
     id: `rev_${job.issueId}_${revision}`,
     issueId: job.issueId,
@@ -151,7 +154,11 @@ async function gather(deps: CoreDeps, job: Extract<ReviewJob, { kind: 'gather' }
     const u = await deps.usage.add(monthOf(now), { tokensIn: 0, tokensOut: 0, reviews: 1 });
     if (!u.ok) return u;
   }
-  log('review.created', { issueId: job.issueId, revision, reason: job.reason, paused: paused.value, partial: b.partial });
+  if (engine) {
+    const q = await deps.queue.push([{ kind: 'engine', reviewId: review.id, stage: 'extract' }]);
+    if (!q.ok) return q;
+  }
+  log('review.created', { issueId: job.issueId, revision, reason: job.reason, paused: paused.value, partial: b.partial, engine });
   const v = await refreshVerdict(deps, job.issueId);
   if (!v.ok) return v;
   // A published page now trails the newest revision: re-publish so it says it is out of date.
@@ -209,6 +216,17 @@ async function assemble(deps: CoreDeps, reviewId: string): Promise<Result<void>>
   await traceSamples(deps, review.id, samples.value);
   await trace(deps, review.id, 'assemble', status === 'failed' ? 'failed' : 'done', status === 'failed' ? (review.failureReason ?? 'failed') : undefined);
   log('review.assembled', { reviewId, status, samples: samples.value.length });
+  // Redline Engine: once settled, the verifier runs (once); a later re-assembly re-applies its stored verdicts.
+  if (status === 'ready' && (await isEngineReview(deps, review.id))) {
+    const verified = await deps.reviews.stage(review.id, 'verify');
+    if (verified.ok && verified.value?.status === 'done') {
+      const re = await reapplyVerification(deps, { ...review, status });
+      if (!re.ok) return re;
+    } else if (review.status !== 'ready') {
+      const q = await deps.queue.push([{ kind: 'engine', reviewId: review.id, stage: 'verify' }]);
+      if (!q.ok) return q;
+    }
+  }
   const v = await refreshVerdict(deps, review.issueId);
   if (!v.ok) return v;
   return afterChange(deps, review.issueId, status === 'ready' && review.status !== 'ready');
@@ -251,6 +269,8 @@ export async function handleJob(deps: CoreDeps, job: ReviewJob): Promise<Result<
       }
       return p;
     }
+    case 'engine':
+      return engineJob(deps, job);
     case 'migrate': {
       const m = await deps.migrate();
       if (!m.ok) return m;

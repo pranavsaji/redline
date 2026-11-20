@@ -60,8 +60,16 @@ export function ThreatCard({
             <Lozenge>{STRIDE_LABEL[threat.stride]}</Lozenge>
             <Lozenge appearance={g.appearance}>{g.label}</Lozenge>
             {threat.state === 'needs_human' && <Lozenge appearance="new">Needs a champion</Lozenge>}
+            {threat.verification?.keep && <Lozenge appearance="success">Verified</Lozenge>}
+            {threat.state === 'dismissed' && threat.verification?.keep === false && <Lozenge appearance="removed">Dropped by the verifier</Lozenge>}
             <span style={{ color: token('color.text.subtlest'), font: token('font.body.small') }}>{runs}</span>
           </div>
+          {threat.verification?.keep === false && (
+            <span style={{ color: token('color.text.subtle'), font: token('font.body.small') }}>
+              The verifier doubted this: {threat.verification.reason}
+              {threat.state === 'needs_human' ? ' A security champion decides.' : ''}
+            </span>
+          )}
           {covers.length > 0 && (
             <span style={{ color: token('color.text.subtle'), font: token('font.body.small') }}>
               Also covers Redline's rule-based {covers.length === 1 ? 'check' : 'checks'}: {covers.join('; ')}.

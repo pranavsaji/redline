@@ -54,6 +54,12 @@ export function memoryReviewRepo(): ReviewRepo & { _reviews: Map<string, Review>
       reviews.set(id, { ...r, ...clone(patch) });
       return ok(undefined);
     },
+    async addUsage(id, delta) {
+      const r = reviews.get(id);
+      if (!r) return err(appError('not_found', `review ${id}`));
+      reviews.set(id, { ...r, tokensIn: r.tokensIn + delta.tokensIn, tokensOut: r.tokensOut + delta.tokensOut, modelIds: [...new Set([...r.modelIds, ...delta.modelIds])] });
+      return ok(undefined);
+    },
     async saveFacts(reviewId, f) {
       facts.set(reviewId, clone(f));
       return ok(undefined);

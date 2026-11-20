@@ -128,6 +128,16 @@ export function repoContract(name: string, f: RepoFactory): void {
       expect((await r.get('nope')).ok && (await r.get('nope'))).toEqual({ ok: true, value: null });
     });
 
+    it('reviews: addUsage increments tokens and merges model ids, and update writes only the patched fields', async () => {
+      const r = await f.reviews();
+      await r.create(review({ tokensIn: 5, tokensOut: 1, modelIds: ['m1'] }));
+      await r.addUsage('rev_1', { tokensIn: 10, tokensOut: 4, modelIds: ['m2', 'm1'] });
+      await r.update('rev_1', { status: 'ready' });
+      await r.addUsage('rev_1', { tokensIn: 1, tokensOut: 1, modelIds: [] });
+      const g = await r.get('rev_1');
+      expect(g.ok && g.value).toMatchObject({ status: 'ready', tokensIn: 16, tokensOut: 6, modelIds: ['m1', 'm2'] });
+    });
+
     it('ledger: append-only, conflict on reused prevHash or seq, concurrent appends serialise', async () => {
       const l = await f.ledger();
       const clock = fixedClock('2026-11-15T00:00:00Z');
