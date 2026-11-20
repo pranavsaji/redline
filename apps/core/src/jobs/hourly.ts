@@ -38,19 +38,24 @@ async function failRateAlert(deps: CoreDeps): Promise<void> {
   const since = new Date(now.getTime() - 3_600_000).toISOString();
   let total = 0;
   let bad = 0;
+  let silent = 0;
   for (const s of STATUSES) {
     const r = await deps.reviews.byStatus(s);
     if (!r.ok) return;
     const recent = r.value.filter((x) => x.createdAt >= since);
     total += recent.length;
     if (s === 'failed' || s === 'agent_timeout') bad += recent.length;
+    if (s === 'agent_timeout') silent += recent.filter((x) => x.samplesReceived === 0).length;
   }
   if (total === 0 || bad / total <= FAILURE_RATE) return;
 
   const sent = await opsAlert(
     deps,
     alertKey,
-    `Redline: ${bad} of ${total} security reviews in the last hour failed or timed out. Work items stay blocked until they are re-run. Check the site's Rovo credits and the Redline admin page.`,
+    `Redline: ${bad} of ${total} security reviews in the last hour failed or timed out. Work items stay blocked until they are re-run. Check the site's Rovo credits and the Redline admin page.` +
+      (silent > 0
+        ? ` ${silent} of them got no agent run at all, so Jira Automation did not run the Redline agent: open Project settings → Automation → the Redline rules → Audit log. If it says the agent is deactivated (this can happen after a Redline update), re-select Redline in each Use agent step and save. If this site has no Rovo, choose Redline admin → Review mode → Rule-based checks only.`
+        : ''),
   );
   if (!sent) return;
   log('alert.failrate', { bad, total });

@@ -62,6 +62,24 @@ describe('sweeper', () => {
 });
 
 describe('hourly', () => {
+  it('feature: when timed-out reviews got no agent run at all, the alert says Automation did not run the agent and how to fix it', async () => {
+    const t = coreDeps({ now: '2026-11-15T12:00:00Z' });
+    t.kv.data.set('config:ops', { issueKey: 'OPS-1', accountIds: ['acc-admin'] });
+    for (const id of ['1', '2']) {
+      await t.deps.reviews.create({
+        id: `rev_${id}`, issueId: id, issueKey: `PAY-${id}`, revision: 1, status: 'agent_timeout', contextHash: 'h', riskScore: 0, partial: false,
+        promptVersion: 'v', modelIds: [], samplesExpected: 3, samplesReceived: 0, tokensIn: 0, tokensOut: 0, createdAt: '2026-11-15T11:30:00.000Z', updatedAt: '2026-11-15T11:50:00.000Z',
+      });
+    }
+    await hourly(t.deps);
+    const text = JSON.stringify(t.jira.commented[0]!.adf);
+    expect(text).toContain('2 of them got no agent run at all');
+    expect(text).toMatch(/Audit log/);
+    expect(text).toMatch(/re-select Redline in each Use agent step/);
+    expect(text).toMatch(/Rule-based checks only/);
+  });
+
+
   it('alerts once on the ops issue when more than 20% of the last hour’s reviews failed or timed out', async () => {
     const t = coreDeps({ now: '2026-11-15T12:00:00Z' });
     t.kv.data.set('config:ops', { issueKey: 'OPS-1', accountIds: ['acc-admin'] });
