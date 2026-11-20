@@ -3,6 +3,6 @@
 [extend]
 useDefault = true
 
-[[allowlists]]
+[allowlist]
 description = "Fake AWS access key used by redaction tests (AKIA + 16 letters in alphabetical order)"
 regexes = ['''AKIAABCDEFGHIJKLMNOP''']

@@ -114,6 +114,9 @@ describe('admin.seed / admin.setupStatus', () => {
     s.t.kv.data.set('ingest:lastAt', '2026-11-14T12:00:00.000Z');
     const status = await adminSetupStatus(s.t.deps, admin, { signingKeys: async () => true });
     expect(status).toMatchObject({ keys: true, sqlVersion: 3, validatorSeenOn: ['PAY'], automationRuleSeen: true, bitbucketKeyCopied: false, mcpEnabledHint: expect.stringMatching(/MCP/) });
+    // The hint names the tools the MCP server really exposes (manifest rovo:mcp), never the agent-only review actions.
+    expect((status as { mcpEnabledHint: string }).mcpEnabledHint).toMatch(/get-security-requirements/);
+    expect((status as { mcpEnabledHint: string }).mcpEnabledHint).not.toMatch(/submit-threat-model|get-review-context/);
     s.t.kv.data.set('ingest:lastAt', '2026-11-01T12:00:00.000Z');
     expect(await adminSetupStatus(s.t.deps, admin, { signingKeys: async () => false })).toMatchObject({ keys: false, automationRuleSeen: false });
     s.t.jira.isAdmin = async () => ok(false);

@@ -50,7 +50,7 @@ export interface SetupStatus {
 }
 
 const MCP_HINT =
-  'Rovo MCP: in Atlassian Administration → Rovo → MCP server, allow the clients your team uses. Redline’s actions (get-review-context, submit-threat-model) are then available to MCP clients with the user’s own permissions.';
+  'Rovo MCP: in Atlassian Administration → Rovo → MCP server, allow the clients your team uses. Coding agents then get Redline’s tools (get-review, get-security-requirements, check-change-risk, get-merge-attestation, request-risk-acceptance, explain-threat, posture-summary) with the user’s own permissions.';
 
 /** `admin.setupStatus` (Task 24): what Redline has seen working on this site. Jira administrators only. */
 export async function adminSetupStatus(deps: CoreDeps, a: Admin, o: { signingKeys: () => Promise<boolean> }): Promise<SetupStatus | ApiError> {
