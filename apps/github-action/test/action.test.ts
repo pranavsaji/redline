@@ -77,6 +77,7 @@ describe('runGitHubCheck (the merge gate on GitHub)', () => {
     expect(r).toMatchObject({ success: false, outcome: 'fail_stale_commit' });
   });
   it('a secret added to any file makes the change sensitive', async () => {
+    // nosemgrep: detected-aws-access-key-id-value -- fake key (see .gitleaks.toml)
     const leak: GitHubFile = { ...DOCS, patch: '@@ -1 +1 @@\n+aws_access_key_id = AKIAABCDEFGHIJKLMNOP' };
     expect(await runGitHubCheck({ settings: inputs(), client: client({ files: [leak] }), nowSec: NOW })).toMatchObject({ success: false, outcome: 'fail_missing' });
   });
