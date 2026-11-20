@@ -75,6 +75,17 @@ describe('kvsSigningKeys', () => {
     return c;
   };
 
+  it('race fix: two first uses at the same moment end on one published key, so no attestation is signed with a lost key', async () => {
+    const kv = memoryKvs();
+    const keys = kvsSigningKeys(clockAt('2026-11-15T00:00:00Z'), kv);
+    const [a, b] = await Promise.all([keys.active(), keys.active()]);
+    expect(a.ok && b.ok).toBe(true);
+    if (!a.ok || !b.ok) return;
+    expect(a.value.kid).toBe(b.value.kid);
+    const pub = await keys.publicKeys();
+    expect(pub.ok && Object.keys(pub.value)).toEqual([a.value.kid]);
+  });
+
   it('creates an active key on first use, stores the private key only as a secret, and reuses it', async () => {
     const kv = memoryKvs();
     const keys = kvsSigningKeys(clockAt('2026-11-15T00:00:00Z'), kv);

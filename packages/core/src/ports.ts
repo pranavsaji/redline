@@ -71,6 +71,7 @@ export interface ReviewRepo {
   threats(reviewId: string): Promise<Result<Threat[]>>;
   discarded(reviewId: string): Promise<Result<DiscardedThreat[]>>;
   updateThreat(id: string, patch: Partial<Threat>): Promise<Result<void>>;
+  /** Inserts run `n`; a number already taken is a `conflict` (never an overwrite), so the caller takes the next one. */
   saveSample(reviewId: string, n: number, sample: Sample): Promise<Result<void>>;
   samples(reviewId: string): Promise<Result<Sample[]>>;
   /** `at` is when the stage reached this status (defaults to now); the admin page reads it as the run's trace. */

@@ -115,7 +115,8 @@ export function sqlReviewRepo(x: SqlExecutor): ReviewRepo {
       return u.ok ? ok(undefined) : u;
     },
     async saveSample(reviewId, n, sample) {
-      const r = await x.exec('REPLACE INTO agent_samples (review_id, n, sample_json) VALUES (?, ?, ?)', [reviewId, n, JSON.stringify(sample)]);
+      // INSERT, not REPLACE: a run number is taken once, so two runs saved at the same moment cannot overwrite each other.
+      const r = await x.exec('INSERT INTO agent_samples (review_id, n, sample_json) VALUES (?, ?, ?)', [reviewId, n, JSON.stringify(sample)]);
       return r.ok ? ok(undefined) : r;
     },
     async samples(reviewId) {

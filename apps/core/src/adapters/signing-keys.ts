@@ -64,6 +64,15 @@ export function kvsSigningKeys(clock: ClockPort, store: KvsPort = forgeKvs()): S
         } catch (e) {
           return fail(e);
         }
+        // Race fix: a concurrent first use may have written its own key after ours. Sign with whichever key the config
+        // names now, so every caller converges on the one published key (an unpublished key's attestation would fail).
+        const now = await config();
+        if (!now.ok) return now;
+        if (now.value && now.value.active !== k.value.kid) {
+          const winner = await secret(now.value.active);
+          if (!winner.ok) return winner;
+          if (winner.value) return ok(winner.value);
+        }
         return k;
       }
       const s = await secret(c.value.active);
