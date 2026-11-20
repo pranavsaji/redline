@@ -17,7 +17,7 @@ const adf = (text: string): AdfDoc => ({ type: 'doc', version: 1, content: [{ ty
  * linked from both stories, two recent incidents on the same component, and the project enabled in the policy.
  * Idempotent: items are matched by summary among those labelled `redline-demo`, the page by title.
  */
-export async function seedDemo(deps: CoreDeps, i: { projectKey: string; spaceKey: string }): Promise<Result<SeedResult>> {
+export async function seedDemo(deps: CoreDeps, i: { projectKey: string; spaceKey: string }, actorAccountId?: string): Promise<Result<SeedResult>> {
   const project = await deps.jira.projectInfo(i.projectKey);
   if (!project.ok) return project.error.code === 'not_found' || project.error.code === 'validation' ? err(appError('validation', `Project ${i.projectKey} was not found.`)) : project;
   const space = await deps.confluence.spaceByKey(i.spaceKey);
@@ -65,10 +65,12 @@ export async function seedDemo(deps: CoreDeps, i: { projectKey: string; spaceKey
   const epicLink = await deps.jira.addRemoteLink(epic.value.id, { globalId: `redline-demo-design-${epic.value.id}`, url: pageUrl, title: DESIGN_PAGE_TITLE });
   if (!epicLink.ok) return epicLink;
   const storyKeys: string[] = [];
+  const reviewIds = [epic.value.id];
   for (const s of STORIES) {
     const story = await ensure(s.summary, s.description, storyType, { parentId: epic.value.id, components: [DEMO_COMPONENT] });
     if (!story.ok) return story;
     storyKeys.push(story.value.key);
+    reviewIds.push(story.value.id);
     const link = await deps.jira.addRemoteLink(story.value.id, { globalId: `redline-demo-design-${story.value.id}`, url: pageUrl, title: DESIGN_PAGE_TITLE });
     if (!link.ok) return link;
   }
@@ -85,5 +87,9 @@ export async function seedDemo(deps: CoreDeps, i: { projectKey: string; spaceKey
     const set = await deps.config.setSite({ ...policy.value, enabledProjects: [...policy.value.enabledProjects, project.value.key] });
     if (!set.ok) return set;
   }
+  // The items were created by the app, and the issue trigger ignores the app's own events: queue their reviews now, as
+  // the admin who loaded the demo (that scopes what the review may read), so the panels fill without a manual re-run.
+  const q = await deps.queue.push(reviewIds.map((issueId) => ({ kind: 'gather' as const, issueId, reason: 'created' as const, ...(actorAccountId ? { actorAccountId } : {}) })));
+  if (!q.ok) return q;
   return ok({ epicKey: epic.value.key, storyKeys, designPageUrl: pageUrl, incidentKeys });
 }

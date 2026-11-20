@@ -73,6 +73,18 @@ describe('demo seeder (Task 24)', () => {
     expect(policy.ok && policy.value.enabledProjects).toContain('PAY');
   });
 
+  it('judge path: queues a review of the epic and each story as the admin who loaded the demo (the app\'s own creates do not trigger one)', async () => {
+    const s = site();
+    s.t.pushed.length = 0;
+    const r = await seedDemo(s.t.deps, { projectKey: 'PAY', spaceKey: 'PAY' }, 'acc-admin');
+    if (!r.ok) throw new Error(r.error.message);
+    expect(s.t.pushed).toEqual([
+      { kind: 'gather', issueId: '20100', reason: 'created', actorAccountId: 'acc-admin' },
+      { kind: 'gather', issueId: '20101', reason: 'created', actorAccountId: 'acc-admin' },
+      { kind: 'gather', issueId: '20102', reason: 'created', actorAccountId: 'acc-admin' },
+    ]);
+  });
+
   it('seeding twice reuses the existing items and page', async () => {
     const s = site();
     const first = await seedDemo(s.t.deps, { projectKey: 'PAY', spaceKey: 'PAY' });

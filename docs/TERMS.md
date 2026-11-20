@@ -1,6 +1,6 @@
 # Redline terms of use
 
-Last updated: 2026-11-20
+Last updated: 2026-11-21
 
 These terms cover Redline for Jira and Redline for Bitbucket ("Redline"), published by Pranav Saji. By installing
 Redline you agree to them, alongside the Atlassian Marketplace Terms of Use.
@@ -13,8 +13,10 @@ Redline you agree to them, alongside the Atlassian Marketplace Terms of Use.
    policies when you accept risks or use break-glass.
 3. **Your data.** You keep all rights to your content. Redline processes it only to provide the app, as described in
    the [privacy policy](PRIVACY.md).
-4. **AI usage.** Reviews use your site's Rovo agent and consume your site's Rovo credits. Redline enforces the budgets
-   you set but is not responsible for credits your site's plan provides or charges.
+4. **AI usage.** By default, reviews run on Atlassian-hosted models (Forge LLMs), billed to the app's publisher, within
+   the monthly review cap you set. If you choose Rovo agent review, reviews use your site's Rovo agent and consume your
+   site's Rovo credits; Redline enforces the budgets you set but is not responsible for credits your site's plan
+   provides or charges.
 5. **Availability.** Redline is provided as is. It depends on Atlassian's platform and on features Atlassian marks as
    Preview, which may change. When Redline cannot complete a review, its gate blocks rather than passes.
 6. **Liability.** To the extent the law allows, Pranav Saji is not liable for indirect or consequential losses, or for

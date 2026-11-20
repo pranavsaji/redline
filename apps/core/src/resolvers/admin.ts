@@ -36,7 +36,7 @@ export async function adminSeed(deps: CoreDeps, a: Admin, payload: unknown): Pro
   if (denied) return denied;
   const p = SeedSchema.safeParse(payload);
   if (!p.success) return { error: 'validation', message: 'Give a Jira project key (like PAY) and a Confluence space key.' };
-  const r = await seedDemo(deps, p.data);
+  const r = await seedDemo(deps, p.data, a.accountId);
   return r.ok ? r.value : apiError(r.error);
 }
 

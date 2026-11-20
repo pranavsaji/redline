@@ -27,7 +27,7 @@ want to use with Redline's MCP tools (optional).
    story or epic itself on Atlassian-hosted Claude models. It takes two to four minutes: a quarantined extraction, three
    independent analyses on the strongest model, then a verifier. To start one by hand: the work item → Redline panel →
    **Run review**. (Prefer your site's Rovo agent? Choose **Rovo agent review** and follow "Rovo agent mode" below.)
-5. **Open the epic "Add AI support agent"**. Within about a minute the Redline panel shows:
+5. **Open the epic "Add AI support agent"**. Loading the demo queues its review; within three to four minutes the Redline panel shows:
    - the risk score and why Done is blocked;
    - threats in plain language first, each with the quote it rests on and a link to its source;
    - a banner naming the design page as containing instructions aimed at the AI: they were treated as data, and the
@@ -77,7 +77,7 @@ Everything above runs against fixture data in a local preview, no Atlassian site
 ```bash
 pnpm install
 pnpm --filter @redline/core-ui dev --port 5179   # then open http://localhost:5179/?state=ready (or ?view=admin, ?view=posture)
-pnpm test                                        # 900+ tests, including accessibility checks
+pnpm test                                        # 1,050+ tests, including accessibility checks
 pnpm redline sign-demo                           # sign an attestation, then show that one changed character fails
 pnpm redline eval --llm recorded --subset 30     # replay the recorded eval offline
 ```

@@ -1,6 +1,6 @@
 # Redline privacy policy
 
-Last updated: 2026-11-20
+Last updated: 2026-11-21
 
 Redline for Jira and Redline for Bitbucket ("Redline") are Forge apps published by Pranav Saji. This policy explains
 what Redline processes, where, and for how long.
@@ -24,8 +24,9 @@ Redline does not collect payment data, does not use cookies or analytics, and do
 
 Everything runs on Atlassian's Forge platform. Neither app declares egress, so Redline sends no data outside Atlassian.
 Stored data lives in Forge-hosted storage (Forge SQL, Key-Value Store and secret storage) and follows Atlassian's data
-residency for your site. The threat model is written by your site's Rovo agent, inside Atlassian, under your site's Rovo
-terms. Before text reaches the agent, Redline caps excerpts and redacts strings that look like secrets.
+residency for your site. The threat model is written inside Atlassian: by default on Atlassian-hosted models (Forge LLMs), or
+by your site's Rovo agent under your site's Rovo terms if you choose that mode. Before text reaches a model, Redline caps
+excerpts and redacts strings that look like secrets.
 
 Logs record ids, timings and counts only; never work item text, page text or prompts.
 

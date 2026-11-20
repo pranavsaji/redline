@@ -45,8 +45,8 @@ code decides. Consensus, quote grounding, scoring, the verdict and the gates are
 
 - Keeping the AI out of the decision while still using it for what it is good at: proposals and verification are
   requests; code decides what they do, and fails closed when the model errs.
-- Prompt injection in design docs: quarantining the only call that reads raw text, and making sure attacker text can
-  never decide which threats are dropped.
+- Prompt injection in design docs: a quarantined injection check runs first, the analyses read the text only inside
+  nonce-fenced data blocks, and attacker text can never decide which threats are dropped or what the verdict is.
 - Forge limits: every model call in its own job to fit a function timeout, and atomic usage accounting across
   parallel jobs.
 

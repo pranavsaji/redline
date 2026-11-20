@@ -2,7 +2,7 @@
 
 ![tests](https://img.shields.io/badge/tests-1050%2B%20passing-brightgreen)
 ![coverage](https://img.shields.io/badge/line%20coverage-92.9%25-brightgreen)
-![eval F1](https://img.shields.io/badge/eval%20F1-50.5%25-blue)
+![high-severity recall](https://img.shields.io/badge/high--severity%20recall-91.9%25-blue)
 ![injection resistance](https://img.shields.io/badge/injection%20resistance-6%2F6-blue)
 ![runs on Atlassian](https://img.shields.io/badge/egress-none-informational)
 
@@ -23,7 +23,7 @@ actions, skill, MCP), Automation and Forge SQL. No egress: nothing leaves Atlass
   agree, each quoting its evidence, then an adversarial verifier that checks every threat against its quotes (doubted
   High and Critical threats go to a champion instead of disappearing). No Rovo agent, Automation rule or setup, and no
   developer can write their own review. [How it works, and what we measured](docs/ENGINE.md).
-- **Cited threat models.** Three independent Rovo agent runs propose STRIDE threats; Redline keeps only those a
+- **Cited threat models.** Three independent AI runs (Redline Engine, or your site's Rovo agent) propose STRIDE threats; Redline keeps only those a
   majority raised and whose quotes are found word for word in the work item, its pages or incidents. Plain language
   first ("A stolen link lets an attacker lock the real owner out for good."), then the STRIDE category, ASVS 5 and CWE.
 - **Injection-resistant by construction.** The model never decides anything: code sets the verdict. Text that tries to
