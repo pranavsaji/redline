@@ -107,7 +107,8 @@ describe('confluence client: canRead', () => {
 
   it('findPage looks a page up by exact title in a space', async () => {
     const { c, calls } = client([[/GET \/wiki\/api\/v2\/pages\?space-id=4456&title=Design%3A%20AI%20support%20agent&status=current$/, { status: 200, body: JSON.stringify({ results: [{ id: '98400', _links: { webui: '/spaces/PAY/pages/98400' } }], _links: { base: 'https://x.atlassian.net/wiki' } }) }]]);
-    expect(await c.findPage('4456', 'Design: AI support agent')).toEqual({ ok: true, value: { id: '98400', url: '/wiki/spaces/PAY/pages/98400' } });
+    // Found live: the list response carries `base` once at the top level; the URL must be absolute or Jira rejects the remote link.
+    expect(await c.findPage('4456', 'Design: AI support agent')).toEqual({ ok: true, value: { id: '98400', url: 'https://x.atlassian.net/wiki/spaces/PAY/pages/98400' } });
     expect(calls).toHaveLength(1);
   });
 

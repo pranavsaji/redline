@@ -63,7 +63,9 @@ describe('demo seeder (Task 24)', () => {
     expect(s.created.every((c) => c.labels.includes(DEMO_LABEL))).toBe(true);
     expect(s.components.has(DEMO_COMPONENT)).toBe(true);
     expect(s.pages[0]).toMatchObject({ title: DESIGN_PAGE_TITLE, spaceId: 'S1', parentId: '1' });
+    // The epic links the design page too: the judge guide opens the epic and expects the poisoned page in its review.
     expect(s.links).toEqual([
+      { issueId: '20100', url: 'https://x/wiki/pages/500' },
       { issueId: '20101', url: 'https://x/wiki/pages/500' },
       { issueId: '20102', url: 'https://x/wiki/pages/500' },
     ]);

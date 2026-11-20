@@ -61,6 +61,9 @@ export async function seedDemo(deps: CoreDeps, i: { projectKey: string; spaceKey
 
   const epic = await ensure(EPIC.summary, EPIC.description, epicType, {});
   if (!epic.ok) return epic;
+  // The epic links the design page as well, so a review of the epic reads it (and flags its hidden instruction).
+  const epicLink = await deps.jira.addRemoteLink(epic.value.id, { globalId: `redline-demo-design-${epic.value.id}`, url: pageUrl, title: DESIGN_PAGE_TITLE });
+  if (!epicLink.ok) return epicLink;
   const storyKeys: string[] = [];
   for (const s of STORIES) {
     const story = await ensure(s.summary, s.description, storyType, { parentId: epic.value.id, components: [DEMO_COMPONENT] });

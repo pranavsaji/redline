@@ -89,10 +89,11 @@ export function createConfluenceClient(request: FetchLike, opts: HttpOptions = {
       if (!NUMERIC_ID.test(spaceId)) return err(appError('validation', 'invalid space id'));
       const r = await call(`/wiki/api/v2/pages?space-id=${seg(spaceId)}&title=${encodeURIComponent(title)}&status=current`);
       if (!r.ok) return r;
-      const p = parse(z.object({ results: z.array(z.object({ id: z.string(), _links: Links })) }), r.value, 'pages');
+      const p = parse(z.object({ results: z.array(z.object({ id: z.string(), _links: Links })), _links: Links }), r.value, 'pages');
       if (!p.ok) return p;
       const hit = p.value.results[0];
-      return ok(hit ? { id: hit.id, url: pageUrl(hit._links) } : null);
+      // The list response gives `base` once, at the top level; without it the URL is relative and Jira rejects it as a remote link.
+      return ok(hit ? { id: hit.id, url: pageUrl({ ...hit._links, ...(p.value._links?.base && !hit._links?.base ? { base: p.value._links.base } : {}) }) } : null);
     },
 
     async updatePage(i) {
