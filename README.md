@@ -33,6 +33,8 @@ Automation and Forge SQL. No egress: nothing leaves Atlassian.
   the panel shows "Overdue by N days" and the posture page counts what is overdue.
 - **Works without Rovo.** An admin can switch Review mode to rule-based checks only: every review completes at once from
   Redline's built-in checks, clearly labelled, so the gates work on any Jira site.
+- **Developers cannot write their own review.** An admin locks AI review runs to the account that owns the Automation
+  rule (Review mode → Who can submit AI review runs). Anyone else's submission is refused and recorded in the ledger.
 - **Enforcement that fails closed.** A workflow validator blocks Done while anything is open, missing, failed or out of
   date, with a message saying exactly why and a one-click re-run. Paused at the budget? A champion can confirm.
 - **Risk acceptance with teeth.** Reason, compensating controls, an expiry (at most 30 days for Critical), an approver

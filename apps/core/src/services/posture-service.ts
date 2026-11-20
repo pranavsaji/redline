@@ -1,4 +1,4 @@
-import { rebuildAcceptances, verifiedHours, type PostureRow } from '@redline/core';
+import { ACCEPTANCE_EVENTS, rebuildAcceptances, verifiedHours, type PostureRow } from '@redline/core';
 import { appError, err, ok, type Acceptance, type Requirement, type Result } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
 import type { JiraIssue } from '../adapters/jira.js';
@@ -37,7 +37,7 @@ export function componentMatches(issue: JiraIssue, component: string | undefined
 export async function postureScope(deps: CoreDeps, audience: PostureAudience, i: { projects: string[]; reviewIssueTypes: string[]; component?: string }): Promise<Result<PostureScope>> {
   if (i.projects.length === 0 || i.reviewIssueTypes.length === 0) return ok({ items: [], acceptances: [], truncated: false });
   const jql = `project in (${i.projects.map(jqlString).join(', ')}) AND issuetype in (${i.reviewIssueTypes.map(jqlString).join(', ')}) ORDER BY updated DESC`;
-  const [found, ledger] = await Promise.all([deps.jira.search(jql, ['summary', 'issuetype', 'project', 'components'], POSTURE_MAX_ITEMS + 1), deps.ledger.all()]);
+  const [found, ledger] = await Promise.all([deps.jira.search(jql, ['summary', 'issuetype', 'project', 'components'], POSTURE_MAX_ITEMS + 1), deps.ledger.ofTypes(ACCEPTANCE_EVENTS)]);
   if (!found.ok) return found;
   if (!ledger.ok) return ledger;
   const listed = found.value.slice(0, POSTURE_MAX_ITEMS);

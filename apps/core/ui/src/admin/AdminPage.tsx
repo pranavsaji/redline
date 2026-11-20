@@ -75,7 +75,7 @@ export function AdminPage({ api }: { api: AdminApi }) {
         </ul>
       </nav>
       {dto && wizard && <FirstRun api={api} policy={dto.policy} onSaved={onSaved} />}
-      {at('setup', <SetupChecklist api={api} {...(dto?.policy.reviewMode ? { reviewMode: dto.policy.reviewMode } : {})} />)}
+      {at('setup', <SetupChecklist api={api} reviewAuthors={dto?.policy.reviewAuthors?.length ?? 0} {...(dto?.policy.reviewMode ? { reviewMode: dto.policy.reviewMode } : {})} />)}
       {policyError && (
         <p role="alert" style={{ margin: 0 }}>
           {policyError}
@@ -86,7 +86,7 @@ export function AdminPage({ api }: { api: AdminApi }) {
           {at('projects', <Projects key={`p-${dto!.saved}`} {...p} />)}
           {at('severity', <SeverityPolicy {...p} />)}
           {at('roles', <Roles key={`r-${dto!.saved}`} {...p} />)}
-          {at('review-mode', <ReviewMode {...p} />)}
+          {at('review-mode', <ReviewMode {...p} recentAuthors={dto?.recentReviewAuthors ?? []} />)}
           {at('budgets', <Budgets {...p} />)}
           {at('warn-only', <WarnOnly api={api} policy={p.policy} onChanged={onSaved} />)}
           {at('notifications', <Notifications api={api} ops={dto!.ops} digest={dto!.digest} />)}

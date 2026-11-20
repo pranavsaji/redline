@@ -46,6 +46,8 @@ describe('Admin: setup checklist (Task 24)', () => {
     expect(within(list).getByText(/Signing keys created/).closest('li')!.textContent).toMatch(/Done/);
     expect(within(list).getByText(/Done gate seen on PAY/)).toBeTruthy();
     expect(within(list).getByText(/No Automation agent run in the last 7 days/).closest('li')!.textContent).toMatch(/To do/);
+    // Security: unlocked review runs are a to-do item.
+    expect((await within(list).findByText(/lock them to the Automation rule owner/)).closest('li')!.textContent).toMatch(/To do/);
     // Feature: the item points sites without Rovo to rule-based review.
     expect(within(list).getByText(/No Rovo on this site\? Choose rule-based checks under Review mode/)).toBeTruthy();
     expect(within(list).getByText('Allow MCP clients in Rovo settings.')).toBeTruthy();
@@ -173,6 +175,19 @@ describe('Admin: budgets (Task 30)', () => {
     await userEvent.click(within(form).getByRole('radio', { name: /Rule-based checks only/ }));
     await userEvent.click(within(form).getByRole('button', { name: 'Save review mode' }));
     expect(setPolicy).toHaveBeenCalledWith(expect.objectContaining({ reviewMode: 'rules_only' }));
+  });
+
+  it('security: an admin locks AI review runs to the account that runs the Automation rule', async () => {
+    const api = mockAdminApi();
+    const setPolicy = vi.fn(api.setPolicy);
+    render(<AdminPage api={{ ...api, setPolicy }} />);
+    const form = await screen.findByRole('form', { name: 'Review authors' });
+    expect(within(form).getByText(/712020:automation-owner/)).toBeTruthy();
+    await userEvent.click(within(form).getByRole('radio', { name: /Only these accounts/ }));
+    await userEvent.click(within(form).getByRole('button', { name: 'Use 712020:automation-owner' }));
+    expect((within(form).getByRole('textbox', { name: 'Account IDs, one per line' }) as HTMLTextAreaElement).value).toBe('712020:automation-owner');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save review authors' }));
+    expect(setPolicy).toHaveBeenCalledWith(expect.objectContaining({ reviewAuthors: ['712020:automation-owner'] }));
   });
 
   it('says when reviews are paused, and why', async () => {

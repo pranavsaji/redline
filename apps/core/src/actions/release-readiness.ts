@@ -1,4 +1,4 @@
-import { rebuildAcceptances, releaseReadiness, type ReleaseCall } from '@redline/core';
+import { ACCEPTANCE_EVENTS, rebuildAcceptances, releaseReadiness, type ReleaseCall } from '@redline/core';
 import type { Severity, Verdict } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
@@ -38,7 +38,7 @@ export async function getReleaseReadiness(payload: ActionPayload & Record<string
   const [found, policy, ledger] = await Promise.all([
     deps.jira.search(`fixVersion = ${jqlString(fixVersion)} ORDER BY key ASC`, ['summary', 'issuetype', 'project', 'status', 'fixVersions', 'components', 'labels'], RELEASE_MAX_ITEMS + 1),
     deps.config.site(),
-    deps.ledger.all(),
+    deps.ledger.ofTypes(ACCEPTANCE_EVENTS),
   ]);
   if (!found.ok || !policy.ok || !ledger.ok) return { error: 'unavailable' };
   const listed = found.value.filter((i) => !i.issueType.subtask);

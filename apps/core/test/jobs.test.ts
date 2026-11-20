@@ -79,6 +79,20 @@ describe('hourly', () => {
     expect(text).toMatch(/Rule-based checks only/);
   });
 
+  it('security: the alert says when agent runs were refused because their account is not a review author', async () => {
+    const t = coreDeps({ now: '2026-11-15T12:00:00Z' });
+    t.kv.data.set('config:ops', { issueKey: 'OPS-1', accountIds: ['acc-admin'] });
+    await t.deps.reviews.create({
+      id: 'rev_1', issueId: '1', issueKey: 'PAY-1', revision: 1, status: 'agent_timeout', contextHash: 'h', riskScore: 0, partial: false,
+      promptVersion: 'v', modelIds: [], samplesExpected: 3, samplesReceived: 0, tokensIn: 0, tokensOut: 0, createdAt: '2026-11-15T11:30:00.000Z', updatedAt: '2026-11-15T11:50:00.000Z',
+    });
+    t.clock.set('2026-11-15T11:40:00Z');
+    await appendLedger(t.deps.ledger, t.deps.clock, 'review.sample_rejected', { issueId: '1', issueKey: 'PAY-1', reason: 'not_review_author' }, 'acc-other');
+    t.clock.set('2026-11-15T12:00:00Z');
+    await hourly(t.deps);
+    expect(JSON.stringify(t.jira.commented[0]!.adf)).toMatch(/1 agent run was refused because the account is not a review author/);
+  });
+
 
   it('alerts once on the ops issue when more than 20% of the last hour’s reviews failed or timed out', async () => {
     const t = coreDeps({ now: '2026-11-15T12:00:00Z' });

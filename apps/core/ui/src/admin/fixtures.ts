@@ -18,7 +18,13 @@ export const POLICY_FIXTURE: SitePolicy = {
   budget: { tokensInPerReview: 40000, tokensOutPerReview: 8000, reviewsPerMonth: 500 },
 };
 
-export const ADMIN_POLICY_FIXTURE: AdminPolicyDto = { policy: POLICY_FIXTURE, saved: true, ops: null, digest: null };
+export const ADMIN_POLICY_FIXTURE: AdminPolicyDto = {
+  policy: POLICY_FIXTURE,
+  saved: true,
+  ops: null,
+  digest: null,
+  recentReviewAuthors: [{ accountId: '712020:automation-owner', runs: 42, lastAt: '2026-11-18T09:31:00.000Z' }],
+};
 
 const t = (m: number) => new Date(Date.UTC(2026, 10, 18, 9, m)).toISOString();
 export const RUNS_FIXTURE: RunDto[] = [

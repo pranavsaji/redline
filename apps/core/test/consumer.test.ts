@@ -116,16 +116,23 @@ describe('gather job', () => {
     expect(codes).not.toContain('review_failed');
   });
 
-  it('final review I5: a verdict refresh reads only the ledger events it needs, never the whole ledger', async () => {
+  it('final review I5 + scale: a verdict refresh reads only this work item\'s ledger events it needs, never the whole site\'s', async () => {
     const t = coreDeps();
     await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
-    let all = 0;
+    let siteWide = 0;
     const types: string[][] = [];
+    const ids: string[][] = [];
     const real = t.deps.ledger;
-    t.deps.ledger = { ...real, all: async () => (all++, real.all()), ofTypes: async (ts) => (types.push([...ts]), real.ofTypes(ts)) };
+    t.deps.ledger = {
+      ...real,
+      all: async () => (siteWide++, real.all()),
+      ofTypes: async (ts) => (siteWide++, real.ofTypes(ts)),
+      forIssues: async (ts, is) => (types.push([...ts]), ids.push([...is]), real.forIssues(ts, is)),
+    };
     const v = await refreshVerdict(t.deps, '10042');
     expect(v.ok).toBe(true);
-    expect(all).toBe(0);
+    expect(siteWide).toBe(0);
+    expect(ids).toEqual([['10042']]);
     expect(types.flat()).toEqual(expect.arrayContaining(['acceptance.approved', 'override.breakglass', 'budget.champion_confirmed']));
     expect(types.flat()).not.toContain('attestation.issued');
   });

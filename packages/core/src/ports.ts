@@ -113,6 +113,7 @@ export type LedgerEventType =
   | 'project.purged'
   | 'reviews.resumed'
   | 'review.sample'
+  | 'review.sample_rejected'
   | 'key.rotated';
 
 export interface LedgerInsert {
@@ -134,6 +135,13 @@ export interface LedgerRepo {
   all(): Promise<Result<LedgerRow[]>>;
   /** Only rows of these event types, in seq order (indexed): what verdicts and the panel read on every refresh. */
   ofTypes(types: readonly LedgerEventType[]): Promise<Result<LedgerRow[]>>;
+  /**
+   * Scale: rows of these types for these work items (indexed on the payload's issueId), in seq order. Rows that name no
+   * work item (entries from before the index, or events about no work item) are included too, so nothing is missed.
+   */
+  forIssues(types: readonly LedgerEventType[], issueIds: readonly string[]): Promise<Result<LedgerRow[]>>;
+  /** Scale: the newest `limit` rows of these types, in seq order. */
+  latestOfTypes(types: readonly LedgerEventType[], limit: number): Promise<Result<LedgerRow[]>>;
 }
 
 export interface FeedbackRow {

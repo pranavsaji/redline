@@ -102,6 +102,36 @@ describe('race fix: agent runs saved at the same moment', () => {
   });
 });
 
+describe('security: only the configured review authors can submit agent runs (gap: developers steering their own review)', () => {
+  const withAuthors = async (t: ReturnType<typeof setup>, authors: string[]) => {
+    const p = await t.deps.config.site();
+    if (!p.ok) throw new Error('policy');
+    await t.deps.config.setSite({ ...p.value, reviewAuthors: authors });
+  };
+
+  it('a developer who can edit the work item but is not a review author is refused, and the attempt is ledgered', async () => {
+    const t = setup();
+    await withAuthors(t, ['acc-automation']);
+    expect(await submit(t.deps, KEY, JSON.stringify(MODEL), 'acc-dev')).toEqual({ saved: false, error: 'not_review_author' });
+    const rows = await t.deps.ledger.ofTypes(['review.sample_rejected']);
+    expect(rows.ok && rows.value).toEqual([expect.objectContaining({ actor: 'acc-dev', payload: expect.objectContaining({ issueKey: KEY, reason: 'not_review_author' }) })]);
+    const latest = await t.deps.reviews.latest('10042');
+    const samples = latest.ok && latest.value ? await t.deps.reviews.samples(latest.value.id) : null;
+    expect(samples && samples.ok ? samples.value.length : 0).toBe(0);
+  });
+
+  it('the configured author (the Automation rule owner) still submits', async () => {
+    const t = setup();
+    await withAuthors(t, ['acc-automation']);
+    expect(await submit(t.deps, KEY, JSON.stringify(MODEL), 'acc-automation')).toMatchObject({ saved: true });
+  });
+
+  it('with no authors configured, anyone who can edit the work item may submit (the default)', async () => {
+    const t = setup();
+    expect(await submit(t.deps, KEY, JSON.stringify(MODEL), 'acc-dev')).toMatchObject({ saved: true });
+  });
+});
+
 describe('submit-threat-model (CREATE action) and ingestSample', () => {
   it('prose-wrapped JSON is stored as a valid sample and pushes assemble', async () => {
     const t = setup();
