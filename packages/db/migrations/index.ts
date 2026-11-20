@@ -72,4 +72,11 @@ export const MIGRATIONS: Migration[] = [
     // Final review I5: verdict refreshes read acceptance, confirmation and break-glass events only, not every attestation.
     statements: [`CREATE INDEX idx_ledger_event_type ON ledger (event_type)`],
   },
+  {
+    version: 4,
+    name: 'ledger_issue_index',
+    // Scale: the panel and every verdict refresh read one work item's events, not the whole site's. Rows written before
+    // this migration have no issue_id; reads include them, so nothing is missed and the cost stays bounded.
+    statements: [`ALTER TABLE ledger ADD COLUMN issue_id VARCHAR(40)`, `CREATE INDEX idx_ledger_issue ON ledger (issue_id, event_type)`],
+  },
 ];

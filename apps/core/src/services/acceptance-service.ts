@@ -21,8 +21,9 @@ const label = (r: Pick<Requirement, 'subtaskKey' | 'severity'>) => r.subtaskKey 
 /** Acceptances as the ledger events alone say (no time-based expiry applied), to find the ones that still need an expiry entry. */
 const byEvents = (rows: readonly LedgerRow[]) => rebuildAcceptances(rows, new Date(0));
 
-async function ledgerRows(deps: CoreDeps): Promise<Result<LedgerRow[]>> {
-  return deps.ledger.ofTypes(ACCEPTANCE_EVENTS);
+/** Every acceptance event (the hourly expiry sweep), or, with an issue, that work item's only (indexed; scale). */
+async function ledgerRows(deps: CoreDeps, issueId?: string): Promise<Result<LedgerRow[]>> {
+  return issueId ? deps.ledger.forIssues(ACCEPTANCE_EVENTS, [issueId]) : deps.ledger.ofTypes(ACCEPTANCE_EVENTS);
 }
 
 async function setStatus(deps: CoreDeps, requirementId: string, from: Requirement['status'][], to: Requirement['status']): Promise<Result<void>> {
@@ -64,7 +65,7 @@ export async function requestAcceptance(
   const now = deps.clock.now();
   const req = await visibleRequirement(deps, v, input.requirementId);
   if (!req.ok) return req;
-  const [policy, rows] = await Promise.all([deps.config.site(), ledgerRows(deps)]);
+  const [policy, rows] = await Promise.all([deps.config.site(), ledgerRows(deps, v.issueId)]);
   if (!policy.ok) return policy;
   if (!rows.ok) return rows;
   const open = rebuildAcceptances(rows.value, now).find((a) => a.requirementId === req.value.id && (a.state === 'pending' || a.state === 'active'));
@@ -115,7 +116,7 @@ export async function requestAcceptance(
 }
 
 async function findAcceptance(deps: CoreDeps, v: Viewer, acceptanceId: string): Promise<Result<{ a: Acceptance; rows: LedgerRow[] }>> {
-  const rows = await ledgerRows(deps);
+  const rows = await ledgerRows(deps, v.issueId);
   if (!rows.ok) return rows;
   const a = rebuildAcceptances(rows.value, deps.clock.now()).find((x) => x.id === acceptanceId);
   if (!a || a.issueId !== v.issueId) return err(appError('not_found', 'risk acceptance not found'));

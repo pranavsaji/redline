@@ -161,6 +161,15 @@ export function memoryLedgerRepo(): LedgerRepo & { _rows: LedgerRow[] } {
     async ofTypes(types) {
       return ok(rows.filter((r) => types.includes(r.eventType)).map(clone));
     },
+    async forIssues(types, issueIds) {
+      if (types.length === 0 || issueIds.length === 0) return ok([]);
+      return ok(
+        rows.filter((r) => types.includes(r.eventType) && (typeof r.payload.issueId !== 'string' || issueIds.includes(r.payload.issueId))).map((r) => ({ ...r, payload: { ...r.payload } })),
+      );
+    },
+    async latestOfTypes(types, limit) {
+      return ok(rows.filter((r) => types.includes(r.eventType)).slice(-Math.max(0, limit)).map((r) => ({ ...r, payload: { ...r.payload } })));
+    },
   };
 }
 

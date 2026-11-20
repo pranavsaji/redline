@@ -273,7 +273,16 @@ export async function refreshVerdict(deps: CoreDeps, issueId: string): Promise<R
   if (!up.ok) return fail(up);
   const policy = await deps.config.site();
   if (!policy.ok) return fail(policy);
-  const rows = await deps.ledger.ofTypes(VERDICT_EVENTS);
+  // Scale: walk the ancestors first, then read only their and this item's ledger events (indexed by work item).
+  const chain: JiraIssue[] = [];
+  let pid = issue.parent?.id;
+  for (let depth = 0; pid && depth < MAX_ANCESTORS; depth++) {
+    const p = await deps.jira.issue(pid);
+    if (!p.ok) return fail(p);
+    chain.push(p.value);
+    pid = p.value.parent?.id;
+  }
+  const rows = await deps.ledger.forIssues(VERDICT_EVENTS, [issue.id, ...chain.map((c) => c.id)]);
   if (!rows.ok) return fail(rows);
   const ledgered = fromLedger(rows.value, now);
 
@@ -308,15 +317,11 @@ export async function refreshVerdict(deps: CoreDeps, issueId: string): Promise<R
   addKeys(own.value.requirements);
 
   const ancestors: Array<{ issueKey: string; verdict: Verdict }> = [];
-  let parentId = issue.parent?.id;
-  for (let depth = 0; parentId && depth < MAX_ANCESTORS; depth++) {
-    const p = await deps.jira.issue(parentId);
-    if (!p.ok) return fail(p);
-    const pv = await ownVerdict(deps, p.value, policy.value, ledgered, `${site}/browse/${p.value.key}`, now);
+  for (const p of chain) {
+    const pv = await ownVerdict(deps, p, policy.value, ledgered, `${site}/browse/${p.key}`, now);
     if (!pv.ok) return fail(pv);
-    if (pv.value.reviewed) ancestors.push({ issueKey: p.value.key, verdict: pv.value.verdict });
+    if (pv.value.reviewed) ancestors.push({ issueKey: p.key, verdict: pv.value.verdict });
     addKeys(pv.value.requirements);
-    parentId = p.value.parent?.id;
   }
 
   const final = combineVerdicts(own.value.verdict, ancestors);

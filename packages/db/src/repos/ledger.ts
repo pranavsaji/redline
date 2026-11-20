@@ -38,7 +38,8 @@ export function sqlLedgerRepo(x: SqlExecutor): LedgerRepo {
       return ok(row ? { seq: Number(row.seq), entryHash: row.entry_hash } : null);
     },
     async append(e) {
-      const r = await x.exec(`INSERT INTO ledger (${COLS}) VALUES (?, ?, ?, ?, ?, ?, ?)`, [e.seq, e.eventType, JSON.stringify(e.payload), e.actor, e.prevHash, e.entryHash, e.createdAt]);
+      const issueId = typeof e.payload.issueId === 'string' && e.payload.issueId.length <= 40 ? e.payload.issueId : null;
+      const r = await x.exec(`INSERT INTO ledger (${COLS}, issue_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [e.seq, e.eventType, JSON.stringify(e.payload), e.actor, e.prevHash, e.entryHash, e.createdAt, issueId]);
       return r.ok ? ok(e) : r;
     },
     async range(fromSeq, toSeq) {
@@ -53,6 +54,22 @@ export function sqlLedgerRepo(x: SqlExecutor): LedgerRepo {
       if (types.length === 0) return ok([]);
       const r = await x.query<Row>(`SELECT ${COLS} FROM ledger WHERE event_type IN (${types.map(() => '?').join(', ')}) ORDER BY seq ASC`, [...types]);
       return r.ok ? list(r.value) : r;
+    },
+    async forIssues(types, issueIds) {
+      if (types.length === 0 || issueIds.length === 0) return ok([]);
+      const t = types.map(() => '?').join(', ');
+      const ids = issueIds.map(() => '?').join(', ');
+      const r = await x.query<Row>(
+        `SELECT ${COLS} FROM ledger WHERE event_type IN (${t}) AND (issue_id IN (${ids}) OR issue_id IS NULL) ORDER BY seq ASC`,
+        [...types, ...issueIds],
+      );
+      return r.ok ? list(r.value) : r;
+    },
+    async latestOfTypes(types, limit) {
+      if (types.length === 0 || limit <= 0) return ok([]);
+      const n = Math.min(Math.floor(limit), 1000);
+      const r = await x.query<Row>(`SELECT ${COLS} FROM ledger WHERE event_type IN (${types.map(() => '?').join(', ')}) ORDER BY seq DESC LIMIT ${n}`, [...types]);
+      return r.ok ? list([...r.value].reverse()) : r;
     },
   };
 }
