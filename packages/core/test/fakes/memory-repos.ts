@@ -85,6 +85,7 @@ export function memoryReviewRepo(): ReviewRepo & { _reviews: Map<string, Review>
     },
     async saveSample(reviewId, n, sample) {
       const m = samples.get(reviewId) ?? new Map<number, Sample>();
+      if (m.has(n)) return err(appError('conflict', `sample ${n} already saved`));
       m.set(n, clone(sample));
       samples.set(reviewId, m);
       return ok(undefined);

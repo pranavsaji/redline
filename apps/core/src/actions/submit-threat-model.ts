@@ -55,15 +55,19 @@ export async function ingestSample(deps: CoreDeps, issueKey: string, raw: string
   const review = latest.value;
   if (!review || review.status !== 'awaiting_agent') return err(appError('conflict', review?.failureReason === 'budget' ? 'budget' : 'no_open_review'));
 
-  const existing = await deps.reviews.samples(review.id);
-  if (!existing.ok) return existing;
-  if (existing.value.length >= review.samplesExpected) return err(appError('conflict', 'complete'));
-  const n = existing.value.length + 1;
-
   const extracted = extractAgentJson(raw, issue.value.key);
   const sample: Sample = extracted.ok ? extracted.value : { failed: extracted.error.code };
-  const saved = await deps.reviews.saveSample(review.id, n, sample);
-  if (!saved.ok) return saved;
+  // Race fix: two runs arriving together read the same count; the insert of a taken number conflicts, so take the next.
+  let n = 0;
+  for (let attempt = 0; ; attempt++) {
+    const existing = await deps.reviews.samples(review.id);
+    if (!existing.ok) return existing;
+    if (existing.value.length >= review.samplesExpected) return err(appError('conflict', 'complete'));
+    n = existing.value.length + 1;
+    const saved = await deps.reviews.saveSample(review.id, n, sample);
+    if (saved.ok) break;
+    if (saved.error.code !== 'conflict' || attempt >= review.samplesExpected) return saved;
+  }
   // Final review C2: who wrote each agent run is on the record, so a review its own developer steered is visible.
   if (actor) {
     const row = await appendLedger(deps.ledger, deps.clock, 'review.sample', { issueId: issue.value.id, reviewId: review.id, n, valid: extracted.ok, threats: extracted.ok ? extracted.value.threats.length : 0 }, actor);

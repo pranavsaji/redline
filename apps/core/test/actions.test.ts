@@ -89,6 +89,19 @@ describe('get-review-context (GET action)', () => {
   });
 });
 
+describe('race fix: agent runs saved at the same moment', () => {
+  it('both are kept, numbered 1 and 2, instead of one overwriting the other', async () => {
+    const t = setup();
+    await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
+    const [a, b] = await Promise.all([ingestSample(t.deps, KEY, JSON.stringify(MODEL), 'agent', 'acc-1'), ingestSample(t.deps, KEY, JSON.stringify(MODEL), 'agent', 'acc-1')]);
+    expect(a.ok && b.ok).toBe(true);
+    expect([a.ok && a.value.received, b.ok && b.value.received].sort()).toEqual([1, 2]);
+    const latest = await t.deps.reviews.latest('10042');
+    const s = latest.ok && latest.value ? await t.deps.reviews.samples(latest.value.id) : null;
+    expect(s && s.ok && s.value.length).toBe(2);
+  });
+});
+
 describe('security: only the configured review authors can submit agent runs (gap: developers steering their own review)', () => {
   const withAuthors = async (t: ReturnType<typeof setup>, authors: string[]) => {
     const p = await t.deps.config.site();

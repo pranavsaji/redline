@@ -254,6 +254,10 @@ export async function handleJob(deps: CoreDeps, job: ReviewJob): Promise<Result<
     case 'migrate': {
       const m = await deps.migrate();
       if (!m.ok) return m;
+      // Create the signing key now (once, from the queue) rather than on the first attestation, where two requests
+      // could race to create it. Best effort: the first attestation still creates it if this fails.
+      const k = await deps.keys.active();
+      if (!k.ok) log('keys.ensure_failed', { code: k.error.code });
       try {
         await deps.state.set(SCHEMA_VERSION_KEY, m.value.to);
       } catch (e) {

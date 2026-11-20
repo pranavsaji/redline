@@ -163,7 +163,7 @@ export async function adminGetPolicy(deps: CoreDeps, a: Admin): Promise<AdminPol
   if (denied) return denied;
   const policy = await deps.config.site();
   if (!policy.ok) return apiError(policy.error);
-  const [version, ops, digest, samples] = await Promise.all([policyVersion(deps), readJson(deps, OPS_CONFIG_KEY, OpsSchema), readJson(deps, DIGEST_CONFIG_KEY, DigestSchema), deps.ledger.ofTypes(['review.sample'])]);
+  const [version, ops, digest, samples] = await Promise.all([policyVersion(deps), readJson(deps, OPS_CONFIG_KEY, OpsSchema), readJson(deps, DIGEST_CONFIG_KEY, DigestSchema), deps.ledger.latestOfTypes(['review.sample'], 500)]);
   const authors = new Map<string, { runs: number; lastAt: string }>();
   for (const r of samples.ok ? [...samples.value].reverse() : []) {
     if (!r.actor) continue;
