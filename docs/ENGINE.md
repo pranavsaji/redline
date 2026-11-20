@@ -6,14 +6,13 @@ work item's review: nothing outside Redline submits to it.
 
 ## The pipeline
 
-Each stage is its own queue job, so every model call fits a function timeout and a redelivered job resumes from a
-checkpoint instead of paying twice.
+Each stage is its own queue job, so every model call fits a function timeout and a redelivered job is not paid twice.
 
 | Stage | Model tier | Reads | Produces |
 | --- | --- | --- | --- |
 | 1. Gather | none | the work item, linked pages, incidents, parent and children (scoped to who triggered it) | facts, each with a source, trust level and injection flag |
-| 2. Extract (quarantined) | balanced (`claude-sonnet-5`, falling back to `claude-sonnet-4-6`) | the untrusted text, fenced with a random nonce | a typed architecture sketch and evidence items that quote the facts verbatim. Sketch strings that read like instructions are dropped and flag injection |
-| 3. Propose ×3, in parallel | deep (`claude-opus-5`, falling back through `claude-opus-4-8`, `-4-7`, `-4-6`) | only the typed sketch, evidence ids and trusted metadata, never raw untrusted text; each run starts from a different lens (data stores, trust boundaries, users, external services, worst outcome) | three independent threat lists, each threat citing evidence ids |
+| 2. Injection check (quarantined) | balanced (`claude-sonnet-5`, falling back to `claude-sonnet-4-6`) | the raw untrusted text, fenced with a random nonce | a typed sketch whose `injectionSuspected` flag joins the scanner's: if set, every AI threat waits for a champion and the verifier is skipped. If the check cannot complete, the verifier is skipped too |
+| 3. Three independent runs, in parallel | deep (`claude-opus-5`, falling back through `claude-opus-4-8`, `-4-7`, `-4-6`) | the Redline agent prompt over the review context, with untrusted text fenced by a random nonce: exactly what a Rovo agent run sees | three threat models, each threat quoting its evidence |
 | 4. Assemble (deterministic) | none | the three runs | consensus (a threat needs a majority of runs), quotes checked word for word against the sources, the rule-based floor, coverage, severity and STRIDE/ASVS/CWE mappings, the risk score |
 | 5. Verify (adversarial) | deep | each accepted AI threat with the quotes it rests on, fenced as data | keep or drop, with a reason |
 
@@ -38,9 +37,27 @@ admin page shows the month's tokens under **Budgets**, where the per-review toke
 (500 by default) live. Choosing Redline Engine lifts per-review caps below 400,000 input and 60,000 output tokens to
 those values. The adapter logs model, tokens and timing for every call, never prompt or reply text.
 
-## Measuring it
+## Measuring it, and why the runs use the agent prompt
 
-`pnpm redline eval --llm claude-code --path pipeline` runs the same five stages offline through `claude -p` and scores
-them like the agent path; recordings live in `evals/results/recorded-engine/` and `judged-engine/`, so the agent path's
-CI gate is never overwritten. The in-product verifier uses its own rubric (does the quoted evidence support the
-threat?), not the offline judge's, so judged precision is not the product grading itself.
+The first engine design split each run into a quarantined extraction and proposals that saw only a typed sketch, never
+the text. On the same 30 cases and model (`claude-sonnet-4-5`) it scored much worse than the agent prompt: strict
+precision 18.7% against 35.9%, recall 80.0% against 85.2% (`evals/results/2026-11-20-claude-code-30-pipeline.md`).
+Proposals that cannot read the design write generic threats. So each engine run is the agent prompt over the fenced
+context, whose injection defences the eval already measures (6 of 6 poisoned cases held).
+
+`pnpm redline eval --llm recorded --path engine --verify claude-code` replays the recorded agent runs and adds the
+verifier (its replies are saved in `evals/results/verified-engine/`; CI replays them). On the 30 cases:
+
+| Metric | Agent runs | Agent runs + verifier (Redline Engine) |
+| --- | --- | --- |
+| High-severity recall | 91.9% | 91.9% |
+| Recall | 85.2% | 85.2% |
+| Injection resistance | 6 of 6 | 6 of 6 |
+| Precision, judged: model-proposed threats | 76.3% | 75.7% |
+| Precision, strict | 35.9% | 34.6% |
+
+On this model the verifier does not raise precision: when it drops an AI threat, the generic rule-based threat that
+threat covered comes back (the floor working as designed). Its value is trust and safety, not noise: kept threats are
+marked Verified, doubted ones show the reason, and doubted threats at or above the blocking threshold go to a champion.
+In the product both stages run on `claude-opus-5`. The in-product verifier uses its own rubric (does the quoted
+evidence support the threat?), not the offline judge's, so judged precision is not the product grading itself.

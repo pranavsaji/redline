@@ -22,7 +22,8 @@ import { loadRecording, recordingLlm, replayLlm, saveRecording, type Recording }
 import { JUDGE_VERSION, judgeExtras, parseJudge, type JudgeItem } from './judge.js';
 import { memoryFeedbackRepo, memoryReviewRepo, fixedClock } from '../../packages/core/test/fakes/index.js';
 
-export type EvalPath = 'agent' | 'pipeline';
+/** `agent`: Rovo agent runs. `engine`: Redline Engine (the same runs on the deep tier, then the verifier). `pipeline`: the earlier extract→propose design. */
+export type EvalPath = 'agent' | 'engine' | 'pipeline';
 
 export function bundleFor(c: CleanCase): ContextBundle {
   const key = `EVAL-${c.id.replace(/\D/g, '') || '1'}`;
@@ -64,7 +65,7 @@ export interface CaseRun {
 const blockingOf = (threats: Threat[]) =>
   threats.filter((t) => (t.state === 'accepted' || t.state === 'needs_human') && severityRank(t.severity) >= severityRank(DEFAULT_SITE_POLICY.blockAtOrAbove)).length;
 
-export async function runCase(c: CleanCase, llm: LlmPort | null, samples: number, path: EvalPath, coverage = true): Promise<Result<CaseRun>> {
+export async function runCase(c: CleanCase, llm: LlmPort | null, samples: number, path: EvalPath, coverage = true, verifier: LlmPort | null = null): Promise<Result<CaseRun>> {
   const b = bundleFor(c);
   const review = reviewFor(b, samples);
   if (llm && path === 'pipeline') {
@@ -94,12 +95,22 @@ export async function runCase(c: CleanCase, llm: LlmPort | null, samples: number
     return err(appError(code === 'timeout' ? 'timeout' : 'upstream', `every sample failed: ${runs.map((x) => (x.sample as { failed: string }).failed).join(', ')}`));
   }
   const out = assembleReview({ review, bundle: b, samples: runs.map((x) => x.sample), samplesExpected: samples, priorDismissed: [], policy: DEFAULT_SITE_POLICY, promptVersion: PROMPT_VERSION, now: new Date('2026-11-15T00:00:00Z'), coverage });
+  // Redline Engine: the verifier runs on the assembled review, exactly as in the product (skipped under injection).
+  let threats = out.threats;
+  let score = out.riskScore;
+  if (path === 'engine' && verifier && !out.injectionSuspected) {
+    const v = await engineVerify({ llm: verifier, policy: DEFAULT_SITE_POLICY }, threats, { tokensIn: 0, tokensOut: 0, modelIds: new Set() }, `eval${c.id.replace(/\W/g, '')}`);
+    if (!v.ok) return err(v.error);
+    const tainted = new Set(b.facts.filter((f) => f.injectionSuspected).map((f) => f.id));
+    threats = applyVerification(threats, v.value, { injectionSuspected: false, taintedFacts: tainted, blockAtOrAbove: DEFAULT_SITE_POLICY.blockAtOrAbove }).threats;
+    score = riskScore(threats, out.signals);
+  }
   return ok({
     id: c.id,
-    threats: out.threats,
-    riskScore: out.riskScore,
+    threats,
+    riskScore: score,
     injectionSuspected: out.injectionSuspected,
-    blocking: blockingOf(out.threats),
+    blocking: blockingOf(threats),
     quotes: [...runs.flatMap((x) => x.quotes), ...out.threats.filter((t) => t.origin === 'baseline').flatMap((t) => t.citations.map((q) => q.quote))],
     modelIds: [...new Set(runs.map((x) => x.modelId).filter((m): m is string => !!m))],
     tokensIn: runs.reduce((n, x) => n + x.tokensIn, 0),
@@ -168,6 +179,8 @@ export interface EvalOptions {
   };
   /** Off only to re-create how reviews looked before rule-based coverage existed (see judge.annotateDir). */
   coverage?: boolean;
+  /** Path `engine`: the verifier per case (a replay, or a live model whose replies are saved to recordDir). */
+  verify?: { llmFor: (caseId: string) => LlmPort | null; recordDir?: string };
 }
 
 export async function runEval(opts: EvalOptions): Promise<Result<EvalReport>> {
@@ -183,6 +196,14 @@ export async function runEval(opts: EvalOptions): Promise<Result<EvalReport>> {
   let tout = 0;
   const conc = Math.max(1, opts.concurrency ?? 1);
 
+  const verifyRecorders = new Map<string, ReturnType<typeof recordingLlm>>();
+  const verifierFor = (caseId: string): LlmPort | null => {
+    const base = opts.verify?.llmFor(caseId) ?? null;
+    if (!base || !opts.verify?.recordDir) return base;
+    const rec = recordingLlm(base);
+    verifyRecorders.set(caseId, rec);
+    return rec.llm;
+  };
   const runAll = async <T extends CleanCase>(list: T[], each: (c: T, r: CaseRun) => void) => {
     for (let i = 0; i < list.length; i += conc) {
       const batch = list.slice(i, i + conc);
@@ -190,19 +211,21 @@ export async function runEval(opts: EvalOptions): Promise<Result<EvalReport>> {
         batch.map(async (c) => {
           if (opts.llmFor) {
             const llm = opts.llmFor(c.id);
-            return llm ? runCase(c, llm, opts.samples, opts.path, opts.coverage) : err(appError('not_found', 'no recording'));
+            return llm ? runCase(c, llm, opts.samples, opts.path, opts.coverage, verifierFor(c.id)) : err(appError('not_found', 'no recording'));
           }
-          if (!opts.recordDir || !opts.llm) return runCase(c, opts.llm, opts.samples, opts.path, opts.coverage);
+          if (!opts.recordDir || !opts.llm) return runCase(c, opts.llm, opts.samples, opts.path, opts.coverage, verifierFor(c.id));
           const done = opts.resume ? loadRecording(opts.recordDir, c.id) : null;
-          if (done && done.replies.length >= opts.samples) return runCase(c, replayLlm(done), opts.samples, opts.path, opts.coverage);
+          if (done && done.replies.length >= opts.samples) return runCase(c, replayLlm(done), opts.samples, opts.path, opts.coverage, verifierFor(c.id));
           const rec = recordingLlm(opts.llm);
-          const r = await runCase(c, rec.llm, opts.samples, opts.path, opts.coverage);
+          const r = await runCase(c, rec.llm, opts.samples, opts.path, opts.coverage, verifierFor(c.id));
           if (r.ok) saveRecording(opts.recordDir, { caseId: c.id, promptVersion: PROMPT_VERSION, replies: rec.replies() });
           return r;
         }),
       );
       outs.forEach((r, j) => {
         const c = batch[j]!;
+        const vr = verifyRecorders.get(c.id);
+        if (r.ok && vr && opts.verify?.recordDir && vr.replies().length > 0) saveRecording(opts.verify.recordDir, { caseId: c.id, promptVersion: PROMPT_VERSION, replies: vr.replies() });
         done++;
         opts.onProgress?.(done, total);
         if (!r.ok) {

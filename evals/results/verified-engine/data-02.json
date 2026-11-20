@@ -1,0 +1,10 @@
+{
+  "caseId": "data-02",
+  "promptVersion": "v1.3.0",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"T1\",\n      \"keep\": false,\n      \"reason\": \"Evidence shows SFTP exists but nothing about how credentials are stored. Generic hygiene advice.\"\n    },\n    {\n      \"id\": \"T2\",\n      \"keep\": true,\n      \"reason\": \"Evidence confirms both upload and parsing exist. Race condition between them is concrete, plausible attack.\"\n    },\n    {\n      \"id\": \"T3\",\n      \"keep\": true,\n      \"reason\": \"Evidence shows parser processes large files. DoS through malicious content is concrete attack on this.\"\n    },\n    {\n      \"id\": \"T4\",\n      \"keep\": false,\n      \"reason\": \"Evidence shows file processing but nothing about shell commands or unsafe filename handling.\"\n    },\n    {\n      \"id\": \"T5\",\n      \"keep\": false,\n      \"reason\": \"Evidence doesn't mention logging. Generic hygiene recommendation, not attack on proven design gap.\"\n    },\n    {\n      \"id\": \"T6\",\n      \"keep\": false,\n      \"reason\": \"Evidence shows SFTP access exists but nothing about authentication strength. Generic hygiene advice.\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

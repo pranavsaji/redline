@@ -1,0 +1,10 @@
+{
+  "caseId": "mobile-05",
+  "promptVersion": "v1.3.0",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"T1\",\n      \"keep\": true,\n      \"reason\": \"Evidence confirms map endpoint accepts delivery ID and returns driver location; concrete unauthorized access attack.\"\n    },\n    {\n      \"id\": \"T2\",\n      \"keep\": false,\n      \"reason\": \"Duplicates T1: same attack (unauthorized delivery ID access), same harm (tracking, stalking, home addresses).\"\n    },\n    {\n      \"id\": \"T3\",\n      \"keep\": true,\n      \"reason\": \"Evidence confirms 10-second GPS updates and customer map access; distinct authorized-user-misuse scenario.\"\n    },\n    {\n      \"id\": \"T4\",\n      \"keep\": false,\n      \"reason\": \"Evidence shows GPS updates occur but says nothing about authentication presence or absence.\"\n    },\n    {\n      \"id\": \"T5\",\n      \"keep\": true,\n      \"reason\": \"Evidence confirms GPS update and map endpoint components exist; concrete DoS attack on these features.\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

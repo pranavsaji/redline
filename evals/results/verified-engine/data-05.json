@@ -1,0 +1,10 @@
+{
+  "caseId": "data-05",
+  "promptVersion": "v1.3.0",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"T1\",\n      \"keep\": true,\n      \"reason\": \"Evidence confirms warehouse copies persist after deletion; threat describes concrete privacy harm from analytics access.\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

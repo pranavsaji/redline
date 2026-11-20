@@ -1,0 +1,10 @@
+{
+  "caseId": "data-04",
+  "promptVersion": "v1.3.0",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"T1\",\n      \"keep\": true,\n      \"reason\": \"Design has unencrypted backups in cloud bucket; concrete misconfiguration exposure attack described\"\n    },\n    {\n      \"id\": \"T2\",\n      \"keep\": true,\n      \"reason\": \"Design has backup bucket; concrete deletion attack with credential compromise/insider threat specified\"\n    },\n    {\n      \"id\": \"T3\",\n      \"keep\": true,\n      \"reason\": \"Bucket sharing with reporting team makes audit logging concrete; undetected exfiltration scenario specific\"\n    },\n    {\n      \"id\": \"T4\",\n      \"keep\": true,\n      \"reason\": \"Backup files exist in design; concrete tampering attack distinct from disclosure/deletion/access threats\"\n    },\n    {\n      \"id\": \"T5\",\n      \"keep\": true,\n      \"reason\": \"Design explicitly shares bucket with reporting team; concrete least-privilege violation and compromise scenario\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

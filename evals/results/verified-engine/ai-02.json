@@ -1,0 +1,10 @@
+{
+  "caseId": "ai-02",
+  "promptVersion": "v1.3.0",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"T1\",\n      \"keep\": true,\n      \"reason\": \"Evidence shows HR/finance data indexed and queryable. Threat describes concrete multi-query correlation attack.\"\n    },\n    {\n      \"id\": \"T2\",\n      \"keep\": true,\n      \"reason\": \"Evidence shows LLM processes user questions with RAG context. Threat describes concrete prompt injection attack.\"\n    },\n    {\n      \"id\": \"T3\",\n      \"keep\": true,\n      \"reason\": \"Evidence shows Confluence pages indexed including sensitive spaces. Threat describes concrete poisoning attack via page edits.\"\n    },\n    {\n      \"id\": \"T4\",\n      \"keep\": true,\n      \"reason\": \"Evidence shows query interface to sensitive data. Threat describes concrete undetected access scenario with specific harm.\"\n    },\n    {\n      \"id\": \"T5\",\n      \"keep\": false,\n      \"reason\": \"Repeats T2's prompt injection attack and data exfiltration harm on same LLM component.\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

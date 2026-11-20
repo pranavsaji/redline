@@ -16,9 +16,9 @@ finishes: the Done transition and the merge.
 
 ## What it does
 
-- **Redline Engine reviews every story by itself.** On Atlassian-hosted Claude models (Forge LLMs): a quarantined
-  extraction of the work item and its linked pages, three independent analyses on the strongest model that must
-  agree, and an adversarial verifier that checks each threat against the quotes it rests on. No setup, no Rovo agent
+- **Redline Engine reviews every story by itself.** On Atlassian-hosted Claude models (Forge LLMs): three
+  independent analyses of the work item and its linked pages on the strongest model, which must agree and quote their
+  evidence word for word, then an adversarial verifier that checks each threat against the quotes it rests on. No setup, no Rovo agent
   or Automation rule needed, and no developer can write their own review.
 - **Every threat is cited.** Redline keeps only threats a majority of analyses raised and whose quotes are found word
   for word in the work item, its pages or incidents. A rule-based floor always runs underneath.

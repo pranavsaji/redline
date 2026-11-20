@@ -46,8 +46,12 @@ async function applyAssembly(deps: CoreDeps, review: Review, bundle: ContextBund
   }
   const prior = await priorRevision(deps, review);
   if (!prior.ok) return prior;
+  // Redline Engine: the quarantined extractor's model-based injection signal counts like a flagged fact.
+  const extract = await deps.reviews.stage(review.id, 'extract');
+  const extractorFlag = extract.ok && extract.value?.status === 'done' && (extract.value.checkpoint as { sketch?: { injectionSuspected?: boolean } } | undefined)?.sketch?.injectionSuspected === true;
   const out = assembleReview({
     review, bundle, samples, samplesExpected: review.samplesExpected, priorDismissed, policy, promptVersion: PROMPT_VERSION, now: deps.clock.now(), mode,
+    ...(extractorFlag ? { injectionSuspected: true } : {}),
     ...(prior.value ? { prior: prior.value } : {}),
   });
   const saved = await deps.reviews.saveThreats(review.id, out.threats, out.discarded);
@@ -155,6 +159,8 @@ async function gather(deps: CoreDeps, job: Extract<ReviewJob, { kind: 'gather' }
     if (!u.ok) return u;
   }
   if (engine) {
+    // Marks the review as Redline Engine's. The quarantined injection check runs first; it then starts the runs.
+    await deps.reviews.saveStage(review.id, 'engine', 'done', { runs: review.samplesExpected }, undefined, now.toISOString());
     const q = await deps.queue.push([{ kind: 'engine', reviewId: review.id, stage: 'extract' }]);
     if (!q.ok) return q;
   }

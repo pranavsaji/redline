@@ -1,0 +1,10 @@
+{
+  "caseId": "ai-03",
+  "promptVersion": "v1.3.0",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"T1\",\n      \"keep\": false,\n      \"reason\": \"Evidence shows agent actions exist but doesn't mention audit logging, attribution, or tracking. Attacked component not in design.\"\n    },\n    {\n      \"id\": \"T2\",\n      \"keep\": true,\n      \"reason\": \"Evidence explicitly shows agent reads comments and runs shell commands. Concrete prompt injection attack on this design.\"\n    },\n    {\n      \"id\": \"T3\",\n      \"keep\": true,\n      \"reason\": \"Evidence directly states token has write access to all repositories. Concrete attack on excessive privileges in design.\"\n    },\n    {\n      \"id\": \"T4\",\n      \"keep\": true,\n      \"reason\": \"Shell command capability in evidence enables environment variable access. Concrete secrets exfiltration, different harm than T2.\"\n    },\n    {\n      \"id\": \"T5\",\n      \"keep\": true,\n      \"reason\": \"Shell command capability in evidence enables resource exhaustion attacks. Concrete DoS attack, different harm than T2/T4.\"\n    },\n    {\n      \"id\": \"T6\",\n      \"keep\": true,\n      \"reason\": \"Evidence shows agent reads repository content. Concrete context poisoning attack when malicious files processed.\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

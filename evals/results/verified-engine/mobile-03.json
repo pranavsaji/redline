@@ -1,0 +1,10 @@
+{
+  "caseId": "mobile-03",
+  "promptVersion": "v1.3.0",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"T1\",\n      \"keep\": true,\n      \"reason\": \"Caching and shared devices evidenced. Cross-patient data access on shared tablets is concrete attack.\"\n    },\n    {\n      \"id\": \"T2\",\n      \"keep\": false,\n      \"reason\": \"Offline access evidenced but authentication absence is not. Assumes missing control without design support.\"\n    },\n    {\n      \"id\": \"T3\",\n      \"keep\": false,\n      \"reason\": \"Only shared devices mentioned, nothing about sessions. Generic security hygiene without design evidence.\"\n    },\n    {\n      \"id\": \"T4\",\n      \"keep\": true,\n      \"reason\": \"SQLite database evidenced. Direct database tampering with sync propagation is concrete attack on component.\"\n    },\n    {\n      \"id\": \"T5\",\n      \"keep\": true,\n      \"reason\": \"Offline work, shared devices, and sync evidenced. Conflicting edits with last-write-wins is concrete scenario.\"\n    },\n    {\n      \"id\": \"T6\",\n      \"keep\": true,\n      \"reason\": \"Offline work and shared devices evidenced. User attribution failure is concrete problem for design.\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

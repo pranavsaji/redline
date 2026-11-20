@@ -1,0 +1,10 @@
+{
+  "caseId": "data-01",
+  "promptVersion": "v1.3.0",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"T1\",\n      \"keep\": true,\n      \"reason\": \"Quotes explicitly show all analysts access customer PII including email and phone numbers in warehouse.\"\n    },\n    {\n      \"id\": \"T2\",\n      \"keep\": false,\n      \"reason\": \"Quotes mention analyst access but say nothing about audit logging presence or absence.\"\n    },\n    {\n      \"id\": \"T3\",\n      \"keep\": false,\n      \"reason\": \"Quotes describe the export job exists but say nothing about its authentication mechanism.\"\n    },\n    {\n      \"id\": \"T4\",\n      \"keep\": false,\n      \"reason\": \"Quotes describe the copy operation but say nothing about integrity verification mechanisms.\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

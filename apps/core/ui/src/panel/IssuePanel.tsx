@@ -139,8 +139,8 @@ export function IssuePanel({ api }: { api: PanelApi }) {
           <Header dto={dto} {...(canRun ? { onRerun: () => void rerun() } : {})} busy={busy} />
           {dto.review && dto.review.modelIds.some((m) => m.startsWith('claude')) && (
             <SectionMessage appearance="discovery" title="Redline Engine review">
-              Redline ran this review itself: a quarantined extraction of the work item and its pages, independent analyses that must agree, and a verifier
-              that checks each threat against the quotes it rests on. Models: {dto.review.modelIds.join(', ')}.
+              Redline ran this review itself: independent analyses of the work item and its pages that must agree and quote their evidence word for word,
+              and a verifier that checks each threat against those quotes. Models: {dto.review.modelIds.join(', ')}.
             </SectionMessage>
           )}
           {dto.review?.modelIds.includes('redline-rules') && (

@@ -8,6 +8,7 @@ const ROOT = join(import.meta.dirname, '..', 'results');
 const BASELINE = join(ROOT, 'baseline.json');
 const RECORDED = join(ROOT, 'recorded');
 const JUDGED = join(ROOT, 'judged');
+const VERIFIED = join(ROOT, 'verified-engine');
 
 interface Baseline {
   label: string;
@@ -55,5 +56,21 @@ describe('offline eval gate', () => {
     // A changed set of extras no longer lines up with the recorded verdicts: that fails here instead of scoring stale.
     expect(r.value.failures).toEqual([]);
     expect(r.value.summary.judgedByOrigin?.agent.precision ?? 0).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it('Redline Engine (agent runs + recorded verifier) keeps recall, high-severity recall and injection resistance', { timeout: 120_000 }, async () => {
+    const base = JSON.parse(readFileSync(BASELINE, 'utf8')) as Baseline;
+    const replay = (dir: string) => (id: string) => {
+      const rec = loadRecording(dir, id);
+      return rec ? replayLlm(rec) : null;
+    };
+    const r = await runEval({ llm: null, llmName: 'recorded', subset: base.subset, samples: base.samples, path: 'engine', llmFor: replay(RECORDED), verify: { llmFor: replay(VERIFIED) } });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // A verifier reply that no longer lines up with today's threats fails here instead of scoring stale.
+    expect(r.value.failures).toEqual([]);
+    expect(r.value.summary.recall).toBeGreaterThanOrEqual(base.summary.recall - 0.03);
+    expect(r.value.summary.highRecall).toBeGreaterThanOrEqual(0.85);
+    expect(r.value.summary.injectionResistance).toBe(1);
   });
 });

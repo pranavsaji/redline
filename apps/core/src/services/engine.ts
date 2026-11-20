@@ -1,4 +1,4 @@
-import { applyVerification, engineExtract, engineProposal, engineVerify, requirementsFor, type Extracted, type Usage } from '@redline/core';
+import { applyVerification, engineAgentRun, engineExtract, engineVerify, requirementsFor, type Extracted, type Usage } from '@redline/core';
 import { appError, err, ok, type ContextBundle, type Result, type Review } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
@@ -34,17 +34,10 @@ async function record(deps: CoreDeps, review: Review, before: { tokensIn: number
 const trace = (deps: CoreDeps, reviewId: string, stage: string, status: 'done' | 'failed', error?: string) =>
   deps.reviews.saveStage(reviewId, `engine_${stage}`, status, undefined, error, deps.clock.now().toISOString()).catch(() => null);
 
-/** A run that could not be made still counts as a received (failed) run, so the review settles instead of hanging. */
-async function failRun(deps: CoreDeps, review: Review, code: string): Promise<Result<void>> {
-  const s = await storeSample(deps, review, { failed: code });
-  if (!s.ok && s.error.message !== 'complete') return s;
-  return deps.queue.push([{ kind: 'assemble', reviewId: review.id }]);
-}
-
 /**
- * Redline Engine, one stage per queue job: extract (quarantined, the only call that reads untrusted text) → N
- * independent proposals in parallel (each becomes a run, exactly like an agent run, so consensus, quote checks and the
- * rule-based floor apply unchanged) → assembly → the adversarial verifier. Model errors become failed runs: the review
+ * Redline Engine, one stage per queue job: a quarantined injection check, then N independent runs in parallel on the deep tier, each the Redline agent
+ * prompt over the nonce-fenced review context (each becomes a run exactly like a Rovo agent run, so consensus, quote
+ * checks, injection flags and the rule-based floor apply unchanged) → assembly → the adversarial verifier. Model errors become failed runs: the review
  * then fails closed, as AI errors count as missing.
  */
 export async function engineJob(deps: CoreDeps, job: EngineJob): Promise<Result<void>> {
@@ -76,41 +69,34 @@ export async function engineJob(deps: CoreDeps, job: EngineJob): Promise<Result<
   const bundle = await bundleOf(deps, review);
   if (!bundle.ok) return bundle;
 
+  // Stage 1, the quarantined injection check: the only call that reads raw untrusted text, on the balanced tier. Its
+  // model-based flag joins the scanner's (assembly and the verifier read it); then the independent runs start.
   if (job.stage === 'extract') {
     const x = await engineExtract(stageDeps, review, bundle.value, usage);
     await record(deps, review, before, usage);
-    await trace(deps, review.id, 'extract', x.ok ? 'done' : 'failed', x.ok ? undefined : x.error.code);
-    if (!x.ok) {
-      log('engine.extract_failed', { reviewId: review.id, code: x.error.code });
-      for (let n = 0; n < review.samplesExpected; n++) {
-        const f = await failRun(deps, review, `extract_${x.error.code}`);
-        if (!f.ok) return f;
-      }
-      return voidOk();
-    }
+    await trace(deps, review.id, 'injection_check', x.ok ? 'done' : 'failed', x.ok ? (x.value.sketch.injectionSuspected ? 'injection suspected' : undefined) : x.error.code);
+    if (!x.ok) log('engine.extract_failed', { reviewId: review.id, code: x.error.code });
     return deps.queue.push(Array.from({ length: review.samplesExpected }, (_, n) => ({ kind: 'engine' as const, reviewId: review.id, stage: 'propose' as const, n })));
   }
 
   const n = job.n ?? 0;
-  const done = await deps.reviews.stage(review.id, `propose:${n}`);
-  if (done.ok && done.value && done.value.status !== 'running') return voidOk(); // redelivered: this run is already in
-  const saved = await deps.reviews.stage(review.id, 'extract');
-  const extracted = saved.ok && saved.value?.status === 'done' ? (saved.value.checkpoint as Extracted | undefined) : undefined;
-  if (!extracted) return failRun(deps, review, 'no_extract');
-  const r = await engineProposal(stageDeps, review, bundle.value, extracted, n, usage);
+  const done = await deps.reviews.stage(review.id, `run:${n}`);
+  if (done.ok && done.value) return voidOk(); // redelivered: this run is already in
+  const r = await engineAgentRun(stageDeps, review, bundle.value, usage);
   await record(deps, review, before, usage);
   const sample = r.ok ? r.value : { failed: r.error.code };
-  await trace(deps, review.id, `propose_${n + 1}`, 'failed' in sample ? 'failed' : 'done', 'failed' in sample ? sample.failed : undefined);
+  await deps.reviews.saveStage(review.id, `run:${n}`, 'failed' in sample ? 'failed' : 'done', undefined, 'failed' in sample ? sample.failed : undefined);
+  await trace(deps, review.id, `run_${n + 1}`, 'failed' in sample ? 'failed' : 'done', 'failed' in sample ? sample.failed : undefined);
   const s = await storeSample(deps, review, sample);
   if (!s.ok && s.error.message !== 'complete') return s;
-  log('engine.proposal', { reviewId: review.id, n, valid: !('failed' in sample) });
+  log('engine.run', { reviewId: review.id, n, valid: !('failed' in sample) });
   return deps.queue.push([{ kind: 'assemble', reviewId: review.id }]);
 }
 
-/** Is this review one Redline Engine ran (it has an extract checkpoint)? */
+/** Is this review one Redline Engine ran (its marker stage, or an extract checkpoint from before runs replaced it)? */
 export async function isEngineReview(deps: Pick<CoreDeps, 'reviews'>, reviewId: string): Promise<boolean> {
-  const s = await deps.reviews.stage(reviewId, 'extract');
-  return s.ok && !!s.value;
+  const [m, x] = await Promise.all([deps.reviews.stage(reviewId, 'engine'), deps.reviews.stage(reviewId, 'extract')]);
+  return (m.ok && !!m.value) || (x.ok && !!x.value);
 }
 
 type Verdicts = Array<{ threatId: string; keep: boolean; reason: string }>;
@@ -162,10 +148,12 @@ async function verify(deps: CoreDeps, review: Review, stageDeps: Parameters<type
   const [threats, facts, extract] = await Promise.all([deps.reviews.threats(review.id), deps.reviews.facts(review.id), deps.reviews.stage(review.id, 'extract')]);
   if (!threats.ok) return threats;
   if (!facts.ok) return facts;
-  const sketchFlag = extract.ok && (extract.value?.checkpoint as Extracted | undefined)?.sketch.injectionSuspected === true;
-  if (sketchFlag || facts.value.some((f) => f.injectionSuspected)) {
+  // Fail safe: without a completed injection check (or when it or the scanner flagged anything) the verifier never runs.
+  const checked = extract.ok && extract.value?.status === 'done';
+  const sketchFlag = checked && (extract.value?.checkpoint as Extracted | undefined)?.sketch.injectionSuspected === true;
+  if (!checked || sketchFlag || facts.value.some((f) => f.injectionSuspected)) {
     await deps.reviews.saveStage(review.id, 'verify', 'done', { skipped: 'injection' });
-    await trace(deps, review.id, 'verify', 'done', 'skipped: injection suspected');
+    await trace(deps, review.id, 'verify', 'done', checked ? 'skipped: injection suspected' : 'skipped: injection check did not complete');
     return voidOk();
   }
   const nonce = globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 12);

@@ -1,0 +1,10 @@
+{
+  "caseId": "api-04",
+  "promptVersion": "v1.3.0",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"T1\",\n      \"keep\": true,\n      \"reason\": \"Evidence confirms URL downloading in VPC near internal services; DNS rebinding is concrete attack on this.\"\n    },\n    {\n      \"id\": \"T2\",\n      \"keep\": true,\n      \"reason\": \"Evidence confirms URL downloading; slow response exhausting resources is concrete attack on this feature.\"\n    },\n    {\n      \"id\": \"T3\",\n      \"keep\": true,\n      \"reason\": \"Evidence confirms image processing; parser exploit via crafted image is concrete attack on this feature.\"\n    },\n    {\n      \"id\": \"T4\",\n      \"keep\": false,\n      \"reason\": \"Duplicate of T2: same slow HTTP attack, same resource exhaustion harm, just named Slowloris.\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

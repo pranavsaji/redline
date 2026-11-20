@@ -1,6 +1,6 @@
 # Redline
 
-![tests](https://img.shields.io/badge/tests-950%2B%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-1050%2B%20passing-brightgreen)
 ![coverage](https://img.shields.io/badge/line%20coverage-92.9%25-brightgreen)
 ![eval F1](https://img.shields.io/badge/eval%20F1-50.5%25-blue)
 ![injection resistance](https://img.shields.io/badge/injection%20resistance-6%2F6-blue)
@@ -19,10 +19,10 @@ actions, skill, MCP), Automation and Forge SQL. No egress: nothing leaves Atlass
 ## What it does
 
 - **Redline Engine: it reviews by itself.** Install, create a story, and within a few minutes the panel shows a cited
-  threat model. Redline runs it on Atlassian-hosted Claude models: a quarantined extraction, three independent
-  analyses on the strongest model that must agree, and an adversarial verifier that drops threats the evidence does
-  not support (High and Critical ones it doubts go to a champion instead). No Rovo agent, Automation rule or setup, and
-  no developer can write their own review. [How it works](docs/ENGINE.md).
+  threat model. Redline runs it on Atlassian-hosted Claude models (Opus 5): three independent analyses that must
+  agree, each quoting its evidence, then an adversarial verifier that checks every threat against its quotes (doubted
+  High and Critical threats go to a champion instead of disappearing). No Rovo agent, Automation rule or setup, and no
+  developer can write their own review. [How it works, and what we measured](docs/ENGINE.md).
 - **Cited threat models.** Three independent Rovo agent runs propose STRIDE threats; Redline keeps only those a
   majority raised and whose quotes are found word for word in the work item, its pages or incidents. Plain language
   first ("A stolen link lets an attacker lock the real owner out for good."), then the STRIDE category, ASVS 5 and CWE.

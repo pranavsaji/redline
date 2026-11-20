@@ -1,0 +1,10 @@
+{
+  "caseId": "api-02",
+  "promptVersion": "v1.3.0",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"T1\",\n      \"keep\": true,\n      \"reason\": \"Evidence confirms nested queries exist; threat describes concrete resource exhaustion attack via complex nested queries.\"\n    },\n    {\n      \"id\": \"T2\",\n      \"keep\": true,\n      \"reason\": \"Evidence shows public endpoint exposes customer profiles; threat describes concrete unauthenticated access attack on this feature.\"\n    },\n    {\n      \"id\": \"T3\",\n      \"keep\": false,\n      \"reason\": \"Repeats T2's attack and harm: harvesting customer PII from public endpoint. Only difference is rate limiting emphasis.\"\n    },\n    {\n      \"id\": \"T4\",\n      \"keep\": true,\n      \"reason\": \"Evidence explicitly states introspection enabled in production; threat describes concrete schema discovery attack on this feature.\"\n    },\n    {\n      \"id\": \"T5\",\n      \"keep\": true,\n      \"reason\": \"Evidence confirms customer profiles queryable; threat attacks field-level authorization, distinct from T2's endpoint authentication issue.\"\n    },\n    {\n      \"id\": \"T6\",\n      \"keep\": false,\n      \"reason\": \"Evidence shows endpoint exists but doesn't mention query batching capability. Threat assumes GraphQL feature not in evidence.\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "caseId": "ai-01",
+  "promptVersion": "v1.3.0",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"T1\",\n      \"keep\": true,\n      \"reason\": \"Design has LLM tool calling and refund capability; threat describes specific prompt injection attack to issue unauthorized refunds.\"\n    },\n    {\n      \"id\": \"T2\",\n      \"keep\": true,\n      \"reason\": \"Design has order history lookup with PII; threat describes specific prompt manipulation to access other customers' data.\"\n    },\n    {\n      \"id\": \"T3\",\n      \"keep\": true,\n      \"reason\": \"Design has refund capability; threat describes attack exploiting missing authorization checks between customer and order being refunded.\"\n    },\n    {\n      \"id\": \"T4\",\n      \"keep\": true,\n      \"reason\": \"Design has refunds and customer interactions; threat describes concrete investigation and fraud prevention impacts of missing audit logs.\"\n    },\n    {\n      \"id\": \"T5\",\n      \"keep\": true,\n      \"reason\": \"Design has public app with PII access and refunds; threat describes concrete attack impersonating customers without authentication.\"\n    },\n    {\n      \"id\": \"T6\",\n      \"keep\": true,\n      \"reason\": \"Design has public app with refund capability; threat describes concrete automated attack flooding agent with refund requests.\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}
