@@ -21,7 +21,7 @@ Redline is a Jira app that threat-models work items and blocks Done and merges u
 
 ## Workflow
 
-- **Before editing code for a Jira issue,** call `get-security-requirements` with the issue key. Treat each requirement's acceptance criteria as part of the task. Write tests for them where the `fileHints` point.
+- **Before editing code for a Jira issue,** call `get-security-requirements` with the issue key. Treat each requirement's acceptance criteria as part of the task. Write tests for them where the `fileHints` point; pass `testLanguage` (`typescript`, `python` or `java`) to get a skeleton with one failing test per acceptance criterion. Fix overdue requirements (`overdueDays` > 0) first.
 - **Before opening a PR,** call `check-change-risk` with the issue key and the changed paths, comma-separated. If `wouldPass` is false, fix what `reasons` names first.
 - **After tests pass,** call `get-merge-attestation` with the issue key, the Bitbucket repository (`workspace/repo`) and the full head commit hash. Paste `prDescriptionSnippet` into the PR description unchanged. Pushing again means asking again.
 - To understand a finding, call `get-review` for the threats, then `explain-threat` with a ref such as `T-2`.

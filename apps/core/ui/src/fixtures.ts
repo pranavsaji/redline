@@ -37,8 +37,8 @@ const base: PanelDto = {
   discarded: [{ title: 'Quantum computers break the token', stride: 'InformationDisclosure', reason: 'unsupported_citation' }, { title: 'SQL injection in reset form', stride: 'Tampering', reason: 'low_votes' }],
   facts: FACTS,
   requirements: [
-    { id: 'req_1', threatId: 'thr_3', issueId: '66405', issueKey: 'PAY-6', title: 'Re-authenticate before changing the account email', criteria: [{ given: 'a signed-in customer', when: 'they change the email address', then: 'they must re-enter a one-time code sent to the old address' }], asvsIds: ['V2.1.1'], severity: 'Critical', status: 'Open' },
-    { id: 'req_2', threatId: 'thr_1', issueId: '66405', issueKey: 'PAY-6', title: 'Magic links expire after 15 minutes', criteria: [{ given: 'a magic link', when: 'it is older than 15 minutes or already used', then: 'sign-in is refused' }], asvsIds: [], severity: 'High', status: 'Open' },
+    { id: 'req_1', threatId: 'thr_3', issueId: '66405', issueKey: 'PAY-6', title: 'Re-authenticate before changing the account email', criteria: [{ given: 'a signed-in customer', when: 'they change the email address', then: 'they must re-enter a one-time code sent to the old address' }], asvsIds: ['V2.1.1'], severity: 'Critical', status: 'Open', createdAt: '2026-11-01T09:00:00.000Z' },
+    { id: 'req_2', threatId: 'thr_1', issueId: '66405', issueKey: 'PAY-6', title: 'Magic links expire after 15 minutes', criteria: [{ given: 'a magic link', when: 'it is older than 15 minutes or already used', then: 'sign-in is refused' }], asvsIds: [], severity: 'High', status: 'Open', createdAt: '2026-11-16T05:31:25.000Z' },
   ],
   acceptances: [],
   viewerAccountId: 'acc-dev',

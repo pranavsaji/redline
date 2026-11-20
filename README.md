@@ -25,6 +25,12 @@ Automation and Forge SQL. No egress: nothing leaves Atlassian.
   instruct the AI is treated as data, flagged in the panel, and the threats it touches wait for a security champion.
 - **Requirements with evidence.** Each threat at or above the policy becomes a Given/When/Then requirement and a
   sub-task; closing it needs a PR, test, Confluence section or note as evidence.
+- **From requirement to test in one click.** Every requirement copies as a ready-to-fill test skeleton (TypeScript,
+  Python or Java) with one failing test per acceptance criterion, in the panel or for coding agents via
+  `get-security-requirements` with `testLanguage`. Requirement text is escaped, so a hostile work item cannot inject
+  code into the skeleton.
+- **Fix-by dates.** Open requirements are due 7 days (Critical), 30 (High) or 90 (Medium) after Redline raised them;
+  the panel shows "Overdue by N days" and the posture page counts what is overdue.
 - **Enforcement that fails closed.** A workflow validator blocks Done while anything is open, missing, failed or out of
   date, with a message saying exactly why and a one-click re-run. Paused at the budget? A champion can confirm.
 - **Risk acceptance with teeth.** Reason, compensating controls, an expiry (at most 30 days for Critical), an approver

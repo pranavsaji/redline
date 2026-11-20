@@ -10,6 +10,7 @@ export const POSTURE_FIXTURE: PostureDto = {
     { team: 'PAY', component: 'None', open: 4, maxSeverity: 'High' },
     { team: 'OPS', component: 'gateway', open: 2, maxSeverity: 'Medium' },
   ],
+  overdue: { total: 4, bySeverity: { Low: 0, Medium: 1, High: 1, Critical: 2 } },
   expiringIn14d: 1,
   meanTimeToVerifyHours: 18.4,
   topRiskyComponents: [

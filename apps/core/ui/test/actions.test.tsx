@@ -39,7 +39,10 @@ describe('Requirements tab', () => {
   it('a viewer without edit permission sees no controls', async () => {
     await open(withRoles('ready', ['viewer']), /Requirements/);
     expect(screen.queryByRole('button', { name: /Create sub-tasks/ })).toBeNull();
-    expect(screen.queryByRole('combobox')).toBeNull();
+    // No control that changes anything; copying a test skeleton (read-only) is open to every viewer.
+    expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Accept risk' })).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Copy test skeleton' }).length).toBeGreaterThan(0);
   });
 
   it('a requirement with a sub-task links to it', async () => {

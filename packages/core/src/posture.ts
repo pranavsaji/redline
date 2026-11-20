@@ -1,4 +1,4 @@
-import { SEVERITIES, severityRank, type Acceptance, type Requirement, type Severity } from '@redline/shared';
+import { fixBy, SEVERITIES, severityRank, type Acceptance, type Requirement, type Severity } from '@redline/shared';
 import { SEVERITY_WEIGHT } from './scoring.js';
 
 const OPEN: ReadonlySet<Requirement['status']> = new Set(['Open', 'InProgress']);
@@ -23,6 +23,7 @@ export function verifiedHours(r: Requirement): number | null {
 
 export function postureSummary(rows: PostureRow[], now: Date) {
   const openBySeverity = Object.fromEntries(SEVERITIES.map((s) => [s, 0])) as Record<Severity, number>;
+  const overdueBySeverity = Object.fromEntries(SEVERITIES.map((s) => [s, 0])) as Record<Severity, number>;
   const groups = new Map<string, { team: string; component: string; open: number; maxSeverity: Severity | null }>();
   const componentScore = new Map<string, number>();
   let expiringIn14d = 0;
@@ -35,6 +36,7 @@ export function postureSummary(rows: PostureRow[], now: Date) {
     for (const r of row.requirements) {
       if (!OPEN.has(r.status)) continue;
       openBySeverity[r.severity]++;
+      if ((fixBy(r, now)?.overdueDays ?? 0) > 0) overdueBySeverity[r.severity]++;
       const g = groups.get(key) ?? { team, component, open: 0, maxSeverity: null };
       g.open++;
       if (g.maxSeverity === null || severityRank(r.severity) > severityRank(g.maxSeverity)) g.maxSeverity = r.severity;
@@ -49,6 +51,8 @@ export function postureSummary(rows: PostureRow[], now: Date) {
   }
   return {
     openBySeverity,
+    /** Open requirements past their fix-by date (Critical 7 days, High 30, Medium 90 after creation). */
+    overdue: { total: SEVERITIES.reduce((n, s) => n + overdueBySeverity[s], 0), bySeverity: overdueBySeverity },
     byTeamComponent: [...groups.values()],
     expiringIn14d,
     meanTimeToVerifyHours: durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length : null,

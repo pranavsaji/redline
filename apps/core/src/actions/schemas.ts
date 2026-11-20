@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RequirementStatusSchema, type AppError } from '@redline/shared';
+import { RequirementStatusSchema, type AppError, TEST_LANGUAGES, type TestLanguage } from '@redline/shared';
 import type { JiraIssue } from '../adapters/jira.js';
 import type { CoreDeps } from '../deps.js';
 import { authorise, type Viewer } from '../resolvers/panel.js';
@@ -44,6 +44,10 @@ export const SCHEMAS = {
     status: z.preprocess(
       (v) => (v === '' || v === null ? undefined : v),
       z.enum(RequirementStatusSchema.options, { message: `status must be one of ${RequirementStatusSchema.options.join(', ')}` }).optional(),
+    ),
+    testLanguage: z.preprocess(
+      (v) => (v === '' || v === null ? undefined : typeof v === 'string' ? v.toLowerCase() : v),
+      z.enum(TEST_LANGUAGES as [TestLanguage, ...TestLanguage[]], { message: `testLanguage must be one of ${TEST_LANGUAGES.join(', ')}` }).optional(),
     ),
   }),
   checkChangeRisk: z.object({ issueKey, changedPaths: pathList, summary: trimmed(2000).optional() }),

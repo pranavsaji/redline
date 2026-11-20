@@ -1,4 +1,4 @@
-import { severityRank, type Requirement, type Severity } from '@redline/shared';
+import { fixBy, dueDate, severityRank, testScaffold, type Requirement, type Severity, type TestLanguage } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
 import { panelGet } from '../resolvers/panel.js';
 import type { ActionPayload } from './common.js';
@@ -13,6 +13,12 @@ export interface RequirementDto {
   acceptanceCriteria: string[];
   asvsIds: string[];
   fileHints: string[];
+  /** When it should be fixed by (Critical 7 days, High 30, Medium 90 from creation); absent for Low or undated. */
+  dueDate?: string;
+  /** Whole days past dueDate while still open; 0 when not yet due. */
+  overdueDays?: number;
+  /** With testLanguage: a test skeleton with one failing test per Given/When/Then, to paste and fill in. */
+  testSkeleton?: string;
 }
 
 export interface GetRequirementsResult {
@@ -23,7 +29,7 @@ export interface GetRequirementsResult {
   truncated: boolean;
 }
 
-export const toRequirementDto = (r: Requirement): RequirementDto => ({
+export const toRequirementDto = (r: Requirement, o: { now?: Date; testLanguage?: TestLanguage } = {}): RequirementDto => ({
   id: r.id,
   ...(r.subtaskKey ? { subtaskKey: r.subtaskKey } : {}),
   title: r.title,
@@ -32,6 +38,9 @@ export const toRequirementDto = (r: Requirement): RequirementDto => ({
   acceptanceCriteria: r.criteria.map((c) => `Given ${c.given}, when ${c.when}, then ${c.then}`),
   asvsIds: r.asvsIds,
   fileHints: r.fileHints ?? [],
+  ...(dueDate(r) ? { dueDate: dueDate(r)! } : {}),
+  ...(o.now && fixBy(r, o.now) ? { overdueDays: fixBy(r, o.now)!.overdueDays } : {}),
+  ...(o.testLanguage ? { testSkeleton: testScaffold(r, o.testLanguage) } : {}),
 });
 
 const OPEN_FIRST: Record<Requirement['status'], number> = { Open: 0, InProgress: 1, AcceptedRisk: 2, Verified: 3, NotApplicable: 4 };
@@ -48,6 +57,6 @@ export async function getSecurityRequirements(payload: ActionPayload & Record<st
   const requirements = panel.requirements
     .filter((r) => !status || r.status === status)
     .sort((a, b) => OPEN_FIRST[a.status] - OPEN_FIRST[b.status] || severityRank(b.severity) - severityRank(a.severity) || a.title.localeCompare(b.title))
-    .map(toRequirementDto);
+    .map((r) => toRequirementDto(r, { now: deps.clock.now(), ...(input.value.testLanguage ? { testLanguage: input.value.testLanguage } : {}) }));
   return fitJson({ issueKey: panel.issueKey, panelUrl: await issueUrl(deps, panel.issueKey), requirements, hiddenRequirements: panel.hiddenRequirements }, ['requirements']);
 }
