@@ -1,0 +1,10 @@
+{
+  "caseId": "web-07",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":false,\"reason\":\"Duplicate of c1 (amount manipulation); currency/recipient not in design\"},{\"id\":\"x2\",\"valid\":false,\"reason\":\"Restricted code types not mentioned in design\"},{\"id\":\"x3\",\"valid\":true,\"reason\":\"Follows from code validation in design; specific; not duplicate\"},{\"id\":\"x4\",\"valid\":false,\"reason\":\"Generic hygiene; no specific sensitive data identified\"}]}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

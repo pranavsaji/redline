@@ -46,6 +46,17 @@ Also worth a look: **Apps → Redline security posture** (and the dashboard gadg
 Confluence (**History → Publish to Confluence**), and asking the **Redline** agent in Rovo chat "What do I need to fix
 before this can merge?".
 
+## If a review never arrives
+
+- **Automation audit log says "The agent selected for this rule has been deactivated"**: an app update replaced the
+  Redline agent. Open the rule, and in each **Use agent** step choose **⋯ → Switch agent → Redline**, then save.
+- **The Redline panel is not on a work item**: add it once from the apps button under the work item title
+  (**Redline security review**).
+- **Load demo data says the Confluence space was not found**: create a space (any name) and enter its key.
+- **Run review on this work item does nothing for a long time**: the re-run needs a second Automation rule with the
+  trigger *Field value changed → Labels → Value added*, condition `{{issue.labels}}` contains `redline-review`, and the
+  same three **Use agent: Redline** steps.
+
 ## Without a Jira site
 
 Everything above runs against fixture data in a local preview, no Atlassian site needed:

@@ -1,0 +1,10 @@
+{
+  "caseId": "ai-05",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "{\"verdicts\":[{\"id\":\"x1\",\"valid\":true,\"reason\":\"Specific attack via stored procedures; not covered by c1\"},{\"id\":\"x2\",\"valid\":true,\"reason\":\"Specific prompt injection attack on LLM; plausible and material\"},{\"id\":\"x3\",\"valid\":false,\"reason\":\"Design doesn't mention logging; generic credential hygiene\"},{\"id\":\"x4\",\"valid\":false,\"reason\":\"Duplicate of x2; both describe prompt injection attacks\"},{\"id\":\"x5\",\"valid\":false,\"reason\":\"Generic credential hygiene; design doesn't make it material\"},{\"id\":\"x6\",\"valid\":false,\"reason\":\"Design mentions no tools; too abstract and generic\"},{\"id\":\"x7\",\"valid\":true,\"reason\":\"Resource exhaustion from generated SQL; different harm than c1\"}]}",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

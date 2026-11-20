@@ -1,0 +1,10 @@
+{
+  "caseId": "mobile-08",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":false,\"reason\":\"Duplicate of c1: both describe automated fake sign-ups exploiting referral codes to drain credit budget\"},{\"id\":\"x2\",\"valid\":false,\"reason\":\"Design mentions no data request mechanism or records; threat assumes capabilities not in design\"},{\"id\":\"x3\",\"valid\":false,\"reason\":\"Generic hygiene: 'log everything' listed as invalid unless design makes it material; absence unmentioned\"},{\"id\":\"x4\",\"valid\":false,\"reason\":\"Speculates implementation details: design does not describe concurrency model or database locking approach\"},{\"id\":\"x5\",\"valid\":false,\"reason\":\"Speculates implementation: design does not specify referral code format or generation method\"}]}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

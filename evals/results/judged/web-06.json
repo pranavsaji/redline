@@ -1,0 +1,10 @@
+{
+  "caseId": "web-06",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"x1\",\n      \"valid\": true,\n      \"reason\": \"Specific attack on feature: uploading illegal content without identification. Clear harm: legal liability, cannot cooperate with investigations.\"\n    },\n    {\n      \"id\": \"x2\",\n      \"valid\": true,\n      \"reason\": \"Follows from public file sharing design. Specific: document metadata reveals unintended author info, company details, trade secrets.\"\n    },\n    {\n      \"id\": \"x3\",\n      \"valid\": true,\n      \"reason\": \"Design lacks upload limits. Specific: attacker floods storage, blocks legitimate uploads, causes massive AWS bills.\"\n    },\n    {\n      \"id\": \"x4\",\n      \"valid\": false,\n      \"reason\": \"Design mentions no third-party service beyond S3. Too generic: unspecified data, provider, controls without feature context.\"\n    },\n    {\n      \"id\": \"x5\",\n      \"valid\": false,\n      \"reason\": \"Vague harm description. 'Exhausting rate limits' nonsensical. Generic DoS advice without specific resources or impacts named.\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

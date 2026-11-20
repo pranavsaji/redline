@@ -1,0 +1,10 @@
+{
+  "caseId": "ai-06",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":false,\"reason\":\"agent memory and context persistence not described in design\"},{\"id\":\"x2\",\"valid\":false,\"reason\":\"generic logging hygiene not specific to this feature\"},{\"id\":\"x3\",\"valid\":true,\"reason\":\"follows from unauthenticated queue exposing sensitive payment and booking data\"},{\"id\":\"x4\",\"valid\":false,\"reason\":\"duplicate of c2: unauthorized payment commands via unauthenticated queue\"},{\"id\":\"x5\",\"valid\":false,\"reason\":\"duplicate of c2: same attack merely reworded\"},{\"id\":\"x6\",\"valid\":false,\"reason\":\"user authentication not described in design; generic hygiene\"},{\"id\":\"x7\",\"valid\":false,\"reason\":\"generic prompt injection not specific to this design\"},{\"id\":\"x8\",\"valid\":false,\"reason\":\"duplicate of c1: tampering with payment details in transit\"},{\"id\":\"x9\",\"valid\":false,\"reason\":\"agent tools and privileges not described in design\"},{\"id\":\"x10\",\"valid\":false,\"reason\":\"assumes agent compromise mechanisms not described in design\"},{\"id\":\"x11\",\"valid\":true,\"reason\":\"replay attack causing duplicate charges; specific to this design\"}]}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}
