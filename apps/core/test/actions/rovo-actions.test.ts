@@ -138,6 +138,20 @@ describe('get-security-requirements', () => {
     expect(Array.isArray(r.requirements[0]!.fileHints)).toBe(true);
   });
 
+  it('feature: with testLanguage, each requirement carries a ready-to-paste test skeleton; every one has its fix-by date', async () => {
+    const { t, req } = await reviewed();
+    const r = await getSecurityRequirements({ issueKey: 'PAY-7', status: 'Open', testLanguage: 'python', ...ctx(ME) }, t.deps);
+    if ('error' in r) throw new Error(r.error);
+    const dto = r.requirements.find((x) => x.id === req.id)!;
+    expect(dto.testSkeleton).toMatch(/^def test_/m);
+    expect(dto.testSkeleton).toContain(`Redline requirement ${req.id}`);
+    expect(dto).toMatchObject({ dueDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/), overdueDays: 0 });
+    const plain = await getSecurityRequirements({ issueKey: 'PAY-7', status: 'Open', ...ctx(ME) }, t.deps);
+    if ('error' in plain) throw new Error(plain.error);
+    expect(plain.requirements[0]).not.toHaveProperty('testSkeleton');
+    expect(await getSecurityRequirements({ issueKey: 'PAY-7', testLanguage: 'cobol', ...ctx(ME) }, t.deps)).toMatchObject({ error: 'invalid_input' });
+  });
+
   it(`never returns more than ${MAX_ACTION_BYTES} bytes: a huge list is cut and marked truncated`, async () => {
     const { t, req } = await reviewed();
     const long = 'x'.repeat(1000);

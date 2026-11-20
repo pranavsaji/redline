@@ -9,6 +9,7 @@ import type { PanelDto, Requirement, RequirementStatus } from '../types.js';
 import { AcceptRiskModal } from './AcceptRiskModal.js';
 import { CopyAttestation } from './CopyAttestation.js';
 import { EvidenceForm } from './EvidenceForm.js';
+import { FixBy, TestSkeletonCopy } from './RequirementTools.js';
 import { count } from '../text.js';
 import { useFocusReturn } from '../components/inline-form.js';
 import { field } from './form-styles.js';
@@ -95,6 +96,7 @@ export function RequirementsTab({ dto, api, onChanged }: { dto: PanelDto; api: P
               <SeverityLozenge severity={r.severity} />
               <Lozenge appearance={DONE.has(r.status) ? 'success' : r.status === 'InProgress' ? 'inprogress' : 'default'}>{STATUS_LABEL[r.status]}</Lozenge>
               <strong>{r.title}</strong>
+              <FixBy requirement={r} />
               {r.subtaskKey && (
                 <a href={`/browse/${r.subtaskKey}`} target="_top" style={{ color: token('color.link') }}>
                   {r.subtaskKey}
@@ -107,6 +109,7 @@ export function RequirementsTab({ dto, api, onChanged }: { dto: PanelDto; api: P
               </span>
             ))}
             <EvidenceLine r={r} />
+            {(r.status === 'Open' || r.status === 'InProgress') && <TestSkeletonCopy requirement={r} />}
             {canEdit && r.status !== 'AcceptedRisk' && (
               <label style={{ display: 'flex', gap: 6, alignItems: 'center', font: token('font.body.small') }}>
                 Status

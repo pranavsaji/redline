@@ -27,6 +27,8 @@ describe('Posture dashboard (PR-1)', () => {
     expect(within(kpis).getByRole('button', { name: /Open Critical: 3/ })).toBeTruthy();
     expect(within(kpis).getByRole('button', { name: /Open High: 21/ })).toBeTruthy();
     expect(within(kpis).getByText(/Expiring in 14 days/).closest('li')!.textContent).toMatch(/1/);
+    // Feature: requirements past their fix-by date, with the Critical count called out.
+    expect(within(kpis).getByText('Overdue').closest('li')!.textContent).toBe('Overdue42 Critical');
     expect(within(kpis).getByText(/Mean time to verify/).closest('li')!.textContent).toMatch(/18 h/);
     expect(within(kpis).getByText(/Reviews in flight/).closest('li')!.textContent).toMatch(/2/);
   });

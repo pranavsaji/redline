@@ -18,8 +18,28 @@ describe('postureSummary', () => {
     expect(s.meanTimeToVerifyHours).toBe(20);
     expect(s.topRiskyComponents[0]).toEqual({ component: 'agent', score: 37 });
   });
+  it('feature: counts open requirements past their fix-by date (Critical 7 days, High 30, Medium 90)', () => {
+    const day = 86_400_000;
+    const ago = (d: number) => new Date(NOW.getTime() - d * day).toISOString();
+    const s = postureSummary(
+      [
+        {
+          issueKey: 'PROJ-1', project: 'PROJ', acceptances: [], verifiedDurationsHours: [],
+          requirements: [
+            requirement({ id: 'c', severity: 'Critical', createdAt: ago(8) }),
+            requirement({ id: 'h', severity: 'High', createdAt: ago(10) }),
+            requirement({ id: 'm', severity: 'Medium', createdAt: ago(91), status: 'InProgress' }),
+            requirement({ id: 'v', severity: 'Critical', createdAt: ago(30), status: 'Verified' }),
+            requirement({ id: 'l', severity: 'Low', createdAt: ago(400) }),
+          ],
+        },
+      ],
+      NOW,
+    );
+    expect(s.overdue).toEqual({ total: 2, bySeverity: { Low: 0, Medium: 1, High: 0, Critical: 1 } });
+  });
   it('handles an empty org', () => {
-    expect(postureSummary([], NOW)).toMatchObject({ expiringIn14d: 0, meanTimeToVerifyHours: null, byTeamComponent: [], topRiskyComponents: [] });
+    expect(postureSummary([], NOW)).toMatchObject({ overdue: { total: 0 }, expiringIn14d: 0, meanTimeToVerifyHours: null, byTeamComponent: [], topRiskyComponents: [] });
   });
 });
 

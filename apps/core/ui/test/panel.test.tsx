@@ -63,6 +63,38 @@ describe('final review I4: the header re-run action re-runs the review', () => {
   });
 });
 
+describe('feature: fix-by dates and test skeletons on requirements', () => {
+  it('shows when each open requirement is due, and how overdue it is', async () => {
+    const api = mockApi('ready');
+    const dto = await api.get();
+    if ('error' in dto) throw new Error('fixture');
+    const day = 86_400_000;
+    const reqs = [
+      { ...dto.requirements[0]!, severity: 'Critical' as const, createdAt: new Date(Date.now() - 10 * day).toISOString() },
+      { ...dto.requirements[1]!, severity: 'High' as const, createdAt: new Date(Date.now() - 1 * day).toISOString() },
+    ];
+    await renderState('ready', { ...api, get: async () => ({ ...dto, requirements: reqs }) });
+    await userEvent.click(screen.getByRole('tab', { name: /^Requirements/ }));
+    const list = screen.getByRole('list', { name: 'Security requirements' });
+    expect(within(list).getByText('Overdue by 3 days')).toBeTruthy();
+    expect(within(list).getByText(/^Fix by \d{4}-\d{2}-\d{2}$/)).toBeTruthy();
+  });
+
+  it('copies a test skeleton in the chosen language', async () => {
+    const copied: string[] = [];
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (s: string) => void copied.push(s) } });
+    await renderState('ready');
+    await userEvent.click(screen.getByRole('tab', { name: /^Requirements/ }));
+    const item = screen.getAllByRole('listitem').find((li) => li.textContent?.includes('Re-authenticate before changing the account email'))!;
+    await userEvent.selectOptions(within(item).getByLabelText('Test language'), 'python');
+    await userEvent.click(within(item).getByRole('button', { name: 'Copy test skeleton' }));
+    await waitFor(() => expect(copied).toHaveLength(1));
+    expect(copied[0]).toMatch(/^# Redline requirement req_1/);
+    expect(copied[0]).toMatch(/^def test_/m);
+    expect(within(item).getByText('Copied a Python test skeleton.')).toBeTruthy();
+  });
+});
+
 describe('break-glass override in the header', () => {
   it('says the gate is overridden and until when, and keeps the reasons visible', async () => {
     const base = mockApi('ready');

@@ -43,6 +43,11 @@ export function KpiRow({ dto, onDrill, onExpiring }: { dto: PostureDto; onDrill:
           </button>
         </li>
         <li style={{ ...tile, margin: 0 }}>
+          <span style={label}>Overdue</span>
+          <span style={{ ...value, ...(dto.overdue.total > 0 ? { color: token('color.text.danger') } : {}) }}>{dto.overdue.total}</span>
+          {dto.overdue.bySeverity.Critical > 0 && <span style={label}>{`${dto.overdue.bySeverity.Critical} Critical`}</span>}
+        </li>
+        <li style={{ ...tile, margin: 0 }}>
           <span style={label}>Mean time to verify</span>
           <span style={value}>{hours(dto.meanTimeToVerifyHours)}</span>
         </li>

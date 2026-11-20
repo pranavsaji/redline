@@ -150,7 +150,7 @@ modules:
       name: Get security requirements
       function: getRequirementsFn
       actionVerb: GET
-      description: Returns the security requirements for a Jira work item with their acceptance criteria, OWASP ASVS ids, status and the file paths they usually concern. Call this before editing code for the work item.
+      description: Returns a Jira work item's security requirements with acceptance criteria, ASVS ids, status, fix-by date, file hints and optional test skeletons. Call this before editing code for the work item.
       inputs:
         issueKey:
           title: Issue key
@@ -162,6 +162,11 @@ modules:
           type: string
           required: false
           description: Only requirements with this status - Open, InProgress, Verified, AcceptedRisk or NotApplicable. Leave empty for all.
+        testLanguage:
+          title: Test language
+          type: string
+          required: false
+          description: Set to typescript, python or java to get a test skeleton for each requirement, with one failing test per acceptance criterion to fill in. Leave empty otherwise.
     - key: check-change-risk
       name: Check change risk
       function: checkChangeRiskFn
