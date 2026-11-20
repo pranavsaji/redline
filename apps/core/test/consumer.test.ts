@@ -142,6 +142,24 @@ describe('gather job', () => {
     expect(after.value.find((x) => x.id === edited.id)).toMatchObject({ title: 'Champion-edited title', state: 'dismissed' });
   });
 
+  it('feature: rules-only mode (no Rovo) settles every review at once from the rule-based checks, labelled as such', async () => {
+    const t = coreDeps({ policy: { ...POLICY, reviewMode: 'rules_only' } });
+    await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
+    const l = (await t.deps.reviews.latest('10042')) as { ok: true; value: { id: string; status: string; samplesExpected: number; modelIds: string[] } };
+    expect(l.value).toMatchObject({ status: 'ready', samplesExpected: 0, modelIds: ['redline-rules'] });
+    const threats = (await t.deps.reviews.threats(l.value.id)) as { ok: true; value: Array<{ origin: string }> };
+    expect(threats.value.length).toBeGreaterThan(0);
+    expect(threats.value.every((x) => x.origin === 'baseline')).toBe(true);
+    const reqs = (await t.deps.requirements.forIssue('10042')) as { ok: true; value: unknown[] };
+    expect(reqs.value.length).toBeGreaterThan(0);
+    const codes = verdictOf(t, '10042')!.reasons.map((r) => r.code);
+    expect(codes).not.toContain('agent_missing');
+    expect(codes).toContain('open_requirement');
+    // No AI was used, so the month's review budget is untouched.
+    const usage = await t.deps.usage.get(new Date().toISOString().slice(0, 7));
+    expect(usage.ok && usage.value.reviews).toBe(0);
+  });
+
   it('a gather failure for a never-reviewed item still writes a blocking verdict', async () => {
     const t = coreDeps();
     t.deps.gatherer = { gather: async () => ({ ok: false, error: { code: 'upstream', message: 'jira down' } }) };

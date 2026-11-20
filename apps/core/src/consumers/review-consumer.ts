@@ -17,6 +17,8 @@ async function afterChange(deps: CoreDeps, issueId: string, republish: boolean):
 }
 
 export const SCHEMA_VERSION_KEY = 'schema:version';
+/** The model id a rules-only review records: no model, only Redline's deterministic rule-based checks. */
+export const RULES_ONLY_MODEL = 'redline-rules';
 
 const voidOk = (): Result<void> => ok(undefined);
 
@@ -95,19 +97,21 @@ async function gather(deps: CoreDeps, job: Extract<ReviewJob, { kind: 'gather' }
   const paused = await isBudgetPaused(deps, policy.value, now);
   if (!paused.ok) return paused;
   const revision = (prev?.revision ?? 0) + 1;
+  // Rules-only mode (no Rovo on the site): the review is settled now from the rule-based checks; no AI, no budget.
+  const rulesOnly = !paused.value && policy.value.reviewMode === 'rules_only';
   const review: Review = {
     id: `rev_${job.issueId}_${revision}`,
     issueId: job.issueId,
     issueKey: b.issueKey,
     revision,
-    status: paused.value ? 'failed' : 'awaiting_agent',
+    status: paused.value ? 'failed' : rulesOnly ? 'ready' : 'awaiting_agent',
     ...(paused.value ? { failureReason: 'budget' } : {}),
     contextHash: b.contextHash,
     riskScore: 0,
     partial: b.partial,
     promptVersion: PROMPT_VERSION,
-    modelIds: [],
-    samplesExpected: paused.value ? 0 : policy.value.agentSamples,
+    modelIds: rulesOnly ? [RULES_ONLY_MODEL] : [],
+    samplesExpected: paused.value || rulesOnly ? 0 : policy.value.agentSamples,
     samplesReceived: 0,
     tokensIn: 0,
     tokensOut: 0,
@@ -126,11 +130,11 @@ async function gather(deps: CoreDeps, job: Extract<ReviewJob, { kind: 'gather' }
   const facts = await deps.reviews.saveFacts(review.id, b.facts);
   if (!facts.ok) return facts;
   await trace(deps, review.id, 'gather', paused.value ? 'failed' : 'done', paused.value ? 'budget' : undefined);
-  const out = await applyAssembly(deps, review, b, [], policy.value, 'progress');
+  const out = await applyAssembly(deps, review, b, [], policy.value, rulesOnly ? 'final' : 'progress');
   if (!out.ok) return out;
   const upd = await deps.reviews.update(review.id, { riskScore: out.value.riskScore, updatedAt: now.toISOString() });
   if (!upd.ok) return upd;
-  if (!paused.value) {
+  if (!paused.value && !rulesOnly) {
     const u = await deps.usage.add(monthOf(now), { tokensIn: 0, tokensOut: 0, reviews: 1 });
     if (!u.ok) return u;
   }

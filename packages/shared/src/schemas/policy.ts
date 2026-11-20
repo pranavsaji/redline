@@ -13,6 +13,11 @@ export const SitePolicySchema = z
     techLeadMaxSeverity: SeveritySchema,
     agentSamples: z.union([z.literal(1), z.literal(3), z.literal(5)]),
     agentTimeoutMinutes: z.number().int().min(1).max(120),
+    /**
+     * `agent` (default): reviews wait for the Redline Rovo agent's runs. `rules_only`: an admin's explicit choice for
+     * sites without Rovo; every review settles at once from Redline's rule-based checks and says so.
+     */
+    reviewMode: z.enum(['agent', 'rules_only']).optional(),
     warnOnly: z.array(z.object({ projectKey: z.string(), since: z.string(), until: z.string() }).strict()),
     attestationTtlHours: z.number().int().min(1).max(168),
     sensitivePaths: z.array(z.string()),

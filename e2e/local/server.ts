@@ -63,6 +63,12 @@ const routes: Record<string, (body: Record<string, unknown>) => Promise<unknown>
     }
     return { saved };
   },
+  /** Redline's own trigger on a new work item (gather), with no agent runs: what a site without Rovo sees. */
+  gather: async () => {
+    await handleJob(t.deps, { kind: 'gather', issueId: ISSUE_ID, reason: 'created' });
+    await settle();
+    return { ok: true };
+  },
   /** One Custom UI resolver call, as `accountId`, from the work item's panel. */
   invoke: async (b) => {
     const fn = TABLE[String(b.key)];

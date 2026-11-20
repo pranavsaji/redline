@@ -48,6 +48,10 @@ before this can merge?".
 
 ## If a review never arrives
 
+- **The site has no Rovo** (for example a free developer site): Redline admin → **Review mode** → **Rule-based checks
+  only** → Save. Every review then completes at once from Redline's built-in checks (no Rovo, no Automation rules), the
+  panel says "Rule-based review", and the Done gate, requirements, acceptances and merge attestations work the same.
+  Then click **Run review on this work item** in the panel.
 - **Automation audit log says "The agent selected for this rule has been deactivated"**: an app update replaced the
   Redline agent. Open the rule, and in each **Use agent** step choose **⋯ → Switch agent → Redline**, then save.
 - **The Redline panel is not on a work item**: add it once from the apps button under the work item title

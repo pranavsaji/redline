@@ -63,6 +63,17 @@ describe('final review I4: the header re-run action re-runs the review', () => {
   });
 });
 
+describe('feature: rules-only reviews are labelled', () => {
+  it('a review made by the rule-based checks alone says so, and says how to turn AI review on', async () => {
+    const api = mockApi('ready');
+    const dto = await api.get();
+    if ('error' in dto) throw new Error('fixture');
+    await renderState('ready', { ...api, get: async () => ({ ...dto, review: { ...dto.review!, modelIds: ['redline-rules'], samplesExpected: 0 } }) });
+    expect(screen.getByText('Rule-based review')).toBeTruthy();
+    expect(screen.getByText(/AI review is off on this site/)).toBeTruthy();
+  });
+});
+
 describe('feature: fix-by dates and test skeletons on requirements', () => {
   it('shows when each open requirement is due, and how overdue it is', async () => {
     const api = mockApi('ready');
