@@ -24,26 +24,8 @@ export interface BitbucketClient {
   diff?(workspace: string, repo: string, id: number): Promise<Result<string>>;
 }
 
-/** Diff text Redline scans (2 MB); a bigger diff is scanned up to here. */
-export const MAX_DIFF_TEXT = 2_000_000;
-
-/** Marker file for diff text Redline could not read whole (unreadable, or over MAX_DIFF_TEXT): treated as sensitive. */
-export const DIFF_UNREAD_PATH = '(diff text Redline could not read)';
-
-/**
- * Every added line in a unified diff, whichever file it belongs to. The secret scan does not need per-file mapping, so
- * no header parsing is trusted: a line that only looks like a `+++` header inside a hunk cannot move text out of the
- * scan (security review). File headers themselves are included, which can only add text to scan.
- */
-export function allAddedText(diff: string): string {
-  let out = '';
-  for (const line of diff.split('\n')) if (line.startsWith('+')) out += `${line.slice(1)}\n`;
-  return out;
-}
-
 const MAX_PAGES = 10;
-/** Appended when the PR changes more files than Redline pages through; the merge check treats it as sensitive. */
-export const TRUNCATED_PATH = '(more files than Redline reads)';
+import { MAX_DIFF_TEXT, TRUNCATED_PATH } from '@redline/core';
 const COMMIT = /^[0-9a-f]{7,40}$/i;
 const SAFE_PATH = /^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/;
 

@@ -1,0 +1,17 @@
+{
+  "name": "@redline/github-action",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@redline/core": "workspace:*",
+    "@redline/crypto": "workspace:*",
+    "@redline/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

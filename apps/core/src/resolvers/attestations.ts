@@ -8,7 +8,7 @@ import { authorise, type Viewer } from './panel.js';
 
 const CopySchema = z.object({
   issueKey: z.string().max(300).optional(),
-  repo: z.string().trim().regex(REPO, 'use workspace/repository, for example acme/payments'),
+  repo: z.string().trim().regex(REPO, 'use workspace/repository or owner/repository, for example acme/payments'),
   commitSha: z.string().trim().regex(COMMIT_SHA, 'use the full 40-character commit hash'),
 });
 

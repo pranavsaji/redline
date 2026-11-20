@@ -39,6 +39,8 @@ Automation and Forge SQL. No egress: nothing leaves Atlassian.
   who is not the requester, and the right role for the severity.
 - **Signed merge attestations.** The Bitbucket merge check accepts a sensitive pull request only with an Ed25519
   attestation for its exact head commit. One changed character fails.
+- **GitHub too.** The same merge gate runs as a GitHub Action ([setup](docs/GITHUB.md)): add a workflow, paste the
+  public key, require the check.
 - **A ledger you can audit.** Append-only hash chain, daily signed Merkle tree heads published to Confluence, and
   downloadable inclusion proofs checked with `node scripts/verify-ledger-proof.mjs` (Node built-ins only).
 - **For everyone involved.** Issue panel, admin page with a first-run wizard, security posture page and dashboard
@@ -115,6 +117,7 @@ pnpm redline eval --llm fake                             # deterministic baselin
 ```
 apps/core        Redline for Jira: Forge functions, Rovo actions and agent, Custom UI (apps/core/ui)
 apps/bitbucket   Redline for Bitbucket: merge check and repository settings
+apps/github-action  Redline merge gate for GitHub (same decision code; see docs/GITHUB.md)
 apps/local       pnpm redline: offline reviews, evals, demo signing
 packages/        core (domain), crypto, db, frameworks (ASVS 5, CWE, OWASP LLM/Agentic), prompts, shared, llm-dev
 evals/           cases, runner, metrics, recorded model outputs, results

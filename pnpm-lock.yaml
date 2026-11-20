@@ -232,6 +232,22 @@ importers:
         specifier: ^6.4.6
         version: 6.4.6(@types/node@22.20.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
 
+  apps/github-action:
+    dependencies:
+      '@redline/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@redline/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
+      '@redline/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+    devDependencies:
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
+
   apps/local:
     dependencies:
       '@redline/core':

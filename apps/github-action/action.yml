@@ -1,0 +1,38 @@
+name: Redline merge gate
+description: Blocks merging a security-sensitive change until it carries a valid Redline attestation from its Jira work item. Run it on pull_request_target so a pull request cannot change its own gate.
+author: Redline
+branding:
+  icon: shield
+  color: red
+inputs:
+  public-keys:
+    description: Redline's public signing keys, one per line (Redline admin → Signing keys → Copy public key). They are public; no secret is needed.
+    required: true
+  sensitive-paths:
+    description: Extra sensitive path globs, one per line, added to Redline's defaults (which include .github/workflows, .github/actions and .redline). The base branch's .redline/policy.yml can add more.
+    required: false
+    default: ''
+  diff-score-threshold:
+    description: A change scoring at or above this (0 to 100) needs an attestation even outside sensitive paths.
+    required: false
+    default: '40'
+  mode:
+    description: block (default) fails the check; warn reports failures but passes, until warn-until.
+    required: false
+    default: block
+  warn-until:
+    description: Required in warn mode. ISO date at most 14 days away, after which the check blocks again.
+    required: false
+    default: ''
+  github-token:
+    description: Token used to read the pull request (read-only).
+    required: false
+    default: ${{ github.token }}
+outputs:
+  outcome:
+    description: pass_attested, pass_not_sensitive, warn, fail_missing, fail_signature, fail_stale_commit, fail_expired, fail_other_repo, fail_other_issue or config_error.
+  message:
+    description: The message shown on the check.
+runs:
+  using: node20
+  main: dist/index.mjs

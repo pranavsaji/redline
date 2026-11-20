@@ -26,6 +26,33 @@ jobs:
       - run: pnpm test:cov
       - name: Generated agent prompt matches @redline/prompts
         run: cd apps/core && node build.mjs && git diff --exit-code agent/prompt.md
+      - name: GitHub Action bundle is up to date
+        run: cd apps/github-action && node build.mjs && git diff --exit-code dist/index.mjs
+
+  github-action:
+    name: GitHub Action runs on a real pull request
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      # Runs the committed bundle against this pull request through GitHub's API. Redline's own pull requests are not
+      # gated (no attestations exist for this repository), so only check that it ran and reported a known outcome.
+      - id: gate
+        uses: ./apps/github-action
+        continue-on-error: true
+        with:
+          public-keys: KqanawLsTC0herN_Fp-LAriFLgOl5LIbDd_I-_tyMTY
+      - name: The action reported an outcome
+        env:
+          OUTCOME: ${{ steps.gate.outputs.outcome }}
+        run: |
+          echo "outcome=$OUTCOME"
+          case "$OUTCOME" in pass_not_sensitive|pass_attested|fail_missing) ;; *) echo "unexpected outcome: '$OUTCOME'"; exit 1 ;; esac
 
   security:
     name: Security scans (zero high findings)

@@ -30,7 +30,7 @@ export async function requestAttestation(deps: CoreDeps, i: { issueKey: string; 
   const issueKey = i.issueKey.trim().toUpperCase();
   const repo = i.repo.trim();
   if (!ISSUE_KEY.test(issueKey)) return err(appError('validation', 'issueKey must be a Jira key like PAY-7'));
-  if (!REPO.test(repo)) return err(appError('validation', 'repo must be workspace/repository, for example acme/payments'));
+  if (!REPO.test(repo)) return err(appError('validation', 'repo must be workspace/repository or owner/repository, for example acme/payments'));
   if (!COMMIT_SHA.test(i.commitSha.trim())) return err(appError('validation', 'commitSha must be the full 40-character commit hash'));
   if (!i.accountId) return err(appError('not_found', 'work item not found'));
 
