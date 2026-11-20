@@ -1,0 +1,68 @@
+name: Nightly
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scans:
+    name: Security scans against today's advisories and rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { fetch-depth: 0 }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --prod --audit-level high
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: '3.12' }
+      - run: |
+          pip install --quiet semgrep
+          semgrep scan --config .semgrep.yml --config p/default --config p/typescript --config p/react --config p/secrets \
+            --metrics off --severity ERROR --error
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_VERSION: 8.30.1
+
+  e2e-local:
+    name: End-to-end journeys (local harness)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @redline/e2e exec playwright install --with-deps chromium
+      - run: pnpm e2e
+
+  e2e-site:
+    name: Smoke test on the demo Jira site
+    # Runs only when the repository has the secrets: E2E_SITE_URL, E2E_ISSUE_KEY, and E2E_SITE_STATE_B64 (a session
+    # saved with `pnpm --filter @redline/e2e login`, base64-encoded). No password is ever stored or typed by CI.
+    if: ${{ vars.E2E_SITE_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # No third-party action runs in this job: it handles a signed-in session. pnpm comes from Node's corepack.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: 22 }
+      - run: corepack enable && pnpm install --frozen-lockfile
+      - run: pnpm --filter @redline/e2e exec playwright install --with-deps chromium
+      - name: Restore the saved session
+        env:
+          STATE: ${{ secrets.E2E_SITE_STATE_B64 }}
+        run: mkdir -p e2e/.auth && printf '%s' "$STATE" | base64 -d > e2e/.auth/site.json
+      - run: pnpm --filter @redline/e2e exec playwright test --project site
+        env:
+          E2E_SITE_URL: ${{ secrets.E2E_SITE_URL }}
+          E2E_ISSUE_KEY: ${{ secrets.E2E_ISSUE_KEY }}
+      - if: always()
+        run: rm -f e2e/.auth/site.json

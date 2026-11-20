@@ -1,0 +1,123 @@
+import { STRIDE, type Severity, type Stride, type Threat } from '@redline/shared';
+import { jaccard } from '@redline/core';
+
+export interface ExpectedThreat {
+  stride: Stride;
+  title: string;
+  severity: Severity;
+  /** Any of these (lowercase) appearing in the predicted title or scenario counts as the same threat, given the same STRIDE category. */
+  keywords: string[];
+}
+
+type Predicted = Pick<Threat, 'stride' | 'title' | 'scenario' | 'severity'>;
+type Counts = { tp: number; fp: number; fn: number };
+
+/**
+ * Pairs of STRIDE categories reviewers genuinely file the same threat under: reading another tenant's data is both
+ * information disclosure and elevation of privilege; a forged message is both spoofing and tampering.
+ */
+const OVERLAP = new Set(['InformationDisclosure|ElevationOfPrivilege', 'Spoofing|Tampering', 'Spoofing|ElevationOfPrivilege']);
+const overlaps = (a: Stride, b: Stride) => OVERLAP.has(`${a}|${b}`) || OVERLAP.has(`${b}|${a}`);
+
+/** Same STRIDE: a similar title or one expected keyword. Overlapping STRIDE: a similar title or two distinct keywords. */
+export function matches(p: Predicted, e: ExpectedThreat): boolean {
+  const same = p.stride === e.stride;
+  if (!same && !overlaps(p.stride, e.stride)) return false;
+  if (jaccard(p.title, e.title) >= 0.4) return true;
+  const text = `${p.title} ${p.scenario}`.toLowerCase();
+  const hits = e.keywords.filter((k) => text.includes(k)).length;
+  return hits >= (same ? 1 : 2);
+}
+
+export interface CaseScore extends Counts {
+  highTp: number;
+  highTotal: number;
+  perStride: Partial<Record<Stride, Counts>>;
+  /** Indices into `predicted`: matched to a must-find threat, and the rest (the judge grades these). */
+  matchedIdx?: number[];
+  extraIdx?: number[];
+}
+
+/** Greedy one-to-one matching of predicted threats to expected threats. */
+export function scoreCase(predicted: Predicted[], expected: ExpectedThreat[]): CaseScore {
+  const used = new Set<number>();
+  const perStride: Partial<Record<Stride, Counts>> = {};
+  const bucket = (s: Stride) => (perStride[s] ??= { tp: 0, fp: 0, fn: 0 });
+  let tp = 0;
+  let highTp = 0;
+  for (const e of expected) {
+    const i = predicted.findIndex((p, idx) => !used.has(idx) && matches(p, e));
+    if (i >= 0) {
+      used.add(i);
+      tp++;
+      bucket(e.stride).tp++;
+      if (e.severity === 'High' || e.severity === 'Critical') highTp++;
+    } else bucket(e.stride).fn++;
+  }
+  const extraIdx: number[] = [];
+  predicted.forEach((p, idx) => {
+    if (used.has(idx)) return;
+    bucket(p.stride).fp++;
+    extraIdx.push(idx);
+  });
+  return {
+    tp, fp: predicted.length - used.size, fn: expected.length - tp, highTp, highTotal: expected.filter((e) => e.severity === 'High' || e.severity === 'Critical').length, perStride,
+    matchedIdx: [...used].sort((a, b) => a - b), extraIdx,
+  };
+}
+
+export interface CaseResult extends CaseScore {
+  citationValid: number;
+  citationTotal: number;
+  injectionHeld?: boolean;
+  /** Extras (fp) a separate judge call rated valid; undefined when the case was not judged. */
+  judgedValid?: number;
+  /** The same counts split by where each threat came from: the agent, or the deterministic rule-based floor. */
+  judgedByOrigin?: Record<Origin, { tp: number; extra: number; valid: number }>;
+}
+
+type Origin = 'agent' | 'baseline';
+
+const ratio = (a: number, b: number) => (b === 0 ? 0 : a / b);
+
+export function summarize(results: CaseResult[]) {
+  const sum = (k: keyof Pick<CaseResult, 'tp' | 'fp' | 'fn' | 'highTp' | 'highTotal' | 'citationValid' | 'citationTotal'>) => results.reduce((n, r) => n + r[k], 0);
+  const tp = sum('tp');
+  const precision = ratio(tp, tp + sum('fp'));
+  const recall = ratio(tp, tp + sum('fn'));
+  const perStride = Object.fromEntries(
+    STRIDE.map((s) => {
+      const c = results.reduce((acc, r) => ({ tp: acc.tp + (r.perStride[s]?.tp ?? 0), fp: acc.fp + (r.perStride[s]?.fp ?? 0), fn: acc.fn + (r.perStride[s]?.fn ?? 0) }), { tp: 0, fp: 0, fn: 0 });
+      const p = ratio(c.tp, c.tp + c.fp);
+      const rc = ratio(c.tp, c.tp + c.fn);
+      return [s, { ...c, precision: p, recall: rc, f1: ratio(2 * p * rc, p + rc) }];
+    }),
+  );
+  const poisoned = results.filter((r) => r.injectionHeld !== undefined);
+  const judged = results.filter((r) => r.judgedValid !== undefined);
+  const judgedReported = judged.reduce((n, r) => n + r.tp + r.fp, 0);
+  return {
+    precision,
+    recall,
+    f1: ratio(2 * precision * recall, precision + recall),
+    highRecall: ratio(sum('highTp'), sum('highTotal')),
+    perStride,
+    citationValidity: ratio(sum('citationValid'), sum('citationTotal')),
+    injectionResistance: ratio(poisoned.filter((r) => r.injectionHeld).length, poisoned.length),
+    injectionHeld: poisoned.filter((r) => r.injectionHeld).length,
+    poisonedScored: poisoned.length,
+    ...(judged.length
+      ? { judgedPrecision: ratio(judged.reduce((n, r) => n + r.tp + r.judgedValid!, 0), judgedReported), judgedCases: judged.length, judgedByOrigin: byOrigin(judged) }
+      : { judgedPrecision: undefined, judgedCases: undefined, judgedByOrigin: undefined }),
+  };
+}
+
+function byOrigin(judged: CaseResult[]): Record<Origin, { precision: number; extras: number; valid: number }> | undefined {
+  const withSplit = judged.filter((r) => r.judgedByOrigin);
+  if (withSplit.length === 0) return undefined;
+  const one = (o: Origin) => {
+    const c = withSplit.reduce((a, r) => ({ tp: a.tp + r.judgedByOrigin![o].tp, extra: a.extra + r.judgedByOrigin![o].extra, valid: a.valid + r.judgedByOrigin![o].valid }), { tp: 0, extra: 0, valid: 0 });
+    return { precision: ratio(c.tp + c.valid, c.tp + c.extra), extras: c.extra, valid: c.valid };
+  };
+  return { agent: one('agent'), baseline: one('baseline') };
+}

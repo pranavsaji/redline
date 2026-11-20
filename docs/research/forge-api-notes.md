@@ -144,7 +144,7 @@ if (!res.ok) throw new Error(`${res.status}`); const json = await res.json();
 api.asUser().requestConfluence(route`/wiki/api/v2/pages/${id}?body-format=storage`);
 api.asApp().requestBitbucket(route`/2.0/repositories/${wsUuid}/${repoUuid}/pullrequests/${prId}`);
 ```
-- `asApp()` acts as the app. `asUser()` acts as the current user and is **"only available in modules that support the UI kit"**, so it is not usable in triggers, consumers or scheduled triggers. `asUser(accountId)` needs `allowImpersonation` scopes. Options follow undici fetch. The default header is `content-type: application/json` and the default method is GET. `route` encodes interpolations and blocks path manipulation. `assumeTrustedRoute` is an escape hatch.
+- `asApp()` acts as the app. `asUser()` acts as the current user and is **"only available in modules that support the UI kit"**, so it is not usable in triggers, consumers or scheduled triggers. `asUser(accountId)` needs `allowImpersonation` scopes. Options follow undici fetch. **VERIFIED 2026-11-15 (spike): there is NO default JSON content type**: a body without `headers: { 'Content-Type': 'application/json' }` is sent as `text/plain` and Jira returns 415. The default method is GET. `route` encodes interpolations and blocks path manipulation. `assumeTrustedRoute` is an escape hatch.
 
 **Issue entity properties** (Jira v3 OpenAPI):
 - `PUT /rest/api/3/issue/{issueIdOrKey}/properties/{propertyKey}` sets a property. Scope `write:jira-work`. The body is non-empty JSON, ≤32768 chars. The calling identity needs Browse + Edit issue permissions. `GET` on the same path reads it (`read:jira-work`).
@@ -201,7 +201,7 @@ export async function analyzeIssue(payload, context) {
   return { findings: [] };               // string or JSON (≤5 MB), the agent phrases it
 }
 ```
-- Confirmation: Rovo shows a platform-generated confirm card for non-GET verbs. This comes from community posts and the ECO-1654 ticket, not the module page, so it is **UNCONFIRMED** in docs. Documented: **agents run by Automation rules will not invoke CREATE/UPDATE/DELETE/TRIGGER actions**.
+- Confirmation: Rovo shows a platform-generated confirm card for non-GET verbs. This comes from community posts and the ECO-1654 ticket, not the module page, so it is **UNCONFIRMED** in docs. Documented earlier: **agents run by Automation rules will not invoke CREATE/UPDATE/DELETE/TRIGGER actions**. **SEEN 2026-11-15 (spike):** the Automation "Use agent" step now has a "Let this agent take actions" checkbox ("Allows the agent to use tools that create, edit, or delete"); the agent then runs with the rule actor's permissions.
 
 **Automation** (Jira only per the page; a GA post mentions Confluence, **UNCONFIRMED**):
 ```yaml
@@ -364,9 +364,18 @@ REST paths (api.bitbucket.org swagger). `{workspace}` / `{repo_slug}` accept a s
 8. `asUser()` is documented only for UI-Kit-capable modules, so treat it as unavailable in triggers, consumers and scheduled jobs, so `requestTeamworkGraph` (asUser-only) can't run there either. Missing TWG scopes return empty results silently.
 9. Entity properties are not JQL-searchable unless indexed by `jira:entityProperty` (100-value cap). The value must be non-empty JSON ≤32 KB.
 10. Opus 4.7/4.8/5 and Sonnet 5 reject `temperature` and `top_p`. Never send both, to any model.
-11. Rovo agents started by Automation won't call non-GET actions. Inputs may be hallucinated, so authorize with `context.accountId`.
+11. Rovo agents started by Automation call non-GET actions only when the step's "Let this agent take actions" box is ticked (seen 2026-11-15). Inputs may be hallucinated, so authorize with `context.accountId`.
 12. Automation needs both `automation:actionProvider` **and** an action `config` UI. There is a 20-action cap and up to 20 min of cache delay.
-13. Bitbucket merge-check payload has only UUIDs/ids (no hashes, no workspace slug). `read:pullrequest:bitbucket` is mandatory. A check blocks only when set to Required, and the "Custom merge checks" feature must be enabled. Repo UUIDs come wrapped in `{}`.
+13. Bitbucket merge-check payload has only UUIDs/ids (no hashes, no workspace slug). `read:pullrequest:bitbucket` is mandatory. A check blocks only when set to Required, and the "Custom merge checks" feature must be enabled. **VERIFIED 2026-11-15: "Required" (and workspace/project-level checks) need Bitbucket Premium** — on Free the check runs and reports but cannot block. Repo UUIDs come wrapped in `{}`.
 14. `rovo:mcp`: one per app, max 50 tools, and admins must switch exposure on per site.
 15. With `manual@2026`, Forge does no bundling or validation. A missing handler export or dependency fails only at runtime. Keep deploy output self-contained (no pnpm symlinks).
 
+
+## 16. Spike-verified platform facts (2026-11-15) — see docs/research/spike-results.md
+- `POST /rest/api/3/expression/eval` returns **410 Gone**; use `POST /rest/api/3/expression/evaluate` (same body; result under `value`). Needs `read:jira-user` in the manifest (forge lint enforces it).
+- Free "Cloud Developer Bundle" sites (go.atlassian.com/cloud-dev) have **no Rovo agents** ("your org admin needs to activate AI"). Use `forge site provision` → a Forge **demo site** (enterprise Jira/Confluence/JSM + Rovo, 90 days, one per developer).
+- Forge Rovo agents appear (a) in Automation "Use agent", (b) in the work item "Agents" menu, and (c) in the **Assignee** picker as an app user. Assigning a work item to the agent **starts an agent session automatically**, labelled "<Agent> with <assigner>"; the reply waits for review and is "Only visible to you" until someone drafts a comment.
+- Automation Forge actions need a Custom UI/UI Kit config page that calls `view.submit({...inputs})` (and listens for `AUTOMATION_ACTION_SUBMIT`); a static page leaves Next disabled. Config resource changes are cached (observed >10 min).
+- A web trigger in the manifest triggers "RoA trust signal loss" → major version; `forge deploy --approve MAJOR_VERSION_RULE` acknowledges it.
+- `forge register` needs a Developer Space; on first use the CLI prompts for its name (TTY required — `script -q /dev/null forge register …` works).
+- Forge CLI 15.x requires Node ^22.23.4 / ^24.22.1 / >=26.12.1; 14.2.0 works on Node 22.22.

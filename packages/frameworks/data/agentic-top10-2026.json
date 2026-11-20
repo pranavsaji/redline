@@ -1,0 +1,16 @@
+{
+  "source": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+  "version": "2026",
+  "items": [
+    { "id": "ASI01", "title": "Agent Goal Hijack", "summary": "Malicious content in documents, tools or data redirects an agent's goals or decision path.", "keywords": ["goal hijack", "prompt injection", "injected instructions", "redirect", "hijack"] },
+    { "id": "ASI02", "title": "Tool Misuse and Exploitation", "summary": "An agent uses legitimate tools in unsafe or unauthorised ways, often through manipulated inputs.", "keywords": ["tool misuse", "tool call", "refund", "over-privileged", "tool"] },
+    { "id": "ASI03", "title": "Identity and Privilege Abuse", "summary": "Agents inherit, escalate or misuse identities, credentials and delegated privileges.", "keywords": ["privilege", "identity", "credential", "impersonat", "delegat"] },
+    { "id": "ASI04", "title": "Agentic Supply Chain Vulnerabilities", "summary": "Compromised tools, plugins, prompts, MCP servers or other agents are pulled into the agent at runtime.", "keywords": ["mcp", "plugin", "supply chain", "third-party tool"] },
+    { "id": "ASI05", "title": "Unexpected Code Execution", "summary": "Agents generate or run code or commands that lead to remote code execution.", "keywords": ["code execution", "execute code", "shell", "eval", "sandbox"] },
+    { "id": "ASI06", "title": "Memory and Context Poisoning", "summary": "Attackers corrupt an agent's memory, context or retrieved knowledge to influence later actions.", "keywords": ["memory", "context poisoning", "rag", "knowledge base", "conversation history"] },
+    { "id": "ASI07", "title": "Insecure Inter-Agent Communication", "summary": "Messages between agents lack authentication, integrity or validation.", "keywords": ["inter-agent", "multi-agent", "agent to agent", "a2a"] },
+    { "id": "ASI08", "title": "Cascading Failures", "summary": "A single fault or compromise propagates through connected agents and workflows.", "keywords": ["cascad", "propagat", "chain of agents"] },
+    { "id": "ASI09", "title": "Human-Agent Trust Exploitation", "summary": "Agents exploit or are used to exploit human trust, for example persuading users to approve harmful actions.", "keywords": ["trust", "persuade", "approval", "social engineering", "human in the loop"] },
+    { "id": "ASI10", "title": "Rogue Agents", "summary": "Compromised or misaligned agents act outside their intended scope.", "keywords": ["rogue", "misaligned", "out of scope", "autonomous"] }
+  ]
+}

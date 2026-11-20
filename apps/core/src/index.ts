@@ -1,0 +1,23 @@
+/** Forge entry: every handler named in manifest.yml is exported from here. */
+export {
+  issueEventHandler,
+  pageEventHandler,
+  lifecycleHandler,
+  jobConsumerHandler,
+  sweeperHandler,
+  hourlyHandler,
+  dailyHandler,
+  getReviewContextHandler,
+  getMergeAttestationHandler,
+  getReviewHandler,
+  getSecurityRequirementsHandler,
+  checkChangeRiskHandler,
+  requestRiskAcceptanceHandler,
+  explainThreatHandler,
+  releaseReadinessHandler,
+  startReviewHandler,
+  postureSummaryHandler,
+  submitThreatModelHandler,
+  validateTransitionHandler,
+} from './handlers.js';
+export { panelResolver } from './resolvers/index.js';

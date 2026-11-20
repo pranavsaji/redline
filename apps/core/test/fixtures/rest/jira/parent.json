@@ -1,0 +1,1 @@
+{ "id": "10040", "key": "PAY-5", "fields": { "summary": "Payments epic", "description": { "type": "doc", "version": 1, "content": [ { "type": "paragraph", "content": [ { "type": "text", "text": "Customer refunds end to end." } ] } ] }, "issuetype": { "id": "10000", "name": "Epic" }, "project": { "id": "10000", "key": "PAY" }, "status": { "name": "In Progress" } } }

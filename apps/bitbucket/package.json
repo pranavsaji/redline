@@ -1,0 +1,21 @@
+{
+  "name": "@redline/bitbucket-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "lint:forge": "forge lint"
+  },
+  "dependencies": {
+    "@forge/api": "^8.5.0",
+    "@forge/kvs": "^2.1.2",
+    "@forge/resolver": "^2.0.2",
+    "@redline/core": "workspace:*",
+    "@redline/crypto": "workspace:*",
+    "@redline/shared": "workspace:*",
+    "zod": "^4.6.6"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

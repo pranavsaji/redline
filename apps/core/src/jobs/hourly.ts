@@ -1,0 +1,57 @@
+import type { ReviewStatus } from '@redline/shared';
+import type { CoreDeps } from '../deps.js';
+import { log } from '../adapters/log.js';
+import { expireAcceptances } from '../services/acceptance-service.js';
+import { OPS_CONFIG_KEY, opsAlert } from '../services/ops-alert.js';
+
+export { OPS_CONFIG_KEY };
+const STATUSES: ReviewStatus[] = ['queued', 'gathering', 'awaiting_agent', 'modeling', 'ready', 'failed', 'agent_timeout'];
+const FAILURE_RATE = 0.2;
+
+/**
+ * Hourly: expire overdue risk acceptances (RL-5); then, if more than 20% of the reviews created in the last hour failed
+ * or timed out, comment once on the configured ops work item, mentioning its admins.
+ */
+export async function hourly(deps: CoreDeps): Promise<void> {
+  const expired = await expireAcceptances(deps, deps.clock.now());
+  if (!expired.ok) log('hourly.expiry_failed', { code: expired.error.code });
+  else if (expired.value.expired > 0) log('hourly.expired', { acceptances: expired.value.expired });
+  await failRateAlert(deps);
+}
+
+async function failRateAlert(deps: CoreDeps): Promise<void> {
+  let ops: { issueKey?: unknown; accountIds?: unknown } | undefined;
+  try {
+    ops = await deps.state.get(OPS_CONFIG_KEY);
+  } catch {
+    ops = undefined;
+  }
+  if (!ops || typeof ops.issueKey !== 'string') return;
+  const now = deps.clock.now();
+  const hour = now.toISOString().slice(0, 13);
+  const alertKey = `alert:failrate:${hour}`;
+  try {
+    if (await deps.state.get(alertKey)) return;
+  } catch {
+    return;
+  }
+  const since = new Date(now.getTime() - 3_600_000).toISOString();
+  let total = 0;
+  let bad = 0;
+  for (const s of STATUSES) {
+    const r = await deps.reviews.byStatus(s);
+    if (!r.ok) return;
+    const recent = r.value.filter((x) => x.createdAt >= since);
+    total += recent.length;
+    if (s === 'failed' || s === 'agent_timeout') bad += recent.length;
+  }
+  if (total === 0 || bad / total <= FAILURE_RATE) return;
+
+  const sent = await opsAlert(
+    deps,
+    alertKey,
+    `Redline: ${bad} of ${total} security reviews in the last hour failed or timed out. Work items stay blocked until they are re-run. Check the site's Rovo credits and the Redline admin page.`,
+  );
+  if (!sent) return;
+  log('alert.failrate', { bad, total });
+}

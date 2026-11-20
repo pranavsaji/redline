@@ -1,0 +1,10 @@
+{
+  "caseId": "web-05",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"x1\",\n      \"valid\": true,\n      \"reason\": \"Valid SAML replay attack; specific attacker action and harm; distinct from role manipulation or IdP attacks.\"\n    },\n    {\n      \"id\": \"x2\",\n      \"valid\": false,\n      \"reason\": \"Design uses SAML SSO not password auth; mentions customers when design specifies employees; doesn't follow design.\"\n    },\n    {\n      \"id\": \"x3\",\n      \"valid\": true,\n      \"reason\": \"Valid XML wrapping attack on SAML; specific mechanism exploiting parser/validator; distinct from role attribute manipulation.\"\n    },\n    {\n      \"id\": \"x4\",\n      \"valid\": true,\n      \"reason\": \"Valid entity expansion attack on SAML XML parser; material to feature's authentication mechanism; causes DoS.\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

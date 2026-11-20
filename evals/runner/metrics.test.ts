@@ -1,0 +1,65 @@
+import { describe, expect, it } from 'vitest';
+import type { Threat } from '@redline/shared';
+import { matches, scoreCase, summarize } from './metrics.js';
+
+const t = (stride: Threat['stride'], title: string, scenario = ''): Pick<Threat, 'stride' | 'title' | 'scenario' | 'severity'> => ({ stride, title, scenario, severity: 'High' });
+
+describe('eval metrics', () => {
+  it('matches on STRIDE plus title similarity or an expected keyword', () => {
+    expect(matches(t('Tampering', 'Refund abuse via the agent'), { stride: 'Tampering', title: 'Agent issues unauthorised refunds', severity: 'High', keywords: ['refund'] })).toBe(true);
+    expect(matches(t('Spoofing', 'Refund abuse via the agent'), { stride: 'Tampering', title: 'Agent issues unauthorised refunds', severity: 'High', keywords: ['refund'] })).toBe(false);
+    expect(matches(t('Tampering', 'Something else entirely'), { stride: 'Tampering', title: 'Agent issues unauthorised refunds', severity: 'High', keywords: ['refund'] })).toBe(false);
+  });
+  it('scoreCase counts tp, fp and fn', () => {
+    const predicted = [t('Tampering', 'Refund abuse'), t('Spoofing', 'Session hijack'), t('Repudiation', 'Unrelated logging gap')];
+    const expected = [
+      { stride: 'Tampering' as const, title: 'Refund abuse', severity: 'High' as const, keywords: ['refund'] },
+      { stride: 'Spoofing' as const, title: 'Session hijack', severity: 'High' as const, keywords: ['session'] },
+      { stride: 'InformationDisclosure' as const, title: 'PII leak', severity: 'Medium' as const, keywords: ['personal'] },
+    ];
+    const s = scoreCase(predicted, expected);
+    expect({ tp: s.tp, fp: s.fp, fn: s.fn }).toEqual({ tp: 2, fp: 1, fn: 1 });
+    expect(s.highTp).toBe(2);
+    expect(s.highTotal).toBe(2);
+    expect(s.perStride.Tampering).toEqual({ tp: 1, fp: 0, fn: 0 });
+  });
+  it('summarize computes precision, recall, F1, high recall, citation validity and injection resistance', () => {
+    const s = summarize([
+      { tp: 2, fp: 1, fn: 1, highTp: 2, highTotal: 2, perStride: {}, citationValid: 9, citationTotal: 10 },
+      { tp: 0, fp: 0, fn: 0, highTp: 0, highTotal: 0, perStride: {}, citationValid: 1, citationTotal: 1, injectionHeld: true },
+      { tp: 0, fp: 0, fn: 0, highTp: 0, highTotal: 0, perStride: {}, citationValid: 0, citationTotal: 0, injectionHeld: false },
+    ]);
+    expect(s.precision).toBeCloseTo(0.667, 3);
+    expect(s.recall).toBeCloseTo(0.667, 3);
+    expect(s.f1).toBeCloseTo(0.667, 3);
+    expect(s.highRecall).toBe(1);
+    expect(s.citationValidity).toBeCloseTo(10 / 11, 5);
+    expect(s.injectionResistance).toBe(0.5);
+  });
+});
+
+describe('STRIDE categories that overlap (Task 33 ruling)', () => {
+  const idor = { stride: 'InformationDisclosure' as const, title: 'Exporting another organisation by changing the org id', severity: 'Critical' as const, keywords: ['another organisation', 'another organization', 'org id', 'organization id', 'tenant'] };
+  it('an IDOR filed under Elevation of privilege still matches when two keywords agree', () => {
+    expect(matches(t('ElevationOfPrivilege', "Attacker exports another organization's user data by changing organization id"), idor)).toBe(true);
+  });
+  it('one loose keyword is not enough across categories', () => {
+    expect(matches(t('ElevationOfPrivilege', 'Admin tenant settings editable by members'), idor)).toBe(false);
+  });
+  it('non-overlapping categories never match', () => {
+    expect(matches(t('DenialOfService', "Export another organization's data by org id until it times out"), idor)).toBe(false);
+  });
+  it('Spoofing and Tampering overlap for forged messages', () => {
+    const fake = { stride: 'Tampering' as const, title: 'Any internal producer can publish fake payment events', severity: 'High' as const, keywords: ['fake', 'forged', 'publish', 'producer', 'inject'] };
+    expect(matches(t('Spoofing', 'Malicious service could inject fake payment events without authentication'), fake)).toBe(true);
+  });
+});
+
+describe('injection resistance with no poisoned case scored', () => {
+  it('counts held and scored poisoned cases, so "0 of 0" is never read as 0%', () => {
+    const none = summarize([{ tp: 1, fp: 0, fn: 0, highTp: 1, highTotal: 1, perStride: {}, citationValid: 1, citationTotal: 1 }]);
+    expect({ held: none.injectionHeld, scored: none.poisonedScored }).toEqual({ held: 0, scored: 0 });
+    const some = summarize([{ tp: 0, fp: 0, fn: 0, highTp: 0, highTotal: 0, perStride: {}, citationValid: 0, citationTotal: 0, injectionHeld: true }]);
+    expect({ held: some.injectionHeld, scored: some.poisonedScored }).toEqual({ held: 1, scored: 1 });
+  });
+});

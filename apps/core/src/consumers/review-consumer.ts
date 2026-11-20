@@ -1,0 +1,260 @@
+import { assembleReview, requirementsFor } from '@redline/core';
+import { PROMPT_VERSION } from '@redline/prompts';
+import { appError, err, ok, type ContextBundle, type ContextFact, type Result, type Review, type SitePolicy, type Threat } from '@redline/shared';
+import type { Sample } from '@redline/core';
+import type { CoreDeps } from '../deps.js';
+import { log } from '../adapters/log.js';
+import { ReviewJobSchema, type ReviewJob } from '../jobs/types.js';
+import { isBudgetPaused, monthOf } from '../services/budget.js';
+import { contextKey, refreshVerdict } from '../services/verdict-service.js';
+import { isPublished, publishThreatModel } from '../services/confluence-page.js';
+
+/** Propagate to children, and re-publish the Confluence page when this work item has one (RQ-6). */
+async function afterChange(deps: CoreDeps, issueId: string, republish: boolean): Promise<Result<void>> {
+  const jobs: ReviewJob[] = [{ kind: 'propagate', issueId }];
+  if (republish && (await isPublished(deps, issueId))) jobs.push({ kind: 'publish', issueId });
+  return deps.queue.push(jobs);
+}
+
+export const SCHEMA_VERSION_KEY = 'schema:version';
+
+const voidOk = (): Result<void> => ok(undefined);
+
+/** R7: the previous revision's threats and facts, so threats on unchanged sources carry over (with their triage). */
+async function priorRevision(deps: CoreDeps, review: Review): Promise<Result<{ threats: Threat[]; facts: ContextFact[] } | null>> {
+  if (review.revision <= 1) return ok(null);
+  const history = await deps.reviews.history(review.issueId);
+  if (!history.ok) return history;
+  const prev = history.value.filter((r) => r.revision < review.revision).at(-1);
+  if (!prev) return ok(null);
+  const [threats, facts] = await Promise.all([deps.reviews.threats(prev.id), deps.reviews.facts(prev.id)]);
+  if (!threats.ok) return threats;
+  if (!facts.ok) return facts;
+  return ok({ threats: threats.value, facts: facts.value });
+}
+
+/** Runs assembleReview and stores the result: threats, discarded, and requirement rows (existing rows keep their status). */
+async function applyAssembly(deps: CoreDeps, review: Review, bundle: ContextBundle, samples: Sample[], policy: SitePolicy, mode: 'progress' | 'final') {
+  const priorDismissed = [];
+  for (const c of bundle.components ?? []) {
+    const d = await deps.feedback.dismissedFor(c);
+    if (!d.ok) return d;
+    priorDismissed.push(...d.value);
+  }
+  const prior = await priorRevision(deps, review);
+  if (!prior.ok) return prior;
+  const out = assembleReview({
+    review, bundle, samples, samplesExpected: review.samplesExpected, priorDismissed, policy, promptVersion: PROMPT_VERSION, now: deps.clock.now(), mode,
+    ...(prior.value ? { prior: prior.value } : {}),
+  });
+  const saved = await deps.reviews.saveThreats(review.id, out.threats, out.discarded);
+  if (!saved.ok) return saved;
+  // Until every agent run is in, consensus is provisional: only rule-based threats get requirement rows, so threats
+  // that later lose the vote never leave orphan requirements behind.
+  const settled = out.status !== 'awaiting_agent';
+  const forRequirements = settled ? out.threats : out.threats.filter((t) => t.origin === 'baseline');
+  for (const req of requirementsFor(forRequirements, { issueId: review.issueId, issueKey: review.issueKey })) {
+    const existing = await deps.requirements.get(req.id);
+    if (!existing.ok) return existing;
+    const row = existing.value ? { ...existing.value, threatId: req.threatId, severity: req.severity, issueKey: req.issueKey } : { ...req, createdAt: deps.clock.now().toISOString() };
+    const u = await deps.requirements.upsert(row);
+    if (!u.ok) return u;
+  }
+  return ok(out);
+}
+
+async function gather(deps: CoreDeps, job: Extract<ReviewJob, { kind: 'gather' }>): Promise<Result<void>> {
+  const policy = await deps.config.site();
+  if (!policy.ok) return policy;
+  const latest = await deps.reviews.latest(job.issueId);
+  if (!latest.ok) return latest;
+  const bundle = await deps.gatherer.gather(job.issueId, job.actorAccountId ? { actorAccountId: job.actorAccountId } : {});
+  if (!bundle.ok) {
+    log('gather.failed', { issueId: job.issueId, code: bundle.error.code });
+    await refreshVerdict(deps, job.issueId);
+    return bundle;
+  }
+  const b = bundle.value;
+  try {
+    await deps.state.set(contextKey(job.issueId), b.contextHash);
+  } catch (e) {
+    return err(appError('upstream', `kvs: ${e instanceof Error ? e.message : String(e)}`));
+  }
+
+  const prev = latest.value;
+  // New revisions: first review; explicit re-run; a create whose content differs. Edits and page changes only mark the
+  // review out of date (verdict review_stale with a one-click re-run), so no agent run is left waiting for nobody.
+  const createNew = !prev || job.reason === 'rerun' || (job.reason === 'created' && prev.contextHash !== b.contextHash);
+  if (!createNew) {
+    const v = await refreshVerdict(deps, job.issueId);
+    if (!v.ok) return v;
+    return deps.queue.push([{ kind: 'propagate', issueId: job.issueId }]);
+  }
+
+  const now = deps.clock.now();
+  const paused = await isBudgetPaused(deps, policy.value, now);
+  if (!paused.ok) return paused;
+  const revision = (prev?.revision ?? 0) + 1;
+  const review: Review = {
+    id: `rev_${job.issueId}_${revision}`,
+    issueId: job.issueId,
+    issueKey: b.issueKey,
+    revision,
+    status: paused.value ? 'failed' : 'awaiting_agent',
+    ...(paused.value ? { failureReason: 'budget' } : {}),
+    contextHash: b.contextHash,
+    riskScore: 0,
+    partial: b.partial,
+    promptVersion: PROMPT_VERSION,
+    modelIds: [],
+    samplesExpected: paused.value ? 0 : policy.value.agentSamples,
+    samplesReceived: 0,
+    tokensIn: 0,
+    tokensOut: 0,
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString(),
+  };
+  const created = await deps.reviews.create(review);
+  if (!created.ok) {
+    // A concurrent gather already created this revision: the work is done, just refresh.
+    if (created.error.code === 'conflict') {
+      await refreshVerdict(deps, job.issueId);
+      return voidOk();
+    }
+    return created;
+  }
+  const facts = await deps.reviews.saveFacts(review.id, b.facts);
+  if (!facts.ok) return facts;
+  await trace(deps, review.id, 'gather', paused.value ? 'failed' : 'done', paused.value ? 'budget' : undefined);
+  const out = await applyAssembly(deps, review, b, [], policy.value, 'progress');
+  if (!out.ok) return out;
+  const upd = await deps.reviews.update(review.id, { riskScore: out.value.riskScore, updatedAt: now.toISOString() });
+  if (!upd.ok) return upd;
+  if (!paused.value) {
+    const u = await deps.usage.add(monthOf(now), { tokensIn: 0, tokensOut: 0, reviews: 1 });
+    if (!u.ok) return u;
+  }
+  log('review.created', { issueId: job.issueId, revision, reason: job.reason, paused: paused.value, partial: b.partial });
+  const v = await refreshVerdict(deps, job.issueId);
+  if (!v.ok) return v;
+  // A published page now trails the newest revision: re-publish so it says it is out of date.
+  return afterChange(deps, job.issueId, true);
+}
+
+/** The run trace the admin page shows (review_stages). Best effort: a trace write never fails the review. */
+export async function trace(deps: Pick<CoreDeps, 'reviews' | 'clock'>, reviewId: string, stage: string, status: 'running' | 'done' | 'failed', error?: string): Promise<void> {
+  const r = await deps.reviews.saveStage(reviewId, stage, status, undefined, error, deps.clock.now().toISOString()).catch(() => null);
+  if (!r?.ok) log('trace.failed', { reviewId, stage });
+}
+
+/** One `agent_<n>` stage per agent sample, recorded the first time an assembly sees it. */
+async function traceSamples(deps: CoreDeps, reviewId: string, samples: readonly Sample[]): Promise<void> {
+  const seen = await deps.reviews.stages(reviewId);
+  const have = new Set(seen.ok ? seen.value.map((s) => s.stage) : []);
+  for (let n = 1; n <= samples.length; n++) {
+    if (have.has(`agent_${n}`)) continue;
+    const s = samples[n - 1]!;
+    await trace(deps, reviewId, `agent_${n}`, 'failed' in s ? 'failed' : 'done', 'failed' in s ? s.failed : undefined);
+  }
+}
+
+async function assemble(deps: CoreDeps, reviewId: string): Promise<Result<void>> {
+  const got = await deps.reviews.get(reviewId);
+  if (!got.ok) return got;
+  const review = got.value;
+  if (!review) return err(appError('not_found', `review ${reviewId} not found`));
+  if (review.status === 'failed' && review.failureReason === 'budget') return refreshVerdict(deps, review.issueId).then(() => voidOk());
+  const policy = await deps.config.site();
+  if (!policy.ok) return policy;
+  const [samples, facts, issue] = await Promise.all([deps.reviews.samples(reviewId), deps.reviews.facts(reviewId), deps.jira.issue(review.issueId)]);
+  if (!samples.ok) return samples;
+  // M3: a settled review with no new samples is not assembled again (a redelivered job would overwrite champion triage).
+  const settled = review.status !== 'awaiting_agent' && review.status !== 'agent_timeout';
+  if (settled && samples.value.length <= review.samplesReceived) return refreshVerdict(deps, review.issueId).then((v) => (v.ok ? voidOk() : v));
+  if (!facts.ok) return facts;
+  const bundle: ContextBundle = {
+    issueId: review.issueId,
+    issueKey: review.issueKey,
+    facts: facts.value,
+    partial: review.partial,
+    partialReasons: [],
+    contextHash: review.contextHash,
+    gatheredAt: review.createdAt,
+    // Trusted component names come from Jira, never from the samples.
+    components: issue.ok ? issue.value.components : [],
+  };
+  const mode = review.status === 'agent_timeout' ? 'final' : 'progress';
+  const out = await applyAssembly(deps, review, bundle, samples.value, policy.value, mode);
+  if (!out.ok) return out;
+  const status = review.status === 'failed' ? 'failed' : out.value.status;
+  const upd = await deps.reviews.update(review.id, { status, riskScore: out.value.riskScore, samplesReceived: samples.value.length, updatedAt: deps.clock.now().toISOString() });
+  if (!upd.ok) return upd;
+  await traceSamples(deps, review.id, samples.value);
+  await trace(deps, review.id, 'assemble', status === 'failed' ? 'failed' : 'done', status === 'failed' ? (review.failureReason ?? 'failed') : undefined);
+  log('review.assembled', { reviewId, status, samples: samples.value.length });
+  const v = await refreshVerdict(deps, review.issueId);
+  if (!v.ok) return v;
+  return afterChange(deps, review.issueId, status === 'ready' && review.status !== 'ready');
+}
+
+async function propagate(deps: CoreDeps, issueId: string): Promise<Result<void>> {
+  const children = await deps.issues.children(issueId);
+  if (!children.ok) return children;
+  for (const c of children.value) {
+    const v = await refreshVerdict(deps, c.issueId);
+    if (!v.ok) log('propagate.failed', { issueId: c.issueId, code: v.error.code });
+  }
+  const grandchildren = [];
+  for (const c of children.value) {
+    const g = await deps.issues.children(c.issueId);
+    if (g.ok && g.value.length > 0) grandchildren.push({ kind: 'propagate' as const, issueId: c.issueId });
+  }
+  return grandchildren.length > 0 ? deps.queue.push(grandchildren) : voidOk();
+}
+
+export async function handleJob(deps: CoreDeps, job: ReviewJob): Promise<Result<void>> {
+  switch (job.kind) {
+    case 'gather':
+      return gather(deps, job);
+    case 'assemble':
+      return assemble(deps, job.reviewId);
+    case 'propagate':
+      return propagate(deps, job.issueId);
+    case 'verdict': {
+      const v = await refreshVerdict(deps, job.issueId);
+      return v.ok ? voidOk() : v;
+    }
+    case 'publish': {
+      const p = await publishThreatModel(deps, job.issueId);
+      if (p.ok) return voidOk();
+      // Nothing to publish or no design page is not worth retrying; transient failures are.
+      if (p.error.code === 'validation' || p.error.code === 'not_found') {
+        log('publish.skipped', { issueId: job.issueId, code: p.error.code });
+        return voidOk();
+      }
+      return p;
+    }
+    case 'migrate': {
+      const m = await deps.migrate();
+      if (!m.ok) return m;
+      try {
+        await deps.state.set(SCHEMA_VERSION_KEY, m.value.to);
+      } catch (e) {
+        return err(appError('upstream', `kvs: ${e instanceof Error ? e.message : String(e)}`));
+      }
+      return voidOk();
+    }
+  }
+}
+
+/** Queue consumer: validates the job body (never trust a queue payload's shape), runs it, logs failures. */
+export async function reviewConsumer(event: { body?: unknown }, deps: CoreDeps): Promise<Result<void>> {
+  const parsed = ReviewJobSchema.safeParse(event.body);
+  if (!parsed.success) {
+    log('job.invalid', { issues: parsed.error.issues.length });
+    return err(appError('validation', 'invalid job'));
+  }
+  const r = await handleJob(deps, parsed.data);
+  if (!r.ok) log('job.failed', { kind: parsed.data.kind, code: r.error.code });
+  return r;
+}

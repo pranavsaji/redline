@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Redline</title>
+    <style>
+      html, body { background: var(--ds-surface, #ffffff); color: var(--ds-text, #172b4d); }
+      body { margin: 0; padding: 8px; }
+      /* Narrow issue panels: tabs keep their full label and the tab row scrolls, instead of truncating to "Requirem…". */
+      [role='tablist'] { flex-wrap: nowrap; }
+      [role='tablist'] > [role='tab'], [role='tablist'] > * { flex-shrink: 0; max-width: none; }
+      [role='tab'] span, [role='tab'] { text-overflow: clip; overflow: visible; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

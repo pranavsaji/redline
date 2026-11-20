@@ -1,0 +1,5 @@
+# Everything git ignores (node_modules, build output, coverage, .tmp, .env) ...
+:include .gitignore
+# ... plus files that hold the one fake AWS key the redaction tests use on purpose (see .gitleaks.toml).
+.gitleaks.toml
+docs/superpowers/

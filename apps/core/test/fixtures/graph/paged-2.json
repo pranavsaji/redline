@@ -1,0 +1,1 @@
+{ "data": { "customQuery": { "edges": [ { "node": { "columns": [ { "key": "pr", "value": { "__typename": "CypherQueryResultNode", "id": "ari:cloud:graph::pull-request/pr-2" } } ] } } ], "pageInfo": { "hasNextPage": true, "endCursor": "cur2" } } } }

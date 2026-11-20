@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist-types",
+    "rootDir": ".",
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler"
+  },
+  "include": ["src", "test"],
+  "exclude": ["dist", "ui"],
+  "references": [{ "path": "../../packages/shared" }, { "path": "../../packages/crypto" }, { "path": "../../packages/core" }]
+}

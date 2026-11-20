@@ -1,0 +1,1 @@
+{"name": "@redline/evals", "version": "0.1.0", "private": true, "type": "module", "dependencies": {"@redline/shared": "workspace:*", "@redline/core": "workspace:*", "@redline/prompts": "workspace:*"}}

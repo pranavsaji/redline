@@ -1,0 +1,92 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/*.{mjs,ts,mts}"
+      ],
+      "project": [
+        "scripts/**/*.{mjs,ts,mts}"
+      ]
+    },
+    "apps/core": {
+      "entry": [
+        "src/index.ts",
+        "scripts/*.ts",
+        "test/**/*.test.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "scripts/**/*.ts",
+        "test/**/*.ts"
+      ]
+    },
+    "apps/core/ui": {
+      "entry": [
+        "test/**/*.test.{ts,tsx}"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx}",
+        "test/**/*.{ts,tsx}"
+      ]
+    },
+    "apps/bitbucket": {
+      "entry": [
+        "src/index.ts",
+        "test/**/*.test.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ]
+    },
+    "apps/bitbucket/ui": {
+      "entry": [
+        "test/**/*.test.{ts,tsx}"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx}",
+        "test/**/*.{ts,tsx}"
+      ]
+    },
+    "apps/local": {
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
+    "packages/*": {
+      "entry": [
+        "test/fakes/index.ts",
+        "scripts/*.ts",
+        "test/**/*.test.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "scripts/**/*.ts",
+        "test/**/*.ts"
+      ]
+    },
+    "evals": {
+      "entry": [
+        "runner/**/*.test.ts",
+        "fixtures/*.ts"
+      ],
+      "project": [
+        "runner/**/*.ts",
+        "fixtures/**/*.ts"
+      ]
+    },
+    "e2e": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "**/*.ts"
+      ]
+    }
+  },
+  "ignoreBinaries": [
+    "forge"
+  ],
+  "ignoreExportsUsedInFile": true
+}

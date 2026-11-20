@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist-types",
+    "rootDir": ".",
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler"
+  },
+  "include": ["src", "test", "scripts", "graph/*.json"],
+  "exclude": ["src/config", "static", "dist"],
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/crypto" },
+    { "path": "../../packages/core" },
+    { "path": "../../packages/db" },
+    { "path": "../../packages/prompts" }
+  ]
+}

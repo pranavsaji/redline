@@ -1,0 +1,16 @@
+{
+  "source": "https://genai.owasp.org/llm-top-10/",
+  "version": "2025",
+  "items": [
+    { "id": "LLM01", "title": "Prompt Injection", "summary": "Crafted input alters the model's behaviour or output in unintended ways, directly or through content the model reads.", "keywords": ["prompt injection", "injected", "instructions", "jailbreak", "untrusted text"] },
+    { "id": "LLM02", "title": "Sensitive Information Disclosure", "summary": "The model reveals personal data, credentials or confidential business data in its output.", "keywords": ["leak", "disclose", "personal data", "pii", "exposed"] },
+    { "id": "LLM03", "title": "Supply Chain", "summary": "Compromised models, datasets, adapters or plugins introduce vulnerabilities.", "keywords": ["model supply", "third-party model", "plugin", "adapter"] },
+    { "id": "LLM04", "title": "Data and Model Poisoning", "summary": "Training, fine-tuning or embedding data is manipulated to introduce backdoors or bias.", "keywords": ["poison", "training data", "fine-tune", "backdoor"] },
+    { "id": "LLM05", "title": "Improper Output Handling", "summary": "Model output is passed to downstream systems without validation, enabling XSS, SQL injection or code execution.", "keywords": ["output", "render", "execute", "downstream", "xss"] },
+    { "id": "LLM06", "title": "Excessive Agency", "summary": "The model is given more functionality, permissions or autonomy than it needs.", "keywords": ["tool", "agency", "permission", "refund", "autonomous", "over-privileged"] },
+    { "id": "LLM07", "title": "System Prompt Leakage", "summary": "System prompts containing sensitive logic or secrets are exposed.", "keywords": ["system prompt", "prompt leak"] },
+    { "id": "LLM08", "title": "Vector and Embedding Weaknesses", "summary": "Weaknesses in how embeddings are generated, stored or retrieved are exploited, including cross-tenant leakage in RAG.", "keywords": ["rag", "embedding", "vector", "retrieval"] },
+    { "id": "LLM09", "title": "Misinformation", "summary": "The model produces false or misleading information that users or systems rely on.", "keywords": ["hallucinat", "misinformation", "wrong answer"] },
+    { "id": "LLM10", "title": "Unbounded Consumption", "summary": "Uncontrolled inference requests cause denial of service, cost blow-ups or model extraction.", "keywords": ["cost", "rate limit", "resource", "exhaustion", "denial"] }
+  ]
+}

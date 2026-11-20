@@ -1,0 +1,3 @@
+sensitivePaths:
+  - "billing/**"
+diffScoreThreshold: 60

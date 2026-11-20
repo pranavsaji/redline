@@ -1,0 +1,7 @@
+{
+  "name": "@redline/local",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": { "@redline/core": "workspace:*", "@redline/crypto": "workspace:*", "@redline/llm-dev": "workspace:*" }
+}

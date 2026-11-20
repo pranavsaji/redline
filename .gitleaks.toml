@@ -1,0 +1,8 @@
+# gitleaks config (Task 34): the default rules, plus an allowlist for the one fake AWS key the secret-redaction tests
+# and the plan use on purpose. It is not a credential; anything else that matches still fails CI.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fake AWS access key used by redaction tests (AKIA + 16 letters in alphabetical order)"
+regexes = ['''AKIAABCDEFGHIJKLMNOP''']

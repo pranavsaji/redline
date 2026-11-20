@@ -1,0 +1,1 @@
+{ "issues": [ { "id": "10061", "key": "PAY-12", "fields": { "summary": "Child B", "issuetype": { "id": "10002", "name": "Subtask", "subtask": true }, "project": { "id": "10000", "key": "PAY" }, "status": { "name": "Done" } } } ] }

@@ -1,0 +1,10 @@
+{
+  "caseId": "ai-01",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"x1\",\n      \"valid\": true,\n      \"reason\": \"Different attack from c1: missing authorization vs prompt injection bypassing controls\"\n    },\n    {\n      \"id\": \"x2\",\n      \"valid\": true,\n      \"reason\": \"Specific materialized logging need: fraud investigation, chargeback defense, non-repudiation for refunds\"\n    },\n    {\n      \"id\": \"x3\",\n      \"valid\": true,\n      \"reason\": \"Fundamental missing control (authentication) distinct from c1/c2's prompt-based attacks\"\n    },\n    {\n      \"id\": \"x4\",\n      \"valid\": false,\n      \"reason\": \"Duplicate of c1: generic description of prompt injection already covered\"\n    },\n    {\n      \"id\": \"x5\",\n      \"valid\": false,\n      \"reason\": \"Doesn't follow from design: no described flow where amount/recipient manipulation is plausible\"\n    },\n    {\n      \"id\": \"x6\",\n      \"valid\": false,\n      \"reason\": \"Duplicate of c2: same harm (PII exposure), just worded generically\"\n    },\n    {\n      \"id\": \"x7\",\n      \"valid\": false,\n      \"reason\": \"Duplicate of c1: generic tool misuse description, same attack and harm\"\n    },\n    {\n      \"id\": \"x8\",\n      \"valid\": true,\n      \"reason\": \"Specific threat: automated refund abuse causing financial loss, not covered by c1\"\n    },\n    {\n      \"id\": \"x9\",\n      \"valid\": false,\n      \"reason\": \"Generic hygiene (encryption, contracts) without specific attack or material harm to feature\"\n    },\n    {\n      \"id\": \"x10\",\n      \"valid\": true,\n      \"reason\": \"Resource exhaustion DoS distinct from x8's financial loss via actual refunds\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

@@ -1,0 +1,414 @@
+import { z } from 'zod';
+import { appendLedger, WARN_ONLY_MAX_DAYS, warnOnlyUntil } from '@redline/core';
+import { SitePolicySchema, type SitePolicy } from '@redline/shared';
+import type { CoreDeps } from '../deps.js';
+import { log } from '../adapters/log.js';
+import { monthOf, pauseReasons, RECENT_INGESTS_KEY } from '../services/budget.js';
+import { DIGEST_CONFIG_KEY } from '../services/digest.js';
+import { OPS_CONFIG_KEY, opsAlert } from '../services/ops-alert.js';
+import { POLICY_VERSION_KEY, policyVersion } from '../services/verdict-service.js';
+import { seedDemo, type SeedResult } from '../seeder/seed.js';
+import { SCHEMA_VERSION_KEY } from '../consumers/review-consumer.js';
+import { apiError, type ApiError } from './errors.js';
+
+export interface Admin {
+  accountId: string;
+}
+
+/** KVS markers the setup checklist reads (written where the thing happens). */
+export const VALIDATOR_SEEN_KEY = 'validator:seen';
+export const INGEST_LAST_AT_KEY = 'ingest:lastAt';
+export const BITBUCKET_KEY_COPIED_KEY = 'setup:bitbucketKeyCopied';
+
+const DAY = 86_400_000;
+const SeedSchema = z.object({ projectKey: z.string().regex(/^[A-Z][A-Z0-9_]{0,254}$/), spaceKey: z.string().regex(/^[A-Za-z0-9~_-]{1,255}$/) });
+
+export async function requireAdmin(deps: CoreDeps, a: Admin): Promise<ApiError | null> {
+  if (!a.accountId) return { error: 'forbidden', message: 'Only a Jira administrator can do this.' };
+  const r = await deps.jira.isAdmin(a.accountId);
+  if (!r.ok) return { error: 'unavailable' };
+  return r.value ? null : { error: 'forbidden', message: 'Only a Jira administrator can do this.' };
+}
+
+/** `admin.seed` (Task 24): loads the demo onto this site. Jira administrators only. */
+export async function adminSeed(deps: CoreDeps, a: Admin, payload: unknown): Promise<SeedResult | ApiError> {
+  const denied = await requireAdmin(deps, a);
+  if (denied) return denied;
+  const p = SeedSchema.safeParse(payload);
+  if (!p.success) return { error: 'validation', message: 'Give a Jira project key (like PAY) and a Confluence space key.' };
+  const r = await seedDemo(deps, p.data);
+  return r.ok ? r.value : apiError(r.error);
+}
+
+export interface SetupStatus {
+  keys: boolean;
+  sqlVersion: number;
+  validatorSeenOn: string[];
+  automationRuleSeen: boolean;
+  mcpEnabledHint: string;
+  bitbucketKeyCopied: boolean;
+}
+
+const MCP_HINT =
+  'Rovo MCP: in Atlassian Administration → Rovo → MCP server, allow the clients your team uses. Coding agents then get Redline’s tools (get-review, get-security-requirements, check-change-risk, get-merge-attestation, request-risk-acceptance, explain-threat, posture-summary) with the user’s own permissions.';
+
+/** `admin.setupStatus` (Task 24): what Redline has seen working on this site. Jira administrators only. */
+export async function adminSetupStatus(deps: CoreDeps, a: Admin, o: { signingKeys: () => Promise<boolean> }): Promise<SetupStatus | ApiError> {
+  const denied = await requireAdmin(deps, a);
+  if (denied) return denied;
+  const now = deps.clock.now().getTime();
+  const get = async <T>(k: string) => deps.state.get<T>(k).catch(() => undefined);
+  const [sql, seen, ingestAt, copied, keys] = await Promise.all([
+    get<unknown>(SCHEMA_VERSION_KEY),
+    get<Record<string, unknown>>(VALIDATOR_SEEN_KEY),
+    get<unknown>(INGEST_LAST_AT_KEY),
+    get<unknown>(BITBUCKET_KEY_COPIED_KEY),
+    o.signingKeys().catch(() => false),
+  ]);
+  const recent = (iso: unknown, days: number) => typeof iso === 'string' && now - new Date(iso).getTime() <= days * DAY;
+  return {
+    keys,
+    sqlVersion: typeof sql === 'number' ? sql : 0,
+    validatorSeenOn: Object.entries(seen && typeof seen === 'object' ? seen : {})
+      .filter(([, at]) => recent(at, 30))
+      .map(([k]) => k)
+      .sort(),
+    automationRuleSeen: recent(ingestAt, 7),
+    mcpEnabledHint: MCP_HINT,
+    bitbucketKeyCopied: copied === true,
+  };
+}
+
+// ---- Task 30: policy, warn-only, runs, usage, notifications ----
+
+export { POLICY_VERSION_KEY };
+export const RUNS_LIMIT = 50;
+const PROJECT_KEY = /^[A-Z][A-Z0-9_]{0,254}$/;
+const ISSUE_KEY = /^[A-Z][A-Z0-9_]{0,254}-\d{1,18}$/;
+const SPACE_KEY = /^[A-Za-z0-9~_-]{1,255}$/;
+const SETTLED = new Set(['ready', 'failed', 'agent_timeout']);
+
+export interface OpsConfig {
+  issueKey: string;
+  accountIds: string[];
+}
+export interface DigestConfig {
+  spaceKey: string;
+  parentPageId?: string;
+}
+export interface AdminPolicyDto {
+  policy: SitePolicy;
+  /** False until an administrator saves a policy here (the first-run wizard shows until then). */
+  saved: boolean;
+  ops: OpsConfig | null;
+  digest: DigestConfig | null;
+}
+
+const name = z.string().trim().min(1).max(255);
+const AdminPolicySchema = SitePolicySchema.superRefine((p, ctx) => {
+  const bad = p.enabledProjects.find((k) => !PROJECT_KEY.test(k));
+  if (bad !== undefined) ctx.addIssue({ code: 'custom', path: ['enabledProjects'], message: `"${bad.slice(0, 40)}" is not a Jira project key (like PAY).` });
+  if (p.enabledProjects.length > 100) ctx.addIssue({ code: 'custom', path: ['enabledProjects'], message: 'Turn Redline on for at most 100 projects.' });
+  if (p.guardedTransitions.length === 0 || p.guardedTransitions.some((t) => !name.safeParse(t).success))
+    ctx.addIssue({ code: 'custom', path: ['guardedTransitions'], message: 'Name at least one guarded transition (like Done).' });
+  if (p.reviewIssueTypes.some((t) => !name.safeParse(t).success)) ctx.addIssue({ code: 'custom', path: ['reviewIssueTypes'], message: 'Work type names cannot be empty.' });
+  for (const g of ['techLeadGroup', 'championGroup'] as const)
+    if (!name.safeParse(p[g]).success) ctx.addIssue({ code: 'custom', path: [g], message: g === 'championGroup' ? 'Name the security champions group.' : 'Name the tech leads group.' });
+  if (p.sensitivePaths.length > 200 || p.sensitivePaths.some((s) => !s.trim() || s.length > 300))
+    ctx.addIssue({ code: 'custom', path: ['sensitivePaths'], message: 'Sensitive paths are up to 200 non-empty patterns.' });
+});
+
+const firstIssue = (e: z.ZodError) => {
+  const i = e.issues[0];
+  if (!i) return 'That policy is not valid.';
+  return i.code === 'custom' ? i.message : `${i.path.join('.') || 'policy'}: ${i.message}`;
+};
+
+async function readJson<T>(deps: CoreDeps, key: string, schema: z.ZodType<T>): Promise<T | null> {
+  const v = await deps.state.get<unknown>(key).catch(() => undefined);
+  const p = schema.safeParse(v);
+  return p.success ? p.data : null;
+}
+const OpsSchema = z.object({ issueKey: z.string().regex(ISSUE_KEY), accountIds: z.array(z.string().regex(/^[A-Za-z0-9:_-]{1,128}$/)).max(10) }).strict();
+const DigestSchema = z.object({ spaceKey: z.string().regex(SPACE_KEY), parentPageId: z.string().regex(/^\d{1,20}$/).optional() }).strict();
+
+/** Bumps the policy version so every stored verdict is recomputed before it is next relied on. */
+async function bumpPolicyVersion(deps: CoreDeps): Promise<boolean> {
+  for (let i = 0; i < 2; i++) {
+    try {
+      const v = await deps.state.get<unknown>(POLICY_VERSION_KEY);
+      await deps.state.set(POLICY_VERSION_KEY, (typeof v === 'number' ? v : 0) + 1);
+      return true;
+    } catch {
+      // retry once
+    }
+  }
+  log('policy.version_bump_failed', {});
+  return false;
+}
+
+const SAVED_UNCHECKED: ApiError = {
+  error: 'unavailable',
+  message: 'The policy was saved, but Redline could not mark existing verdicts for a recheck. Save again to retry.',
+};
+
+/** `admin.getPolicy`: the site policy in force, and where alerts and the weekly digest go. */
+export async function adminGetPolicy(deps: CoreDeps, a: Admin): Promise<AdminPolicyDto | ApiError> {
+  const denied = await requireAdmin(deps, a);
+  if (denied) return denied;
+  const policy = await deps.config.site();
+  if (!policy.ok) return apiError(policy.error);
+  const [version, ops, digest] = await Promise.all([policyVersion(deps), readJson(deps, OPS_CONFIG_KEY, OpsSchema), readJson(deps, DIGEST_CONFIG_KEY, DigestSchema)]);
+  return { policy: policy.value, saved: (version ?? 0) > 0, ops, digest };
+}
+
+/**
+ * `admin.setPolicy`: validates, checks newly enabled projects exist, ledgers which fields changed, saves, and marks
+ * every stored verdict for a recheck. Warn-only windows are kept as stored: they change only through `admin.warnOnly`.
+ */
+export async function adminSetPolicy(deps: CoreDeps, a: Admin, payload: unknown): Promise<{ policy: SitePolicy } | ApiError> {
+  const denied = await requireAdmin(deps, a);
+  if (denied) return denied;
+  const raw = (payload as { policy?: unknown } | null)?.policy;
+  const current = await deps.config.site();
+  if (!current.ok) return apiError(current.error);
+  const parsed = AdminPolicySchema.safeParse(raw && typeof raw === 'object' ? { ...raw, warnOnly: current.value.warnOnly } : raw);
+  if (!parsed.success) return { error: 'validation', message: firstIssue(parsed.error) };
+  const next: SitePolicy = { ...parsed.data, enabledProjects: [...new Set(parsed.data.enabledProjects)] };
+  for (const key of next.enabledProjects.filter((k) => !current.value.enabledProjects.includes(k))) {
+    const p = await deps.jira.projectInfo(key);
+    if (!p.ok) return p.error.code === 'not_found' || p.error.code === 'forbidden' || p.error.code === 'validation' ? { error: 'validation', message: `Jira project ${key} was not found.` } : apiError(p.error);
+  }
+  const fields = (Object.keys(next) as Array<keyof SitePolicy>).filter((k) => JSON.stringify(next[k]) !== JSON.stringify(current.value[k])).sort();
+  const row = await appendLedger(deps.ledger, deps.clock, 'policy.changed', { fields }, a.accountId);
+  if (!row.ok) return apiError(row.error);
+  const saved = await deps.config.setSite(next);
+  if (!saved.ok) return apiError(saved.error);
+  if (!(await bumpPolicyVersion(deps))) return SAVED_UNCHECKED;
+  log('policy.changed', { fields: fields.join(',') });
+  return { policy: next };
+}
+
+const WarnSchema = z.object({
+  projectKey: z.string().regex(PROJECT_KEY, 'Give a Jira project key (like PAY).'),
+  days: z.number({ message: `Warn-only lasts 1 to ${WARN_ONLY_MAX_DAYS} days.` }).int(`Warn-only lasts 1 to ${WARN_ONLY_MAX_DAYS} days.`).min(1, `Warn-only lasts 1 to ${WARN_ONLY_MAX_DAYS} days.`).max(WARN_ONLY_MAX_DAYS, `Warn-only lasts 1 to ${WARN_ONLY_MAX_DAYS} days.`),
+});
+
+/** `admin.warnOnly`: the project's gate warns instead of blocking, from now, for 1 to 14 days. Ledgered; replaces any window. */
+export async function adminWarnOnly(deps: CoreDeps, a: Admin, payload: unknown): Promise<{ projectKey: string; since: string; until: string; entryHash: string } | ApiError> {
+  const denied = await requireAdmin(deps, a);
+  if (denied) return denied;
+  const p = WarnSchema.safeParse(payload);
+  if (!p.success) return { error: 'validation', message: p.error.issues[0]?.message ?? 'Invalid warn-only request.' };
+  const { projectKey, days } = p.data;
+  const policy = await deps.config.site();
+  if (!policy.ok) return apiError(policy.error);
+  if (!policy.value.enabledProjects.includes(projectKey)) return { error: 'validation', message: `Redline is not turned on for ${projectKey}.` };
+  const now = deps.clock.now();
+  const since = now.toISOString();
+  const until = new Date(now.getTime() + days * DAY).toISOString();
+  const row = await appendLedger(deps.ledger, deps.clock, 'policy.warn_only', { projectKey, since, until, days }, a.accountId);
+  if (!row.ok) return apiError(row.error);
+  const kept = policy.value.warnOnly.filter((w) => w.projectKey !== projectKey && new Date(w.until).getTime() > now.getTime());
+  const saved = await deps.config.setSite({ ...policy.value, warnOnly: [...kept, { projectKey, since, until }] });
+  if (!saved.ok) return apiError(saved.error);
+  if (!(await bumpPolicyVersion(deps))) return SAVED_UNCHECKED;
+  await opsAlert(deps, `alert:warn_only:${row.value.entryHash}`, `Redline: an administrator switched ${projectKey} to warn-only until ${until.slice(0, 16).replace('T', ' ')} UTC. Its Done gate warns instead of blocking until then. Recorded in the Redline ledger.`);
+  return { projectKey, since, until, entryHash: row.value.entryHash };
+}
+
+/** `admin.warnOnlyEnd`: ends a project's warn-only window now. Ledgered; the gate blocks again at once. */
+export async function adminWarnOnlyEnd(deps: CoreDeps, a: Admin, payload: unknown): Promise<{ projectKey: string; entryHash: string } | ApiError> {
+  const denied = await requireAdmin(deps, a);
+  if (denied) return denied;
+  const p = WarnSchema.pick({ projectKey: true }).safeParse(payload);
+  if (!p.success) return { error: 'validation', message: 'Give a Jira project key (like PAY).' };
+  const { projectKey } = p.data;
+  const policy = await deps.config.site();
+  if (!policy.ok) return apiError(policy.error);
+  const now = deps.clock.now();
+  if (!warnOnlyUntil(policy.value, projectKey, now)) return { error: 'validation', message: `${projectKey} is not in warn-only mode.` };
+  const row = await appendLedger(deps.ledger, deps.clock, 'policy.warn_only', { projectKey, ended: true, at: now.toISOString() }, a.accountId);
+  if (!row.ok) return apiError(row.error);
+  const saved = await deps.config.setSite({ ...policy.value, warnOnly: policy.value.warnOnly.filter((w) => w.projectKey !== projectKey && new Date(w.until).getTime() > now.getTime()) });
+  if (!saved.ok) return apiError(saved.error);
+  if (!(await bumpPolicyVersion(deps))) return SAVED_UNCHECKED;
+  return { projectKey, entryHash: row.value.entryHash };
+}
+
+/**
+ * `admin.resumeReviews` (final review C3): clears the out-of-credits signal (three empty agent runs in a row) so new
+ * reviews run again, for example after credits are topped up. Ledgered. The monthly budget is raised on the policy.
+ */
+export async function adminResumeReviews(deps: CoreDeps, a: Admin, _payload: unknown): Promise<{ resumed: true; entryHash: string } | ApiError> {
+  const denied = await requireAdmin(deps, a);
+  if (denied) return denied;
+  const row = await appendLedger(deps.ledger, deps.clock, 'reviews.resumed', { at: deps.clock.now().toISOString() }, a.accountId);
+  if (!row.ok) return apiError(row.error);
+  try {
+    await deps.state.set(RECENT_INGESTS_KEY, []);
+  } catch {
+    return { error: 'unavailable' };
+  }
+  return { resumed: true, entryHash: row.value.entryHash };
+}
+
+const PurgeSchema = z.object({ projectKey: z.string().regex(PROJECT_KEY), confirm: z.string() });
+
+/**
+ * `admin.purgeProject` (privacy): deletes every review, gathered fact, threat and requirement of a project Redline no
+ * longer reviews. The ledger and attestations stay (audit trail). Ledgered before anything is deleted.
+ */
+export async function adminPurgeProject(deps: CoreDeps, a: Admin, payload: unknown): Promise<{ projectKey: string; reviews: number; requirements: number; entryHash: string } | ApiError> {
+  const denied = await requireAdmin(deps, a);
+  if (denied) return denied;
+  const p = PurgeSchema.safeParse(payload);
+  if (!p.success) return { error: 'validation', message: 'Give a Jira project key (like PAY).' };
+  const { projectKey, confirm } = p.data;
+  if (confirm !== projectKey) return { error: 'validation', message: `Type ${projectKey} to confirm. This cannot be undone.` };
+  const policy = await deps.config.site();
+  if (!policy.ok) return apiError(policy.error);
+  if (policy.value.enabledProjects.includes(projectKey))
+    return { error: 'validation', message: `Redline still reviews ${projectKey}. Turn it off under Projects and transitions first, then purge.` };
+  const row = await appendLedger(deps.ledger, deps.clock, 'project.purged', { projectKey }, a.accountId);
+  if (!row.ok) return apiError(row.error);
+  const done = await deps.retention.purgeProject(projectKey);
+  if (!done.ok) return apiError(done.error);
+  await opsAlert(deps, `alert:purge:${row.value.entryHash}`, `Redline: an administrator purged ${projectKey}'s reviews (${done.value.reviews} reviews, ${done.value.requirements} requirements). The risk ledger is kept. Recorded in the Redline ledger.`);
+  return { projectKey, ...done.value, entryHash: row.value.entryHash };
+}
+
+export interface RunStage {
+  stage: string;
+  status: string;
+  error?: string;
+  at: string;
+  /** Since the previous stage (the first: since the review was created). */
+  ms: number;
+}
+export interface RunDto {
+  reviewId: string;
+  issueKey: string;
+  revision: number;
+  status: string;
+  failureReason: string | null;
+  partial: boolean;
+  samplesExpected: number;
+  samplesReceived: number;
+  tokensIn: number;
+  tokensOut: number;
+  promptVersion: string;
+  createdAt: string;
+  /** Created to settled (ready, failed or timed out); null while the review is still running. */
+  durationMs: number | null;
+  stages: RunStage[];
+}
+
+const ms = (from: string, to: string) => Math.max(0, Date.parse(to) - Date.parse(from)) || 0;
+
+/** `admin.runs`: the last 50 reviews, newest first, with their stage trace and why any failed. */
+export async function adminRuns(deps: CoreDeps, a: Admin): Promise<{ runs: RunDto[] } | ApiError> {
+  const denied = await requireAdmin(deps, a);
+  if (denied) return denied;
+  const recent = await deps.reviews.recent(RUNS_LIMIT);
+  if (!recent.ok) return apiError(recent.error);
+  const traces = await Promise.all(recent.value.map((r) => deps.reviews.stages(r.id)));
+  const runs = recent.value.map((r, i): RunDto => {
+    const t = traces[i]!;
+    let prev = r.createdAt;
+    const stages = (t.ok ? t.value : []).map((s) => {
+      const out: RunStage = { stage: s.stage, status: s.status, ...(s.error ? { error: s.error } : {}), at: s.at, ms: ms(prev, s.at) };
+      prev = s.at;
+      return out;
+    });
+    return {
+      reviewId: r.id,
+      issueKey: r.issueKey,
+      revision: r.revision,
+      status: r.status,
+      failureReason: r.failureReason ?? null,
+      partial: r.partial,
+      samplesExpected: r.samplesExpected,
+      samplesReceived: r.samplesReceived,
+      tokensIn: r.tokensIn,
+      tokensOut: r.tokensOut,
+      promptVersion: r.promptVersion,
+      createdAt: r.createdAt,
+      durationMs: SETTLED.has(r.status) ? ms(r.createdAt, r.updatedAt) : null,
+      stages,
+    };
+  });
+  return { runs };
+}
+
+export interface UsageDto {
+  month: string;
+  reviews: number;
+  tokensIn: number;
+  tokensOut: number;
+  /** Agent samples received for reviews created this month (each one is a Rovo agent run). */
+  agentSamples: number;
+  agentSamplesPerReview: number;
+  budget: SitePolicy['budget'];
+  paused: { budget: boolean; credits: boolean };
+}
+
+/** `admin.usage`: this month's reviews, tokens and agent runs against the budget, and whether reviews are paused. */
+export async function adminUsage(deps: CoreDeps, a: Admin): Promise<UsageDto | ApiError> {
+  const denied = await requireAdmin(deps, a);
+  if (denied) return denied;
+  const policy = await deps.config.site();
+  if (!policy.ok) return apiError(policy.error);
+  const now = deps.clock.now();
+  const month = monthOf(now);
+  const [u, paused, reviews] = await Promise.all([deps.usage.get(month), pauseReasons(deps, policy.value, now), deps.reviews.recent(500, `${month}-01T00:00:00.000Z`)]);
+  if (!u.ok) return apiError(u.error);
+  if (!paused.ok) return apiError(paused.error);
+  const agentSamples = reviews.ok ? reviews.value.reduce((n, r) => n + r.samplesReceived, 0) : 0;
+  return { month, ...u.value, agentSamples, agentSamplesPerReview: policy.value.agentSamples, budget: policy.value.budget, paused: paused.value };
+}
+
+const NotifySchema = z
+  .object({
+    ops: z.union([z.null(), z.object({ issueKey: z.string().trim().toUpperCase().pipe(z.string().regex(ISSUE_KEY, 'Give a work item key (like OPS-12).')), accountIds: z.array(z.string().trim().regex(/^[A-Za-z0-9:_-]{1,128}$/, 'Account IDs are letters, digits, colons and dashes.')).max(10, 'Mention at most 10 people.') }).strict()]).optional(),
+    digest: z.union([z.null(), z.object({ spaceKey: z.string().trim().regex(SPACE_KEY, 'Give a Confluence space key.'), parentPageId: z.string().trim().regex(/^\d{1,20}$/, 'The parent page ID is a number.').optional() }).strict()]).optional(),
+  })
+  .strict();
+
+/** `admin.setNotifications`: where ops alerts are commented and where the Monday digest is posted. null turns one off. */
+export async function adminSetNotifications(deps: CoreDeps, a: Admin, payload: unknown): Promise<{ ops: OpsConfig | null; digest: DigestConfig | null } | ApiError> {
+  const denied = await requireAdmin(deps, a);
+  if (denied) return denied;
+  const p = NotifySchema.safeParse(payload);
+  if (!p.success) return { error: 'validation', message: p.error.issues[0]?.message ?? 'Invalid settings.' };
+  const { ops, digest } = p.data;
+  if (ops) {
+    const i = await deps.jira.issue(ops.issueKey);
+    if (!i.ok) return i.error.code === 'not_found' || i.error.code === 'forbidden' || i.error.code === 'validation' ? { error: 'validation', message: `Work item ${ops.issueKey} was not found.` } : apiError(i.error);
+  }
+  if (digest) {
+    const s = await deps.confluence.spaceByKey(digest.spaceKey);
+    if (!s.ok) return s.error.code === 'not_found' || s.error.code === 'forbidden' || s.error.code === 'validation' ? { error: 'validation', message: `Confluence space ${digest.spaceKey} was not found.` } : apiError(s.error);
+  }
+  try {
+    if (ops === null) await deps.state.delete(OPS_CONFIG_KEY);
+    else if (ops) await deps.state.set(OPS_CONFIG_KEY, ops);
+    if (digest === null) await deps.state.delete(DIGEST_CONFIG_KEY);
+    else if (digest) await deps.state.set(DIGEST_CONFIG_KEY, { spaceKey: digest.spaceKey, ...(digest.parentPageId ? { parentPageId: digest.parentPageId } : {}) });
+  } catch {
+    return { error: 'unavailable' };
+  }
+  const [o, d] = await Promise.all([readJson(deps, OPS_CONFIG_KEY, OpsSchema), readJson(deps, DIGEST_CONFIG_KEY, DigestSchema)]);
+  return { ops: o, digest: d };
+}
+
+/** `admin.projectStatuses`: the project's workflow statuses, for picking the guarded transition. */
+export async function adminProjectStatuses(deps: CoreDeps, a: Admin, payload: unknown): Promise<{ projectKey: string; statuses: string[] } | ApiError> {
+  const denied = await requireAdmin(deps, a);
+  if (denied) return denied;
+  const p = WarnSchema.pick({ projectKey: true }).safeParse(payload);
+  if (!p.success) return { error: 'validation', message: 'Give a Jira project key (like PAY).' };
+  const r = await deps.jira.projectStatuses(p.data.projectKey);
+  if (!r.ok) return r.error.code === 'not_found' || r.error.code === 'forbidden' ? { error: 'validation', message: `Jira project ${p.data.projectKey} was not found.` } : apiError(r.error);
+  return { projectKey: p.data.projectKey, statuses: r.value };
+}

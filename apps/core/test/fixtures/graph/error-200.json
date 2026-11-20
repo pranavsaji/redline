@@ -1,0 +1,1 @@
+{ "data": { "customQuery": null }, "errors": [ { "message": "Installation not found", "extensions": { "code": "INSTALLATION_NOT_FOUND" } } ] }

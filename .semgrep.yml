@@ -1,0 +1,81 @@
+# Redline's own semgrep rules (Task 34). CI runs them together with the registry rulesets:
+#   semgrep scan --config .semgrep.yml --config p/default --config p/typescript --config p/react --config p/secrets \
+#     --metrics off --severity ERROR --error
+# Each rule pins a control from docs/SECURITY_REVIEW.md so a regression fails CI, not just a test.
+rules:
+  - id: redline-no-egress
+    message: >-
+      Forge app code must not call fetch(): Redline declares no egress and reaches Atlassian only through
+      @forge/api (requestJira, requestConfluence, requestBitbucket) or Rovo. Nothing leaves Atlassian.
+    severity: ERROR
+    languages: [typescript]
+    paths:
+      include: ['apps/core/src/**', 'apps/bitbucket/src/**', 'packages/*/src/**']
+    pattern-either:
+      - pattern: fetch(...)
+      - pattern: import { fetch } from '@forge/api'
+      - pattern: import { ..., fetch, ... } from '@forge/api'
+
+  - id: redline-no-raw-console
+    message: >-
+      Log through log() from @redline/shared (structured, with prompt text, quotes and secrets stripped), never console.*
+      directly: a raw log line can carry prompt text or a work item's content into Forge logs.
+    severity: ERROR
+    languages: [typescript]
+    paths:
+      include: ['apps/core/src/**', 'apps/bitbucket/src/**', 'packages/*/src/**']
+      exclude: ['packages/shared/src/log.ts']
+    pattern-either:
+      - pattern: console.log(...)
+      - pattern: console.info(...)
+      - pattern: console.warn(...)
+      - pattern: console.error(...)
+      - pattern: console.debug(...)
+
+  - id: redline-no-raw-html
+    message: >-
+      Threat text, quotes and design excerpts are attacker-controlled. Render them as text through React, never as
+      HTML.
+    severity: ERROR
+    languages: [typescript]
+    paths:
+      include: ['apps/core/ui/src/**', 'apps/bitbucket/ui/src/**']
+    pattern-either:
+      - pattern: <$EL dangerouslySetInnerHTML={...} />
+      - pattern: <$EL dangerouslySetInnerHTML={...}>...</$EL>
+      - pattern: $X.innerHTML = $Y
+      - pattern: $X.outerHTML = $Y
+      - pattern: document.write(...)
+
+  - id: redline-no-dynamic-code
+    message: No eval or Function constructor anywhere in Redline.
+    severity: ERROR
+    languages: [typescript]
+    paths:
+      exclude: ['**/node_modules/**', '**/dist/**', '**/build/**']
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+      - pattern: Function(...)
+
+  - id: redline-crypto-randomness
+    message: Key material, nonces and attestation ids must come from node:crypto, never Math.random.
+    severity: ERROR
+    languages: [typescript]
+    paths:
+      include: ['packages/crypto/src/**', 'apps/core/src/adapters/signing-keys.ts', 'apps/core/src/services/attestation*.ts']
+    pattern: Math.random()
+
+  - id: redline-no-model-in-validator
+    message: >-
+      The Done validator and merge check decide from stored state only. Calling a model there would let the model
+      decide a verdict and make the gate slow and non-deterministic.
+    severity: ERROR
+    languages: [typescript]
+    paths:
+      include: ['apps/core/src/validators/**', 'apps/bitbucket/src/**']
+    pattern-either:
+      - pattern: $LLM.complete(...)
+      - pattern: import '@forge/llm'
+      - pattern: import $X from '@forge/llm'
+      - pattern: import { ... } from '@forge/llm'
