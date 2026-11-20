@@ -47,3 +47,37 @@ export const ProposalFallbackSchema = z
       .max(25),
   })
   .strict();
+
+const KEYS = ['stride', 'title', 'scenario', 'component', 'likelihood', 'impact', 'evidenceIds', 'asvs', 'cwe', 'plainLanguage', 'requirement'] as const;
+const LIMITS: Record<string, number> = { title: 120, scenario: 600, component: 80, plainLanguage: 200 };
+const cut = (v: unknown, n: number) => (typeof v === 'string' && v.length > n ? `${v.slice(0, n - 1).trimEnd()}…` : v);
+const score1to5 = (v: unknown) => {
+  const n = typeof v === 'string' && /^\d+$/.test(v.trim()) ? Number(v) : v;
+  return typeof n === 'number' && Number.isFinite(n) ? Math.min(5, Math.max(1, Math.round(n))) : n;
+};
+
+/**
+ * Fits a strong model's proposal to the contract before validation: trims the model's own wording to the length limits,
+ * caps list lengths, drops keys the contract does not have, and reads "4" as 4. Evidence stays by id, so the verbatim
+ * quotes the threats rest on are untouched; a proposal that is wrong in substance still fails validation.
+ */
+export function fitProposal(raw: unknown): unknown {
+  if (typeof raw !== 'object' || raw === null || !Array.isArray((raw as { threats?: unknown }).threats)) return raw;
+  const threats = ((raw as { threats: unknown[] }).threats).slice(0, 25).map((t) => {
+    if (typeof t !== 'object' || t === null) return t;
+    const o = t as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const k of KEYS) if (o[k] !== undefined && o[k] !== null) out[k] = o[k];
+    for (const [k, n] of Object.entries(LIMITS)) if (k in out) out[k] = cut(out[k], n);
+    out.likelihood = score1to5(out.likelihood);
+    out.impact = score1to5(out.impact);
+    if (Array.isArray(out.evidenceIds)) out.evidenceIds = out.evidenceIds.slice(0, 3);
+    for (const k of ['asvs', 'cwe'] as const) if (Array.isArray(out[k])) out[k] = (out[k] as unknown[]).filter((x) => typeof x === 'string' && x.length <= 20).slice(0, 10);
+    const r = out.requirement as Record<string, unknown> | undefined;
+    if (r && typeof r === 'object') {
+      out.requirement = { title: cut(r.title, 200), given: cut(r.given, 300), when: cut(r.when, 300), then: cut(r.then, 300) };
+    }
+    return out;
+  });
+  return { threats };
+}

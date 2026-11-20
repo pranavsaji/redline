@@ -62,11 +62,35 @@ export function sqlReviewRepo(x: SqlExecutor): ReviewRepo {
       const next = ReviewSchema.safeParse({ ...cur.value, ...patch });
       if (!next.success) return err(appError('validation', 'invalid review update'));
       const v = values(next.data);
-      const r = await x.exec(
-        'UPDATE reviews SET status = ?, context_hash = ?, risk_score = ?, partial_bundle = ?, prompt_version = ?, model_ids = ?, samples_expected = ?, samples_received = ?, tokens_in = ?, tokens_out = ?, failure_reason = ?, updated_at = ? WHERE id = ?',
-        [v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[16], id],
-      );
+      // Only the fields in the patch are written, so a concurrent addUsage increment is never overwritten by a stale read.
+      const cols: Array<[keyof Review, string, unknown]> = [
+        ['status', 'status', v[4]], ['contextHash', 'context_hash', v[5]], ['riskScore', 'risk_score', v[6]], ['partial', 'partial_bundle', v[7]],
+        ['promptVersion', 'prompt_version', v[8]], ['modelIds', 'model_ids', v[9]], ['samplesExpected', 'samples_expected', v[10]],
+        ['samplesReceived', 'samples_received', v[11]], ['tokensIn', 'tokens_in', v[12]], ['tokensOut', 'tokens_out', v[13]],
+        ['failureReason', 'failure_reason', v[14]], ['updatedAt', 'updated_at', v[16]],
+      ];
+      const set = cols.filter(([k]) => k in patch);
+      if (set.length === 0) return ok(undefined);
+      const r = await x.exec(`UPDATE reviews SET ${set.map(([, c]) => `${c} = ?`).join(', ')} WHERE id = ?`, [...set.map(([, , val]) => val), id]);
       return r.ok ? ok(undefined) : r;
+    },
+    async reserveUsage(id, est, cap) {
+      const i = Math.max(0, Math.round(est.tokensIn));
+      const o = Math.max(0, Math.round(est.tokensOut));
+      const r = await x.exec('UPDATE reviews SET tokens_in = tokens_in + ?, tokens_out = tokens_out + ? WHERE id = ? AND tokens_in + ? <= ? AND tokens_out + ? <= ?', [i, o, id, i, cap.tokensIn, o, cap.tokensOut]);
+      return r.ok ? ok(r.value.affectedRows > 0) : r;
+    },
+    async addUsage(id, delta) {
+      const r = await x.exec('UPDATE reviews SET tokens_in = tokens_in + ?, tokens_out = tokens_out + ? WHERE id = ?', [Math.round(delta.tokensIn), Math.round(delta.tokensOut), id]);
+      if (!r.ok) return r;
+      if (delta.modelIds.length === 0) return ok(undefined);
+      const cur = await one(`SELECT ${COLS} FROM reviews WHERE id = ?`, [id]);
+      if (!cur.ok) return cur;
+      if (!cur.value) return err(appError('not_found', `review ${id}`));
+      const merged = [...new Set([...cur.value.modelIds, ...delta.modelIds])];
+      if (merged.length === cur.value.modelIds.length) return ok(undefined);
+      const m = await x.exec('UPDATE reviews SET model_ids = ? WHERE id = ?', [JSON.stringify(merged), id]);
+      return m.ok ? ok(undefined) : m;
     },
     async saveFacts(reviewId, facts) {
       const d = await x.exec('DELETE FROM context_facts WHERE review_id = ?', [reviewId]);

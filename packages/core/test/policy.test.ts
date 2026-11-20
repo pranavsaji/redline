@@ -10,8 +10,10 @@ describe('policy', () => {
     expect(DEFAULT_SITE_POLICY.techLeadMaxSeverity).toBe('Medium');
     expect(DEFAULT_SITE_POLICY.attestationTtlHours).toBe(24);
     expect(DEFAULT_SITE_POLICY.agentSamples).toBe(3);
-    expect(DEFAULT_SITE_POLICY.budget.tokensInPerReview).toBe(40000);
-    expect(DEFAULT_SITE_POLICY.budget.tokensOutPerReview).toBe(8000);
+    // Redline Engine (the default for new sites) makes five deep-model calls per review.
+    expect(DEFAULT_SITE_POLICY.reviewMode).toBe('engine');
+    expect(DEFAULT_SITE_POLICY.budget.tokensInPerReview).toBe(400000);
+    expect(DEFAULT_SITE_POLICY.budget.tokensOutPerReview).toBe(60000);
     expect(DEFAULT_SITE_POLICY.reviewIssueTypes).toEqual(['Epic', 'Story']);
   });
 

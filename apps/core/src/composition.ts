@@ -1,3 +1,4 @@
+import { forgeLlm } from './adapters/forge-llm.js';
 import api, { route } from '@forge/api';
 import { sqlAttestationRepo, sqlTreeHeadRepo, sqlFeedbackRepo, sqlIssueRepo, sqlLedgerRepo, sqlRequirementRepo, sqlReviewRepo, sqlUsageRepo } from '@redline/db';
 import type { CoreDeps } from './deps.js';
@@ -61,6 +62,7 @@ export function composeCore(ctx?: ForgeContext): CoreDeps {
     attestations: sqlAttestationRepo(x),
     treeHeads: sqlTreeHeadRepo(x),
     keys: kvsSigningKeys(systemClock, state),
+    llm: forgeLlm(),
     jira,
     confluence,
     gatherer: restGatherer({ jira, confluence, reviews, issues, clock: systemClock, cloudId: cloudIdOf(ctx), siteUrl: siteUrl(state) }),

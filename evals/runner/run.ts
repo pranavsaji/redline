@@ -1,7 +1,10 @@
 import { agentPrompt, automationPrompt, PROMPT_VERSION } from '@redline/prompts';
 import { appError, err, ok, severityRank, type AgentThreatModel, type ContextBundle, type Result, type Review, type Threat } from '@redline/shared';
 import {
+  applyVerification,
   assembleReview,
+  engineVerify,
+  riskScore,
   buildReviewContext,
   contextHash,
   DEFAULT_SITE_POLICY,
@@ -65,9 +68,22 @@ export async function runCase(c: CleanCase, llm: LlmPort | null, samples: number
   const b = bundleFor(c);
   const review = reviewFor(b, samples);
   if (llm && path === 'pipeline') {
-    const r = await runPipeline({ llm, reviews: memoryReviewRepo(), feedback: memoryFeedbackRepo(), clock: fixedClock('2026-11-15T00:00:00Z'), policy: DEFAULT_SITE_POLICY }, review, b, { samples });
+    // Redline Engine exactly as the product runs it: extract → proposals → assembly → verifier (skipped under injection).
+    const reviews = memoryReviewRepo();
+    await reviews.create(review);
+    const r = await runPipeline({ llm, reviews, feedback: memoryFeedbackRepo(), clock: fixedClock('2026-11-15T00:00:00Z'), policy: DEFAULT_SITE_POLICY }, review, b, { samples });
     if (!r.ok) return err(r.error);
-    return ok({ id: c.id, threats: r.value.threats, riskScore: r.value.riskScore, injectionSuspected: r.value.injectionSuspected, blocking: blockingOf(r.value.threats), quotes: r.value.threats.flatMap((t) => t.citations.map((x) => x.quote)), modelIds: [], tokensIn: 0, tokensOut: 0 });
+    let threats = r.value.threats;
+    const tainted = new Set(b.facts.filter((f) => f.injectionSuspected).map((f) => f.id));
+    if (!r.value.injectionSuspected) {
+      const usage = { tokensIn: 0, tokensOut: 0, modelIds: new Set<string>() };
+      const v = await engineVerify({ llm, policy: DEFAULT_SITE_POLICY }, threats, usage, `eval${c.id.replace(/\W/g, '')}`);
+      if (v.ok) threats = applyVerification(threats, v.value, { injectionSuspected: false, taintedFacts: tainted, blockAtOrAbove: DEFAULT_SITE_POLICY.blockAtOrAbove }).threats;
+    }
+    const score = riskScore(threats, r.value.signals);
+    const rev = await reviews.get(review.id);
+    const models = rev.ok && rev.value ? rev.value.modelIds : [];
+    return ok({ id: c.id, threats, riskScore: score, injectionSuspected: r.value.injectionSuspected, blocking: blockingOf(threats), quotes: threats.flatMap((t) => t.citations.map((x) => x.quote)), modelIds: models, tokensIn: rev.ok && rev.value ? rev.value.tokensIn : 0, tokensOut: rev.ok && rev.value ? rev.value.tokensOut : 0 });
   }
   const runs = llm
     ? await Promise.all(Array.from({ length: samples }, () => agentSample(llm, b)))

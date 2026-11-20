@@ -19,5 +19,9 @@ export const ReviewJobSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('verdict'), issueId }).strict(),
   z.object({ kind: z.literal('publish'), issueId }).strict(),
   z.object({ kind: z.literal('migrate') }).strict(),
+  /** Redline Engine: one stage of a review Redline runs itself on Forge LLMs (each stage is its own job and timeout). */
+  z
+    .object({ kind: z.literal('engine'), reviewId: z.string().min(1).max(64), stage: z.enum(['extract', 'propose', 'verify']), n: z.number().int().min(0).max(4).optional() })
+    .strict(),
 ]);
 export type ReviewJob = z.infer<typeof ReviewJobSchema>;

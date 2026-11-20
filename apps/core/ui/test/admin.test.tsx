@@ -177,6 +177,21 @@ describe('Admin: budgets (Task 30)', () => {
     expect(setPolicy).toHaveBeenCalledWith(expect.objectContaining({ reviewMode: 'rules_only' }));
   });
 
+  it('feature: an admin chooses Redline Engine; the checklist then needs no Rovo, Automation rule or review authors', async () => {
+    const api = mockAdminApi();
+    const setPolicy = vi.fn(api.setPolicy);
+    const dto = await api.getPolicy();
+    if ('error' in dto) throw new Error('fixture');
+    render(<AdminPage api={{ ...api, setPolicy, getPolicy: async () => ({ ...dto, policy: { ...dto.policy, reviewMode: 'engine' } }) }} />);
+    const list = await screen.findByRole('list', { name: 'Setup checklist' });
+    expect((await within(list).findByText(/Redline Engine runs every review itself/)).closest('li')!.textContent).toMatch(/Done/);
+    expect(within(list).getByText(/Redline Engine writes reviews itself/).closest('li')!.textContent).toMatch(/Done/);
+    const form = screen.getByRole('form', { name: 'Review mode' });
+    expect((within(form).getByRole('radio', { name: /Redline Engine \(recommended\)/ }) as HTMLInputElement).checked).toBe(true);
+    await userEvent.click(within(form).getByRole('button', { name: 'Save review mode' }));
+    expect(setPolicy).toHaveBeenCalledWith(expect.objectContaining({ reviewMode: 'engine', budget: expect.objectContaining({ tokensInPerReview: 400000, tokensOutPerReview: 60000 }) }));
+  });
+
   it('security: an admin locks AI review runs to the account that runs the Automation rule', async () => {
     const api = mockAdminApi();
     const setPolicy = vi.fn(api.setPolicy);

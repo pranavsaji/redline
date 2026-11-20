@@ -5,3 +5,4 @@ export * from './extract.js';
 export * from './propose.js';
 export * from './explain.js';
 export * from './schemas.js';
+export * from './verify.js';

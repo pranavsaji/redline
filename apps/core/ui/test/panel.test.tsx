@@ -74,6 +74,25 @@ describe('feature: rules-only reviews are labelled', () => {
   });
 });
 
+describe('feature: Redline Engine reviews', () => {
+  it('say how the review was made, and show the verifier\'s call on each threat', async () => {
+    const api = mockApi('ready');
+    const dto = await api.get();
+    if ('error' in dto) throw new Error('fixture');
+    const [a, b, ...rest] = dto.threats;
+    const threats = [
+      { ...a!, verification: { keep: true, reason: 'the design quotes a public webhook' } },
+      { ...b!, state: 'needs_human' as const, verification: { keep: false, reason: 'the quote does not mention an admin console' } },
+      ...rest,
+    ];
+    await renderState('ready', { ...api, get: async () => ({ ...dto, threats, review: { ...dto.review!, modelIds: ['claude-sonnet-5', 'claude-opus-5'], samplesReceived: 3 } }) });
+    expect(screen.getByText('Redline Engine review')).toBeTruthy();
+    expect(screen.getByText(/claude-sonnet-5, claude-opus-5/)).toBeTruthy();
+    expect(screen.getAllByText('Verified').length).toBe(1);
+    expect(screen.getByText(/The verifier doubted this: the quote does not mention an admin console/)).toBeTruthy();
+  });
+});
+
 describe('feature: rule-based checks covered by a more specific AI threat', () => {
   it('are not listed on their own; the covering threat names them', async () => {
     const api = mockApi('ready');

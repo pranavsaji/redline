@@ -1,3 +1,4 @@
+import { storeSample } from '../services/samples.js';
 import { appendLedger, extractAgentJson, type Sample } from '@redline/core';
 import { appError, err, ok, type Result } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
@@ -57,17 +58,10 @@ export async function ingestSample(deps: CoreDeps, issueKey: string, raw: string
 
   const extracted = extractAgentJson(raw, issue.value.key);
   const sample: Sample = extracted.ok ? extracted.value : { failed: extracted.error.code };
-  // Race fix: two runs arriving together read the same count; the insert of a taken number conflicts, so take the next.
-  let n = 0;
-  for (let attempt = 0; ; attempt++) {
-    const existing = await deps.reviews.samples(review.id);
-    if (!existing.ok) return existing;
-    if (existing.value.length >= review.samplesExpected) return err(appError('conflict', 'complete'));
-    n = existing.value.length + 1;
-    const saved = await deps.reviews.saveSample(review.id, n, sample);
-    if (saved.ok) break;
-    if (saved.error.code !== 'conflict' || attempt >= review.samplesExpected) return saved;
-  }
+  // Race fix: two runs arriving together get consecutive numbers (insert-only), never overwrite each other.
+  const stored = await storeSample(deps, review, sample);
+  if (!stored.ok) return stored;
+  const n = stored.value;
   // Final review C2: who wrote each agent run is on the record, so a review its own developer steered is visible.
   if (actor) {
     const row = await appendLedger(deps.ledger, deps.clock, 'review.sample', { issueId: issue.value.id, reviewId: review.id, n, valid: extracted.ok, threats: extracted.ok ? extracted.value.threats.length : 0 }, actor);
@@ -82,7 +76,7 @@ export async function ingestSample(deps: CoreDeps, issueKey: string, raw: string
 
 export type SubmitResult =
   | { saved: true; valid: boolean; received: number; expected: number; message: string }
-  | { saved: false; error: 'invalid_input' | 'invalid_token' | 'not_found' | 'not_review_author' | 'project_not_enabled' | 'complete' | 'budget' | 'rate_limited' | 'unavailable' };
+  | { saved: false; error: 'invalid_input' | 'invalid_token' | 'not_found' | 'not_review_author' | 'engine_mode' | 'project_not_enabled' | 'complete' | 'budget' | 'rate_limited' | 'unavailable' };
 
 /**
  * CREATE action the agent calls to save its threat model (Automation "take actions" runs it unattended; chat and
@@ -107,6 +101,8 @@ export async function submitThreatModel(payload: ActionPayload & { issueKey?: un
   // cannot write their own work item's threat model. The refusal is ledgered with who tried.
   const policy = await deps.config.site();
   if (!policy.ok) return deny('policy_unavailable', 'unavailable');
+  // Redline Engine writes this site's reviews itself; agent runs are not part of them.
+  if (policy.value.reviewMode === 'engine') return deny('engine_mode', 'engine_mode');
   const authors = policy.value.reviewAuthors ?? [];
   if (authors.length > 0 && !authors.includes(caller)) {
     const row = await appendLedger(deps.ledger, deps.clock, 'review.sample_rejected', { issueId: issue.value.id, issueKey: issue.value.key, reason: 'not_review_author' }, caller);
