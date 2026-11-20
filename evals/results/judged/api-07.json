@@ -6,5 +6,12 @@
       "text": "{\"verdicts\":[{\"id\":\"x1\",\"valid\":true,\"reason\":\"DoS impact differs from c1/c2 data impacts; follows from SQL injection via concatenation.\"}]}",
       "modelId": "claude-sonnet-4-5"
     }
+  ],
+  "items": [
+    {
+      "id": "x1",
+      "stride": "DenialOfService",
+      "title": "SQL injection enables resource exhaustion attacks"
+    }
   ]
 }

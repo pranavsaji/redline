@@ -6,5 +6,17 @@
       "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":true,\"reason\":\"Specific attack using unrestricted SQL editor to discover and query sensitive tables via information_schema\"},{\"id\":\"x2\",\"valid\":true,\"reason\":\"Specific mass exfiltration via export functionality, distinct from resource exhaustion in c1\"}]}\n```",
       "modelId": "claude-sonnet-4-5"
     }
+  ],
+  "items": [
+    {
+      "id": "x1",
+      "stride": "InformationDisclosure",
+      "title": "Users can enumerate database schema and discover sensitive tables"
+    },
+    {
+      "id": "x2",
+      "stride": "InformationDisclosure",
+      "title": "Users can export unlimited query results"
+    }
   ]
 }

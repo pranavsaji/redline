@@ -1,9 +1,14 @@
-import type { AgentThreat } from '@redline/shared';
+import type { AgentThreat, Stride } from '@redline/shared';
 import type { Signals } from '../context/signals.js';
 
 interface Rule {
   when: (s: Signals) => string | undefined; // returns the evidence key that triggered the rule
   threat: Omit<AgentThreat, 'evidence'>;
+  /**
+   * When a trusted AI threat covers this generic one: the STRIDE categories that count as the same kind of risk, and
+   * the words that show it is about the same thing (matched against its title, scenario and component).
+   */
+  covers: { strides: Stride[]; topic: RegExp };
 }
 
 /** Deterministic STRIDE threats derived from bundle signals. They always run, so a failed or poisoned agent run still leaves a cited review. */
@@ -16,6 +21,7 @@ const RULES: Rule[] = [
       likelihood: 3, impact: 4, asvs: ['V6.3.1', 'V7.2.1'], cwe: ['CWE-287'],
       plainLanguage: 'Someone could log in as a customer using a stolen password or session.',
     },
+    covers: { strides: ['Spoofing'], topic: /\b(auth\w*|log ?in|sign[- ]?in|session|credential|password|token|mfa|2fa|otp|impersonat\w*|account takeover|reset)/i },
   },
   {
     when: (s) => (s.dataClasses.includes('pii') ? 'pii' : undefined),
@@ -25,6 +31,7 @@ const RULES: Rule[] = [
       likelihood: 3, impact: 4, asvs: ['V8.2.1', 'V14.2.1'], cwe: ['CWE-359', 'CWE-639'],
       plainLanguage: 'Someone could see another customer’s personal details.',
     },
+    covers: { strides: ['InformationDisclosure'], topic: /\b(personal|pii|customer (data|records?|details?)|privacy|profile|address(es)?|phone|e-?mail|idor|another (user|customer)|other (users?|customers?)|enumerat\w*)/i },
   },
   {
     when: (s) => (s.payment ? 'payment' : undefined),
@@ -34,6 +41,7 @@ const RULES: Rule[] = [
       likelihood: 3, impact: 5, asvs: ['V2.3.1', 'V2.2.1'], cwe: ['CWE-841'],
       plainLanguage: 'Someone could change how much money moves, or where it goes.',
     },
+    covers: { strides: ['Tampering'], topic: /\b(payments?|amount|refunds?|payouts?|transfers?|charges?|price|currency|recipient|invoices?|checkout|money)\b/i },
   },
   {
     when: (s) => (s.dataClasses.includes('credentials') ? 'credentials' : s.dataClasses.includes('secrets') ? 'secrets' : undefined),
@@ -43,6 +51,7 @@ const RULES: Rule[] = [
       likelihood: 3, impact: 4, asvs: ['V13.3.1', 'V6.2.1'], cwe: ['CWE-798', 'CWE-522'],
       plainLanguage: 'Someone could find a password or key and use it to get in.',
     },
+    covers: { strides: ['InformationDisclosure'], topic: /\b(secrets?|api keys?|keys?|credentials?|passwords?|tokens?|signing)\b/i },
   },
   {
     when: (s) => (s.fileUpload ? 'fileUpload' : undefined),
@@ -52,6 +61,7 @@ const RULES: Rule[] = [
       likelihood: 2, impact: 4, asvs: ['V5.2.1', 'V5.3.1'], cwe: ['CWE-434'],
       plainLanguage: 'Someone could upload a harmful file that runs on our servers or in other users’ browsers.',
     },
+    covers: { strides: ['ElevationOfPrivilege', 'Tampering'], topic: /\b(upload\w*|files?|attachments?|images?)\b/i },
   },
   {
     when: (s) => (s.exposure === 'public' ? 'exposure' : undefined),
@@ -61,6 +71,7 @@ const RULES: Rule[] = [
       likelihood: 3, impact: 3, asvs: ['V2.4.1'], cwe: ['CWE-770', 'CWE-400'],
       plainLanguage: 'Someone could flood the public endpoint so real customers can’t use it, and run up our costs.',
     },
+    covers: { strides: ['DenialOfService'], topic: /\b(rate|flood\w*|exhaust\w*|denial|dos|abuse\w*|throttl\w*|quota|costs?|spam\w*|brute)/i },
   },
   {
     when: (s) => (s.llmFeatures ? 'llmFeatures' : undefined),
@@ -70,6 +81,7 @@ const RULES: Rule[] = [
       likelihood: 4, impact: 4, asvs: ['V8.3.1', 'V2.2.1'], cwe: ['CWE-1427'],
       plainLanguage: 'Someone could slip instructions into what the AI reads and make it work for them.',
     },
+    covers: { strides: ['ElevationOfPrivilege', 'Tampering', 'Spoofing'], topic: /\b(prompt injection|inject\w*|instructions?|jailbreak\w*|hijack\w*)/i },
   },
   {
     when: (s) => (s.llmFeatures ? 'llmFeatures' : undefined),
@@ -79,6 +91,7 @@ const RULES: Rule[] = [
       likelihood: 3, impact: 4, asvs: ['V8.2.1', 'V8.3.1'], cwe: ['CWE-250', 'CWE-1426'],
       plainLanguage: 'The AI could be tricked into using its tools, like refunds, in ways nobody intended.',
     },
+    covers: { strides: ['Tampering', 'ElevationOfPrivilege'], topic: /\b(tools?|tool calls?|function calls?|actions?|over-?privileg\w*|excessive agency|permissions?)\b/i },
   },
   {
     when: (s) => (s.thirdParty.length > 0 ? `thirdParty:${s.thirdParty[0]}` : undefined),
@@ -88,8 +101,19 @@ const RULES: Rule[] = [
       likelihood: 2, impact: 3, asvs: ['V12.2.1', 'V14.2.1'], cwe: ['CWE-200'],
       plainLanguage: 'Customer data could leave our systems and be exposed by another company.',
     },
+    covers: { strides: ['InformationDisclosure'], topic: /\b(third[- ]party|vendors?|providers?|external|integrations?|processors?|sent to|shared with)\b/i },
   },
 ];
+
+/**
+ * The coverage test for a rule-based threat (by title): the trusted AI threat whose kind and topic match it, if any.
+ * Used to keep a generic rule-based threat from repeating a more specific one the AI already raised.
+ */
+export function coveredByText(baselineTitle: string, candidate: { stride: Stride; title: string; scenario: string; component: string }): boolean {
+  const rule = RULES.find((r) => r.threat.title === baselineTitle);
+  if (!rule) return false;
+  return rule.covers.strides.includes(candidate.stride) && rule.covers.topic.test(`${candidate.title} ${candidate.scenario} ${candidate.component}`);
+}
 
 export function baselineThreats(signals: Signals): AgentThreat[] {
   const out: AgentThreat[] = [];

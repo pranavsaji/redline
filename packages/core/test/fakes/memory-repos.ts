@@ -132,6 +132,10 @@ export function memoryRequirementRepo(): RequirementRepo {
       reqs.set(r.id, clone(r));
       return ok(undefined);
     },
+    async remove(id) {
+      reqs.delete(id);
+      return ok(undefined);
+    },
   };
 }
 

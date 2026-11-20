@@ -37,6 +37,51 @@ async function settled(champion = true) {
 const verdict = (t: ReturnType<typeof coreDeps>) => t.verdicts._written.get(ISSUE) as Verdict & { message: string };
 const reqs = async (t: ReturnType<typeof coreDeps>) => ((await t.deps.requirements.forIssue(ISSUE)) as { ok: true; value: Requirement[] }).value;
 
+describe('feature: covered rule-based threats come back when their covering AI threat goes', () => {
+  const covering: AgentThreatModel = {
+    ...twoThreats,
+    threats: [
+      ...twoThreats.threats,
+      { stride: 'InformationDisclosure', title: 'Another customer’s personal data returned by the refund lookup', scenario: 'A caller passes another customer’s order id and gets their email address.', component: 'refund lookup', likelihood: 4, impact: 4, evidence: [{ quote: 'customer email address' }] },
+    ],
+  };
+  async function coveredSetup() {
+    const t = coreDeps({ issues: [jiraIssue({ id: ISSUE, key: 'PAY-7' })] });
+    t.jira.groupsOf = async () => ok([CHAMPIONS]);
+    await handleJob(t.deps, { kind: 'gather', issueId: ISSUE, reason: 'created' });
+    const rev = (await t.deps.reviews.latest(ISSUE)) as { ok: true; value: { id: string } };
+    for (let n = 1; n <= 3; n++) {
+      await t.deps.reviews.saveSample(rev.value.id, n, covering);
+      await handleJob(t.deps, { kind: 'assemble', reviewId: rev.value.id });
+    }
+    const all = async () => ((await t.deps.reviews.threats(rev.value.id)) as { ok: true; value: Threat[] }).value;
+    return { t, all };
+  }
+
+  it('dismissing the covering AI threat makes the rule-based one active again, with its requirement', async () => {
+    const { t, all } = await coveredSetup();
+    const before = await all();
+    const pii = before.find((x) => x.origin === 'baseline' && x.title === 'Personal data exposed to unauthorised users')!;
+    const cover = before.find((x) => x.id === pii.coveredBy)!;
+    expect(pii.state).toBe('covered');
+    expect((await reqs(t)).some((r) => r.threatId === pii.id)).toBe(false);
+    await threatsTriage(t.deps, who, { threatId: cover.id, op: 'dismiss', reason: 'false_positive' });
+    const after = (await all()).find((x) => x.id === pii.id)!;
+    expect(after.state).toBe('accepted');
+    expect(after.coveredBy).toBeUndefined();
+    expect((await reqs(t)).some((r) => r.threatId === pii.id)).toBe(true);
+  });
+
+  it('merging the covering AI threat into another one also brings the rule-based one back', async () => {
+    const { t, all } = await coveredSetup();
+    const before = await all();
+    const pii = before.find((x) => x.origin === 'baseline' && x.title === 'Personal data exposed to unauthorised users')!;
+    const leak = before.find((x) => x.title === 'Customer email leaks in webhook logs')!;
+    await threatsTriage(t.deps, who, { threatId: pii.coveredBy!, op: 'merge', intoThreatId: leak.id });
+    expect((await all()).find((x) => x.id === pii.id)!.state).toBe('accepted');
+  });
+});
+
 describe('threats.triage (TM-7)', () => {
   it('only a security champion can triage', async () => {
     const { t, forged } = await settled(false);

@@ -15,8 +15,8 @@ import {
 } from '@redline/core';
 import { CLEAN_CASES, POISONED_CASES, type CleanCase, type PoisonedCase } from '../fixtures/cases.js';
 import { scoreCase, summarize, type CaseResult } from './metrics.js';
-import { loadRecording, recordingLlm, replayLlm, saveRecording } from './recorded.js';
-import { JUDGE_VERSION, judgeExtras, type JudgeItem } from './judge.js';
+import { loadRecording, recordingLlm, replayLlm, saveRecording, type Recording } from './recorded.js';
+import { JUDGE_VERSION, judgeExtras, parseJudge, type JudgeItem } from './judge.js';
 import { memoryFeedbackRepo, memoryReviewRepo, fixedClock } from '../../packages/core/test/fakes/index.js';
 
 export type EvalPath = 'agent' | 'pipeline';
@@ -61,7 +61,7 @@ export interface CaseRun {
 const blockingOf = (threats: Threat[]) =>
   threats.filter((t) => (t.state === 'accepted' || t.state === 'needs_human') && severityRank(t.severity) >= severityRank(DEFAULT_SITE_POLICY.blockAtOrAbove)).length;
 
-export async function runCase(c: CleanCase, llm: LlmPort | null, samples: number, path: EvalPath): Promise<Result<CaseRun>> {
+export async function runCase(c: CleanCase, llm: LlmPort | null, samples: number, path: EvalPath, coverage = true): Promise<Result<CaseRun>> {
   const b = bundleFor(c);
   const review = reviewFor(b, samples);
   if (llm && path === 'pipeline') {
@@ -77,7 +77,7 @@ export async function runCase(c: CleanCase, llm: LlmPort | null, samples: number
     const code = (runs[0]!.sample as { failed: string }).failed;
     return err(appError(code === 'timeout' ? 'timeout' : 'upstream', `every sample failed: ${runs.map((x) => (x.sample as { failed: string }).failed).join(', ')}`));
   }
-  const out = assembleReview({ review, bundle: b, samples: runs.map((x) => x.sample), samplesExpected: samples, priorDismissed: [], policy: DEFAULT_SITE_POLICY, promptVersion: PROMPT_VERSION, now: new Date('2026-11-15T00:00:00Z') });
+  const out = assembleReview({ review, bundle: b, samples: runs.map((x) => x.sample), samplesExpected: samples, priorDismissed: [], policy: DEFAULT_SITE_POLICY, promptVersion: PROMPT_VERSION, now: new Date('2026-11-15T00:00:00Z'), coverage });
   return ok({
     id: c.id,
     threats: out.threats,
@@ -117,6 +117,8 @@ export interface EvalReport {
   tokens: { in: number; out: number };
   failures: string[];
   perCase: Array<{ id: string; tp: number; fp: number; fn: number; riskScore: number; blocking: number; injectionHeld?: boolean; judgedValid?: number }>;
+  /** Judged extras from each rule-based threat (by title): how often the judge rated the rule's threat valid. */
+  baselineRules?: Array<{ title: string; extras: number; valid: number }>;
 }
 
 export interface EvalOptions {
@@ -137,7 +139,19 @@ export interface EvalOptions {
    * Grade each reported threat that is not on the case's must-find list with a separate model call (offline eval only).
    * llmFor returns the judge for a case (null: no recording, the case is not judged); recordDir saves live replies.
    */
-  judge?: { llmFor: (caseId: string) => LlmPort | null; recordDir?: string };
+  judge?: {
+    llmFor: (caseId: string) => LlmPort | null;
+    recordDir?: string;
+    /**
+     * A case's judge recording. When it lists the items it rated, the recorded verdicts are matched to today's extras by
+     * STRIDE and title, so removing some extras (for example, rule-based threats now covered) keeps the others judged.
+     */
+    recordingFor?: (caseId: string) => Recording | null;
+    /** Write the rated items into recordings that lack them (run once with the review code that made the recording). */
+    annotateDir?: string;
+  };
+  /** Off only to re-create how reviews looked before rule-based coverage existed (see judge.annotateDir). */
+  coverage?: boolean;
 }
 
 export async function runEval(opts: EvalOptions): Promise<Result<EvalReport>> {
@@ -160,13 +174,13 @@ export async function runEval(opts: EvalOptions): Promise<Result<EvalReport>> {
         batch.map(async (c) => {
           if (opts.llmFor) {
             const llm = opts.llmFor(c.id);
-            return llm ? runCase(c, llm, opts.samples, opts.path) : err(appError('not_found', 'no recording'));
+            return llm ? runCase(c, llm, opts.samples, opts.path, opts.coverage) : err(appError('not_found', 'no recording'));
           }
-          if (!opts.recordDir || !opts.llm) return runCase(c, opts.llm, opts.samples, opts.path);
+          if (!opts.recordDir || !opts.llm) return runCase(c, opts.llm, opts.samples, opts.path, opts.coverage);
           const done = opts.resume ? loadRecording(opts.recordDir, c.id) : null;
-          if (done && done.replies.length >= opts.samples) return runCase(c, replayLlm(done), opts.samples, opts.path);
+          if (done && done.replies.length >= opts.samples) return runCase(c, replayLlm(done), opts.samples, opts.path, opts.coverage);
           const rec = recordingLlm(opts.llm);
-          const r = await runCase(c, rec.llm, opts.samples, opts.path);
+          const r = await runCase(c, rec.llm, opts.samples, opts.path, opts.coverage);
           if (r.ok) saveRecording(opts.recordDir, { caseId: c.id, promptVersion: PROMPT_VERSION, replies: rec.replies() });
           return r;
         }),
@@ -192,6 +206,7 @@ export async function runEval(opts: EvalOptions): Promise<Result<EvalReport>> {
     return run.quotes.filter((q) => groundQuote(q, facts).grounding === 'supported').length;
   };
 
+  const ruleStats = new Map<string, { extras: number; valid: number }>();
   const toJudge: Array<{ c: CleanCase; counted: JudgeItem[]; extras: JudgeItem[]; extraOrigins: Array<'agent' | 'baseline'>; split: NonNullable<CaseResult['judgedByOrigin']>; result: CaseResult; row: EvalReport['perCase'][number] }> = [];
   await runAll(clean, (c, run) => {
     cleanRuns.set(c.id, run);
@@ -222,6 +237,27 @@ export async function runEval(opts: EvalOptions): Promise<Result<EvalReport>> {
             result.judgedByOrigin = split;
             return;
           }
+          const rec0 = judge.recordingFor?.(c.id) ?? null;
+          const key = (x: { stride: string; title: string }) => `${x.stride}|${x.title}`;
+          if (rec0?.items && rec0.replies[0]) {
+            const parsed = parseJudge(rec0.replies[0].text, rec0.items.map((x) => x.id));
+            if (parsed.ok) {
+              const byKey = new Map(rec0.items.map((it) => [key(it), parsed.value.find((v) => v.id === it.id)?.valid ?? false] as const));
+              if (extras.every((e) => byKey.has(key(e)))) {
+                const valid = extras.map((e) => byKey.get(key(e))!);
+                result.judgedValid = row.judgedValid = valid.filter(Boolean).length;
+                valid.forEach((v, k) => {
+                  if (v) split[extraOrigins[k]!].valid++;
+                  if (extraOrigins[k] === 'baseline') {
+                    const r = ruleStats.get(extras[k]!.title) ?? { extras: 0, valid: 0 };
+                    ruleStats.set(extras[k]!.title, { extras: r.extras + 1, valid: r.valid + (v ? 1 : 0) });
+                  }
+                });
+                result.judgedByOrigin = split;
+                return;
+              }
+            }
+          }
           const base = judge.llmFor(c.id);
           if (!base) {
             failures.push(`judge ${c.id}: not_found (no recorded judge reply)`);
@@ -234,10 +270,17 @@ export async function runEval(opts: EvalOptions): Promise<Result<EvalReport>> {
             failures.push(`judge ${c.id}: ${v.error.code} (${v.error.message}${why ? `: ${why}` : ''})`);
             return;
           }
-          if (rec && judge.recordDir) saveRecording(judge.recordDir, { caseId: c.id, promptVersion: JUDGE_VERSION, replies: rec.replies() });
+          const items = extras.map((e) => ({ id: e.id, stride: e.stride, title: e.title }));
+          if (rec && judge.recordDir) saveRecording(judge.recordDir, { caseId: c.id, promptVersion: JUDGE_VERSION, replies: rec.replies(), items });
+          else if (judge.annotateDir && rec0 && !rec0.items) saveRecording(judge.annotateDir, { ...rec0, items });
           result.judgedValid = row.judgedValid = v.value.filter((x) => x.valid).length;
           v.value.forEach((x, k) => {
             if (x.valid) split[extraOrigins[k]!].valid++;
+            if (extraOrigins[k] === 'baseline') {
+              const t = extras[k]!.title;
+              const r = ruleStats.get(t) ?? { extras: 0, valid: 0 };
+              ruleStats.set(t, { extras: r.extras + 1, valid: r.valid + (x.valid ? 1 : 0) });
+            }
           });
           result.judgedByOrigin = split;
         }),
@@ -271,6 +314,7 @@ export async function runEval(opts: EvalOptions): Promise<Result<EvalReport>> {
     tokens: { in: tin, out: tout },
     failures,
     perCase,
+    ...(ruleStats.size ? { baselineRules: [...ruleStats].map(([title, v]) => ({ title, ...v })).sort((a, b) => b.extras - a.extras || a.title.localeCompare(b.title)) } : {}),
   });
 }
 
@@ -300,6 +344,16 @@ ${s.judgedPrecision === undefined ? '' : `| Precision, judged | ${pct(s.judgedPr
 | STRIDE | TP | FP | FN | Precision | Recall | F1 |
 | --- | --- | --- | --- | --- | --- | --- |
 ${rows}
+${
+  r.baselineRules?.length
+    ? `
+Rule-based floor, judged (extras only; matches to must-find threats are not listed):
 
+| Rule-based threat | Extras | Rated valid |
+| --- | --- | --- |
+${r.baselineRules.map((b) => `| ${b.title} | ${b.extras} | ${b.valid} (${pct(b.extras ? b.valid / b.extras : 0)}) |`).join('\n')}
+`
+    : ''
+}
 ${r.failures.length ? `Failures: ${r.failures.join(', ')}\n` : ''}`;
 }

@@ -6,5 +6,22 @@
       "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":false,\"reason\":\"Design has no user-facing requests; threat describes customer-to-customer access not in scope\"},{\"id\":\"x2\",\"valid\":false,\"reason\":\"Attacks job scheduler and network components not mentioned in design; generic job authentication\"},{\"id\":\"x3\",\"valid\":true,\"reason\":\"Copy operation is in design; integrity failure specific to export with material analyst impact\"}]}\n```",
       "modelId": "claude-sonnet-4-5"
     }
+  ],
+  "items": [
+    {
+      "id": "x1",
+      "stride": "InformationDisclosure",
+      "title": "Personal data exposed to unauthorised users"
+    },
+    {
+      "id": "x2",
+      "stride": "Spoofing",
+      "title": "Export job runs without authenticated identity"
+    },
+    {
+      "id": "x3",
+      "stride": "Tampering",
+      "title": "No integrity verification of exported customer data"
+    }
   ]
 }

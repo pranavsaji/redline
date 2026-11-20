@@ -6,5 +6,32 @@
       "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":false,\"reason\":\"Duplicate of c1: both describe automated fake sign-ups exploiting referral codes to drain credit budget\"},{\"id\":\"x2\",\"valid\":false,\"reason\":\"Design mentions no data request mechanism or records; threat assumes capabilities not in design\"},{\"id\":\"x3\",\"valid\":false,\"reason\":\"Generic hygiene: 'log everything' listed as invalid unless design makes it material; absence unmentioned\"},{\"id\":\"x4\",\"valid\":false,\"reason\":\"Speculates implementation details: design does not describe concurrency model or database locking approach\"},{\"id\":\"x5\",\"valid\":false,\"reason\":\"Speculates implementation: design does not specify referral code format or generation method\"}]}\n```",
       "modelId": "claude-sonnet-4-5"
     }
+  ],
+  "items": [
+    {
+      "id": "x1",
+      "stride": "ElevationOfPrivilege",
+      "title": "Unlimited credit generation through automated self-referral"
+    },
+    {
+      "id": "x2",
+      "stride": "InformationDisclosure",
+      "title": "Personal data exposed to unauthorised users"
+    },
+    {
+      "id": "x3",
+      "stride": "Repudiation",
+      "title": "No audit logging for financial transactions"
+    },
+    {
+      "id": "x4",
+      "stride": "Tampering",
+      "title": "Race condition in credit allocation could duplicate rewards"
+    },
+    {
+      "id": "x5",
+      "stride": "InformationDisclosure",
+      "title": "Referral codes may be enumerable, revealing which users exist"
+    }
   ]
 }

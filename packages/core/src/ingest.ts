@@ -20,7 +20,7 @@ import {
 import { sha256Hex } from '@redline/crypto';
 import { extractSignals, type Signals } from './context/signals.js';
 import { htmlToText } from './context/normalize.js';
-import { baselineThreats } from './baseline/rules.js';
+import { baselineThreats, coveredByText } from './baseline/rules.js';
 import { clusterSamples, consensus, similar } from './threats/cluster.js';
 import { groundQuote } from './threats/grounding.js';
 import { mapThreat } from './threats/mapping.js';
@@ -134,6 +134,8 @@ export interface AssembleInput {
   mode?: 'progress' | 'final';
   /** Extra injection signal from outside the facts (e.g. the quarantined extractor flagged the material). */
   injectionSuspected?: boolean;
+  /** Off only to replay how a review looked before coverage existed (eval recordings); default on. */
+  coverage?: boolean;
   /**
    * R7: the previous revision's threats and facts. Threats whose citations all point at unchanged sources are carried
    * over with their votes, state and triage; agent output then only adds threats (or raises a carried one's severity).
@@ -313,7 +315,25 @@ export function assembleReview(i: AssembleInput): AssembleOutput {
     });
   }
 
-  if (i.prior) carryOver(threats, i.prior, facts, i.review.id, injectionSuspected);
+  const carried = i.prior ? carryOver(threats, i.prior, facts, i.review.id, injectionSuspected) : new Set<string>();
+
+  // 3. Noise: a generic rule-based threat stands back (state `covered`) when a trusted AI threat (majority-voted,
+  // quoted word for word, untouched by injection) of the same kind, on the same topic and at least as severe covers it.
+  // It stays stored and comes back if that AI threat is dismissed. Its framework mappings move to the AI threat. Never
+  // under suspected injection (attacker text must not steer what is shown), and never for a rule-based threat carried
+  // from an earlier revision, whose triage stands.
+  if (!injectionSuspected && i.coverage !== false) {
+    for (const b of threats) {
+      if (b.origin !== 'baseline' || b.state !== 'accepted' || carried.has(b.id)) continue;
+      const cover = threats.find(
+        (t) => t.origin === 'agent' && t.state === 'accepted' && t.grounding === 'supported' && severityRank(t.severity) >= severityRank(b.severity) && coveredByText(b.title, t),
+      );
+      if (!cover) continue;
+      cover.mappings = mergeMappings(cover.mappings, b.mappings);
+      b.state = 'covered';
+      b.coveredBy = cover.id;
+    }
+  }
 
   threats.sort((a, b) => severityRank(b.severity) - severityRank(a.severity) || b.votes - a.votes || a.title.localeCompare(b.title));
 
@@ -340,13 +360,15 @@ export function assembleReview(i: AssembleInput): AssembleOutput {
  * needs_human is never downgraded), and when the material shows injection an earlier dismissal does not suppress the
  * fresh threat. Severity only rises. Prior threats citing a changed or removed source are not carried.
  */
-function carryOver(threats: Threat[], prior: NonNullable<AssembleInput['prior']>, facts: readonly ContextFact[], reviewId: string, injectionSuspected: boolean): void {
+function carryOver(threats: Threat[], prior: NonNullable<AssembleInput['prior']>, facts: readonly ContextFact[], reviewId: string, injectionSuspected: boolean): Set<string> {
   const present = new Set(facts.map((f) => f.id));
   const unchanged = new Set(prior.facts.map((f) => f.id).filter((id) => present.has(id)));
   const onlyUnchanged = (t: Pick<Threat, 'citations'>) => t.citations.length > 0 && t.citations.every((c) => unchanged.has(c.factId));
   const { keep } = threatsToReevaluate([...prior.threats], prior.facts, diffBundles(prior.facts, facts));
   const matched = new Set<number>();
   for (const old of keep) {
+    // A covered rule-based threat is not a decision: coverage is worked out afresh for each revision.
+    if (old.state === 'covered') continue;
     if (!onlyUnchanged(old)) continue;
     const id = threatId(reviewId, old.origin, old.stride, old.title);
     const idx = threats.findIndex((t, n) => !matched.has(n) && onlyUnchanged(t) && similar(t, old, { ignoreComponent: true }));
@@ -373,6 +395,7 @@ function carryOver(threats: Threat[], prior: NonNullable<AssembleInput['prior']>
       matched.add(threats.length - 1);
     }
   }
+  return new Set([...matched].map((n) => threats[n]!.id));
 }
 
 export const isBlockingSeverity = (t: Pick<Threat, 'severity'>, policy: Pick<SitePolicy, 'blockAtOrAbove'>): boolean =>

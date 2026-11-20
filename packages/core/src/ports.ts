@@ -93,6 +93,8 @@ export interface RequirementRepo {
   forIssue(issueId: string): Promise<Result<Requirement[]>>;
   get(id: string): Promise<Result<Requirement | null>>;
   upsert(r: Requirement): Promise<Result<void>>;
+  /** Removes a requirement row nobody has started (used when its rule-based threat becomes covered). */
+  remove(id: string): Promise<Result<void>>;
 }
 
 export type LedgerEventType =

@@ -49,7 +49,7 @@ describe('offline eval gate', () => {
       const rec = loadRecording(dir, id);
       return rec ? replayLlm(rec) : null;
     };
-    const r = await runEval({ llm: null, llmName: 'recorded', subset: base.subset, samples: base.samples, path: 'agent', llmFor: replay(RECORDED), judge: { llmFor: replay(JUDGED) } });
+    const r = await runEval({ llm: null, llmName: 'recorded', subset: base.subset, samples: base.samples, path: 'agent', llmFor: replay(RECORDED), judge: { llmFor: replay(JUDGED), recordingFor: (id) => loadRecording(JUDGED, id) } });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     // A changed set of extras no longer lines up with the recorded verdicts: that fails here instead of scoring stale.

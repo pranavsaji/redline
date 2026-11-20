@@ -6,5 +6,27 @@
       "text": "{\"verdicts\":[{\"id\":\"x1\",\"valid\":false,\"reason\":\"No attacker; describes regulatory audit and consequences, not an attack\"},{\"id\":\"x2\",\"valid\":true,\"reason\":\"Follows design; specific insider threat; not duplicate of external SQL injection attack\"},{\"id\":\"x3\",\"valid\":false,\"reason\":\"Generic auth attack; design doesn't describe authentication mechanisms\"},{\"id\":\"x4\",\"valid\":false,\"reason\":\"Payment processing attack unrelated to logging; design doesn't describe payment handling\"}]}",
       "modelId": "claude-sonnet-4-5"
     }
+  ],
+  "items": [
+    {
+      "id": "x1",
+      "stride": "InformationDisclosure",
+      "title": "PII in logs violates data protection regulations"
+    },
+    {
+      "id": "x2",
+      "stride": "Spoofing",
+      "title": "Logged session tokens enable persistent account hijacking"
+    },
+    {
+      "id": "x3",
+      "stride": "Spoofing",
+      "title": "Account takeover through weak authentication"
+    },
+    {
+      "id": "x4",
+      "stride": "Tampering",
+      "title": "Payment amount or recipient manipulated"
+    }
   ]
 }

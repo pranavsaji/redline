@@ -6,5 +6,27 @@
       "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"x1\",\n      \"valid\": true,\n      \"reason\": \"Valid SAML replay attack; specific attacker action and harm; distinct from role manipulation or IdP attacks.\"\n    },\n    {\n      \"id\": \"x2\",\n      \"valid\": false,\n      \"reason\": \"Design uses SAML SSO not password auth; mentions customers when design specifies employees; doesn't follow design.\"\n    },\n    {\n      \"id\": \"x3\",\n      \"valid\": true,\n      \"reason\": \"Valid XML wrapping attack on SAML; specific mechanism exploiting parser/validator; distinct from role attribute manipulation.\"\n    },\n    {\n      \"id\": \"x4\",\n      \"valid\": true,\n      \"reason\": \"Valid entity expansion attack on SAML XML parser; material to feature's authentication mechanism; causes DoS.\"\n    }\n  ]\n}\n```",
       "modelId": "claude-sonnet-4-5"
     }
+  ],
+  "items": [
+    {
+      "id": "x1",
+      "stride": "Spoofing",
+      "title": "SAML assertion replay allows reuse of stolen authentication tokens"
+    },
+    {
+      "id": "x2",
+      "stride": "Spoofing",
+      "title": "Account takeover through weak authentication"
+    },
+    {
+      "id": "x3",
+      "stride": "Spoofing",
+      "title": "XML signature wrapping attack allows assertion content replacement"
+    },
+    {
+      "id": "x4",
+      "stride": "DenialOfService",
+      "title": "XML entity expansion attack crashes SAML parser or exhausts memory"
+    }
   ]
 }

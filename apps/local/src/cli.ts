@@ -92,7 +92,17 @@ async function main() {
       onProgress: (d, t) => process.stderr.write(`\r${d}/${t}`),
       ...(llm ? { recordDir: RECORDED, resume: has('resume') } : {}),
       ...(recorded ? { llmFor: (id: string) => { const rec = loadRecording(RECORDED, id); return rec ? replayLlm(rec) : null; } } : {}),
-      ...(judgeWith ? { judge: { llmFor: judgeFor, ...(judgeLive ? { recordDir: JUDGED } : {}) } } : {}),
+      ...(judgeWith
+        ? {
+            judge: {
+              llmFor: judgeFor,
+              recordingFor: (id: string) => loadRecording(JUDGED, id),
+              ...(judgeLive ? { recordDir: JUDGED } : {}),
+              ...(has('annotate-judged') ? { annotateDir: JUDGED } : {}),
+            },
+          }
+        : {}),
+      ...(has('no-coverage') ? { coverage: false } : {}),
     });
     process.stderr.write('\n');
     if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);

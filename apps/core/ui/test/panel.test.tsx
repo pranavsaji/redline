@@ -74,6 +74,17 @@ describe('feature: rules-only reviews are labelled', () => {
   });
 });
 
+describe('feature: rule-based checks covered by a more specific AI threat', () => {
+  it('are not listed on their own; the covering threat names them', async () => {
+    const api = mockApi('ready');
+    const dto = await api.get();
+    if ('error' in dto) throw new Error('fixture');
+    const cover = dto.threats[0]!;
+    await renderState('ready', { ...api, get: async () => ({ ...dto, covered: [{ title: 'Tool misuse by an over-privileged agent', coveredBy: cover.id }] }) });
+    expect(screen.getByText("Also covers Redline's rule-based check: Tool misuse by an over-privileged agent.")).toBeTruthy();
+  });
+});
+
 describe('feature: fix-by dates and test skeletons on requirements', () => {
   it('shows when each open requirement is due, and how overdue it is', async () => {
     const api = mockApi('ready');

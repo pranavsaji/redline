@@ -6,5 +6,37 @@
       "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"x1\",\n      \"valid\": true,\n      \"reason\": \"SFTP server requires credentials; insecure storage is plausible threat to this design component.\"\n    },\n    {\n      \"id\": \"x2\",\n      \"valid\": false,\n      \"reason\": \"Design specifies CSV files. Billion laughs and XML entity expansion don't apply to CSV.\"\n    },\n    {\n      \"id\": \"x3\",\n      \"valid\": true,\n      \"reason\": \"File processing involves filenames. Command injection via unsafe handling is specific, plausible attack.\"\n    },\n    {\n      \"id\": \"x4\",\n      \"valid\": false,\n      \"reason\": \"Generic 'log everything' hygiene. Describes missing control, not a specific attack on feature.\"\n    },\n    {\n      \"id\": \"x5\",\n      \"valid\": true,\n      \"reason\": \"SFTP authentication required by design. Weak authentication enabling takeover is specific, plausible threat.\"\n    },\n    {\n      \"id\": \"x6\",\n      \"valid\": false,\n      \"reason\": \"Too vague. Doesn't specify attack mechanism, dangerous type, or execution method. No concrete threat.\"\n    }\n  ]\n}\n```",
       "modelId": "claude-sonnet-4-5"
     }
+  ],
+  "items": [
+    {
+      "id": "x1",
+      "stride": "InformationDisclosure",
+      "title": "Insecure storage of SFTP credentials"
+    },
+    {
+      "id": "x2",
+      "stride": "DenialOfService",
+      "title": "Billion laughs attack through nested CSV structures"
+    },
+    {
+      "id": "x3",
+      "stride": "ElevationOfPrivilege",
+      "title": "Command injection through malicious filenames"
+    },
+    {
+      "id": "x4",
+      "stride": "Repudiation",
+      "title": "Missing audit trail for file uploads and processing"
+    },
+    {
+      "id": "x5",
+      "stride": "Spoofing",
+      "title": "Partner account takeover through weak SFTP authentication"
+    },
+    {
+      "id": "x6",
+      "stride": "ElevationOfPrivilege",
+      "title": "Malicious file upload executes code"
+    }
   ]
 }

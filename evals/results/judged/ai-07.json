@@ -6,5 +6,37 @@
       "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":false,\"reason\":\"Database breach exposing unencrypted data is generic security hygiene, not specific to memory feature\"},{\"id\":\"x2\",\"valid\":false,\"reason\":\"Design mentions no admin privileges, restrictions, or access controls that false memories could bypass\"},{\"id\":\"x3\",\"valid\":true,\"reason\":\"Storing malicious instructions that execute when memories load is specific attack on automatic memory mechanism\"},{\"id\":\"x4\",\"valid\":false,\"reason\":\"Generic prompt injection description applicable to any chatbot, not specific to memory storage feature\"},{\"id\":\"x5\",\"valid\":true,\"reason\":\"Flooding automatic memory writing to exhaust storage is specific denial of service on this feature\"},{\"id\":\"x6\",\"valid\":false,\"reason\":\"Design describes chatbot with memory store, mentions no agent tools to misuse\"}]}\n```",
       "modelId": "claude-sonnet-4-5"
     }
+  ],
+  "items": [
+    {
+      "id": "x1",
+      "stride": "InformationDisclosure",
+      "title": "Sensitive Data Stored in Cleartext"
+    },
+    {
+      "id": "x2",
+      "stride": "ElevationOfPrivilege",
+      "title": "Goal Hijacking via False Memory Claims"
+    },
+    {
+      "id": "x3",
+      "stride": "ElevationOfPrivilege",
+      "title": "Persistent prompt injection via stored memories"
+    },
+    {
+      "id": "x4",
+      "stride": "ElevationOfPrivilege",
+      "title": "Agent goal hijack through injected instructions"
+    },
+    {
+      "id": "x5",
+      "stride": "DenialOfService",
+      "title": "Memory Exhaustion Attack"
+    },
+    {
+      "id": "x6",
+      "stride": "Tampering",
+      "title": "Tool misuse by an over-privileged agent"
+    }
   ]
 }

@@ -135,6 +135,18 @@ export async function applyTriage(
       break;
     }
   }
+  // A rule-based threat covered by a threat that is now dismissed (dismiss, merge, split) is active again, with its
+  // requirement: dismissing the specific AI threat must never take the generic rule-based floor with it.
+  const gone = new Set(changed.filter((c) => c.state === 'dismissed').map((c) => c.id));
+  for (const b of all.filter((x) => x.state === 'covered' && x.coveredBy && gone.has(x.coveredBy))) {
+    const { coveredBy: _c, ...rest } = b;
+    const back: Threat = { ...rest, state: 'accepted' };
+    const u = await deps.reviews.updateThreat(b.id, { state: 'accepted', coveredBy: undefined });
+    if (!u.ok) return u;
+    const s = await syncRequirement(deps, issue, back);
+    if (!s.ok) return s;
+    changed.push(back);
+  }
   await refreshVerdict(deps, issue.id);
   await deps.queue.push([{ kind: 'propagate', issueId: issue.id }]);
   return ok(changed);
