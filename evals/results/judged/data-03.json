@@ -6,5 +6,27 @@
       "text": "{\"verdicts\":[{\"id\":\"x1\",\"valid\":false,\"reason\":\"Duplicate of c1: same attack path (compromised service subscribes to topic) and harm (payment data access)\"},{\"id\":\"x2\",\"valid\":true,\"reason\":\"Audit trail for event sources is specific to streaming feature and material for incident response\"},{\"id\":\"x3\",\"valid\":false,\"reason\":\"Threat describes payment processing pipeline not event streaming; design only covers events after execution\"},{\"id\":\"x4\",\"valid\":true,\"reason\":\"Specific tampering threat on events in Kafka; distinct from spoofing (c2) which injects new events\"}]}",
       "modelId": "claude-sonnet-4-5"
     }
+  ],
+  "items": [
+    {
+      "id": "x1",
+      "stride": "ElevationOfPrivilege",
+      "title": "Compromised low-privilege service gains payment data access"
+    },
+    {
+      "id": "x2",
+      "stride": "Repudiation",
+      "title": "No audit trail of which service published which payment event"
+    },
+    {
+      "id": "x3",
+      "stride": "Tampering",
+      "title": "Payment amount or recipient manipulated"
+    },
+    {
+      "id": "x4",
+      "stride": "Tampering",
+      "title": "Payment events lack integrity protection"
+    }
   ]
 }

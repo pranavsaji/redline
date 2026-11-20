@@ -6,5 +6,27 @@
       "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":true,\"reason\":\"External images in comments enable tracking visitors via image requests - follows from design allowing images.\"},{\"id\":\"x2\",\"valid\":true,\"reason\":\"Automated comment posting floods database and pages - specific to comment feature, not generic rate limiting advice.\"},{\"id\":\"x3\",\"valid\":true,\"reason\":\"Large images in comments exhaust visitor resources - follows from design allowing images in comments.\"},{\"id\":\"x4\",\"valid\":false,\"reason\":\"Too generic - could apply to any endpoint, not specific to comment feature or design described.\"}]}\n```",
       "modelId": "claude-sonnet-4-5"
     }
+  ],
+  "items": [
+    {
+      "id": "x1",
+      "stride": "InformationDisclosure",
+      "title": "Tracking users through external image URLs"
+    },
+    {
+      "id": "x2",
+      "stride": "DenialOfService",
+      "title": "Comment spam overwhelming product pages"
+    },
+    {
+      "id": "x3",
+      "stride": "DenialOfService",
+      "title": "Resource exhaustion through oversized images"
+    },
+    {
+      "id": "x4",
+      "stride": "DenialOfService",
+      "title": "Unauthenticated endpoint abused for resource exhaustion"
+    }
   ]
 }

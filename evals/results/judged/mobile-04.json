@@ -6,5 +6,27 @@
       "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":false,\"reason\":\"Design says server trusts flag, not receipt. Forging receipts irrelevant when flag is what matters.\"},{\"id\":\"x2\",\"valid\":false,\"reason\":\"Duplicate of c1: same attack (forge purchased flag), same vulnerability, same harm (unlock without payment).\"},{\"id\":\"x3\",\"valid\":false,\"reason\":\"Introduces auth, sessions, account identifiers not mentioned in design. Only describes payment-unlock flow.\"},{\"id\":\"x4\",\"valid\":false,\"reason\":\"Assumes receipt validation and error messages not in design. Design only describes trusting flag.\"}]}\n```",
       "modelId": "claude-sonnet-4-5"
     }
+  ],
+  "items": [
+    {
+      "id": "x1",
+      "stride": "Spoofing",
+      "title": "Attacker forges app store receipts"
+    },
+    {
+      "id": "x2",
+      "stride": "ElevationOfPrivilege",
+      "title": "Client-controlled flag bypasses payment verification"
+    },
+    {
+      "id": "x3",
+      "stride": "ElevationOfPrivilege",
+      "title": "Attacker unlocks premium for other users' accounts"
+    },
+    {
+      "id": "x4",
+      "stride": "InformationDisclosure",
+      "title": "Error responses reveal receipt validation logic"
+    }
   ]
 }

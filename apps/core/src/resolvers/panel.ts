@@ -42,6 +42,8 @@ export interface PanelDto {
   threatsCursor: number | null;
   threatsTotal: number;
   hiddenThreats: number;
+  /** Rule-based threats a more specific AI threat covers: not listed on their own, named on the covering threat. */
+  covered: Array<{ title: string; coveredBy: string }>;
   /** Listed only when the viewer can see every source of the review (discarded entries do not record their sources). */
   discarded: DiscardedThreat[];
   hiddenDiscarded: number;
@@ -120,12 +122,14 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
   let threats: Threat[] = [];
   let facts: FactDto[] = [];
   let hiddenThreats = 0;
+  let covered: PanelDto['covered'] = [];
   let discarded: DiscardedThreat[] = [];
   let hiddenDiscarded = 0;
   if (review) {
     const scoped = await scopedReview(deps, v, review.id, cache);
     if (!scoped) return { error: 'unavailable' };
-    threats = scoped.threats;
+    threats = scoped.threats.filter((t) => t.state !== 'covered');
+    covered = scoped.threats.flatMap((t) => (t.state === 'covered' && t.coveredBy ? [{ title: t.title, coveredBy: t.coveredBy }] : []));
     facts = scoped.facts.map(toFactDto);
     hiddenThreats = scoped.hiddenThreats;
     const d = await deps.reviews.discarded(review.id);
@@ -168,6 +172,7 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
     threatsCursor: threats.length > PAGE_SIZE ? PAGE_SIZE : null,
     threatsTotal: threats.length,
     hiddenThreats,
+    covered,
     discarded,
     hiddenDiscarded,
     facts,
@@ -192,8 +197,9 @@ export async function panelThreats(deps: CoreDeps, v: Viewer, p: { cursor?: unkn
   const scoped = await scopedReview(deps, v, latest.value.id);
   if (!scoped) return { error: 'unavailable' };
   const from = Number.isInteger(p.cursor) && (p.cursor as number) >= 0 ? (p.cursor as number) : 0;
-  const page = scoped.threats.slice(from, from + PAGE_SIZE);
-  return { threats: page, cursor: from + PAGE_SIZE < scoped.threats.length ? from + PAGE_SIZE : null };
+  const listed = scoped.threats.filter((t) => t.state !== 'covered');
+  const page = listed.slice(from, from + PAGE_SIZE);
+  return { threats: page, cursor: from + PAGE_SIZE < listed.length ? from + PAGE_SIZE : null };
 }
 
 /** (Re-)adds the redline-review label (visible in Jira; starts the Automation re-run rule) and queues the gather. */

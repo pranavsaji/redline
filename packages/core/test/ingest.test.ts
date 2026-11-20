@@ -98,6 +98,43 @@ describe('assembleReview', () => {
     expect(hijack[0]!.citations.length).toBeGreaterThanOrEqual(2);
   });
 
+  const covered = (out: ReturnType<typeof assemble>, title: string) => out.threats.find((t) => t.origin === 'baseline' && t.title === title);
+
+  it('noise: a trusted AI threat of the same kind and severity covers the generic rule-based one, which stays stored', () => {
+    const s = model([refundAbuse]);
+    const out = assemble([s, s, s]);
+    const cover = out.threats.find((t) => t.title === refundAbuse.title)!;
+    expect(covered(out, 'Tool misuse by an over-privileged agent')).toMatchObject({ state: 'covered', coveredBy: cover.id });
+    expect(cover.state).toBe('accepted');
+    // The rule's framework mappings move to the covering threat, so nothing is lost from the audit trail.
+    expect(cover.mappings.map((m) => m.refId)).toEqual(expect.arrayContaining(['CWE-250']));
+    // A covered threat does not count towards blocking; the covering one does.
+    expect(blocking(out)).toBe(out.threats.filter((t) => t.state === 'accepted' && (t.severity === 'High' || t.severity === 'Critical')).length);
+    // Without the agent threat, the rule-based one is active.
+    expect(covered(assemble([model([]), model([]), model([])]), 'Tool misuse by an over-privileged agent')?.state).toBe('accepted');
+  });
+
+  it('noise: an AI threat on another topic, of a different kind, or less severe does not cover a rule-based one', () => {
+    const lower = { ...refundAbuse, title: 'Refund tool misused for small amounts', likelihood: 1, impact: 2 };
+    const s = model([transcriptLeak, lower]);
+    const out = assemble([s, s, s]);
+    expect(covered(out, 'Tool misuse by an over-privileged agent')?.state).toBe('accepted');
+    expect(covered(out, 'Agent goal hijack through injected instructions')?.state).toBe('accepted');
+  });
+
+  it('security: under suspected injection every rule-based threat stays active, whatever the AI proposes', () => {
+    const poisoned = bundle([...facts, normalizeFact(poisonedRawFact)]);
+    const s = model([refundAbuse]);
+    const out = assemble([s, s, s], { bundle: poisoned });
+    expect(out.threats.filter((t) => t.origin === 'baseline').every((t) => t.state === 'accepted')).toBe(true);
+  });
+
+  it('security: a weakly grounded AI threat cannot cover a rule-based one', () => {
+    const weak = { ...refundAbuse, evidence: [{ quote: 'the agent may refund orders on request' }] };
+    const s = model([weak]);
+    expect(covered(assemble([s, s, s]), 'Tool misuse by an over-privileged agent')?.state).toBe('accepted');
+  });
+
   it('suppresses threats similar to previously dismissed ones (TM-5)', () => {
     const s = model([transcriptLeak, refundAbuse]);
     const out = assemble([s, s, s], { priorDismissed: [{ title: 'Conversation transcripts expose customer data', stride: 'InformationDisclosure', reason: 'already_mitigated' }] });

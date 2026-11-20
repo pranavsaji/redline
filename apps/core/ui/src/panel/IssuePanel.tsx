@@ -265,6 +265,7 @@ export function IssuePanel({ api }: { api: PanelApi }) {
                     key={t.id}
                     threat={t}
                     facts={facts}
+                    covers={dto.covered.filter((c) => c.coveredBy === t.id).map((c) => c.title)}
                     explain={async (x) => {
                       const r = await api.explain(x.reviewId, x.id).catch(() => null);
                       return r && !isError(r) ? r : null;

@@ -8,6 +8,8 @@ export interface Recording {
   caseId: string;
   promptVersion: string;
   replies: Array<{ text: string; modelId: string }>;
+  /** Judge recordings: the extras the judge rated, by id, so verdicts can be matched by threat when the list changes. */
+  items?: Array<{ id: string; stride: string; title: string }>;
 }
 
 /** Wraps a live LLM and keeps every successful reply, in call order. */

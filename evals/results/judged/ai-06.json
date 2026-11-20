@@ -6,5 +6,62 @@
       "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":false,\"reason\":\"agent memory and context persistence not described in design\"},{\"id\":\"x2\",\"valid\":false,\"reason\":\"generic logging hygiene not specific to this feature\"},{\"id\":\"x3\",\"valid\":true,\"reason\":\"follows from unauthenticated queue exposing sensitive payment and booking data\"},{\"id\":\"x4\",\"valid\":false,\"reason\":\"duplicate of c2: unauthorized payment commands via unauthenticated queue\"},{\"id\":\"x5\",\"valid\":false,\"reason\":\"duplicate of c2: same attack merely reworded\"},{\"id\":\"x6\",\"valid\":false,\"reason\":\"user authentication not described in design; generic hygiene\"},{\"id\":\"x7\",\"valid\":false,\"reason\":\"generic prompt injection not specific to this design\"},{\"id\":\"x8\",\"valid\":false,\"reason\":\"duplicate of c1: tampering with payment details in transit\"},{\"id\":\"x9\",\"valid\":false,\"reason\":\"agent tools and privileges not described in design\"},{\"id\":\"x10\",\"valid\":false,\"reason\":\"assumes agent compromise mechanisms not described in design\"},{\"id\":\"x11\",\"valid\":true,\"reason\":\"replay attack causing duplicate charges; specific to this design\"}]}\n```",
       "modelId": "claude-sonnet-4-5"
     }
+  ],
+  "items": [
+    {
+      "id": "x1",
+      "stride": "ElevationOfPrivilege",
+      "title": "Agent context poisoning enables persistent unauthorized charges"
+    },
+    {
+      "id": "x2",
+      "stride": "Repudiation",
+      "title": "Missing audit trail prevents investigation of fraudulent charges"
+    },
+    {
+      "id": "x3",
+      "stride": "InformationDisclosure",
+      "title": "Unauthenticated queue exposes payment card and booking data"
+    },
+    {
+      "id": "x4",
+      "stride": "ElevationOfPrivilege",
+      "title": "Tool misuse attack directly commands payments agent via queue access"
+    },
+    {
+      "id": "x5",
+      "stride": "ElevationOfPrivilege",
+      "title": "Unauthenticated queue allows any agent to trigger payment charges"
+    },
+    {
+      "id": "x6",
+      "stride": "Spoofing",
+      "title": "Account takeover through weak authentication"
+    },
+    {
+      "id": "x7",
+      "stride": "ElevationOfPrivilege",
+      "title": "Agent goal hijack through injected instructions"
+    },
+    {
+      "id": "x8",
+      "stride": "Tampering",
+      "title": "Payment amount or recipient manipulated"
+    },
+    {
+      "id": "x9",
+      "stride": "Tampering",
+      "title": "Tool misuse by an over-privileged agent"
+    },
+    {
+      "id": "x10",
+      "stride": "DenialOfService",
+      "title": "Cascading failures from compromised planner flood payment processing"
+    },
+    {
+      "id": "x11",
+      "stride": "DenialOfService",
+      "title": "Message queue flooding causes duplicate charges or service outage"
+    }
   ]
 }

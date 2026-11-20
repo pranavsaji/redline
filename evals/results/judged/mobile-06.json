@@ -6,5 +6,12 @@
       "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":false,\"reason\":\"Describes backend API authorization attack; design only covers push notification display, not data retrieval systems\"}]}\n```",
       "modelId": "claude-sonnet-4-5"
     }
+  ],
+  "items": [
+    {
+      "id": "x1",
+      "stride": "InformationDisclosure",
+      "title": "Personal data exposed to unauthorised users"
+    }
   ]
 }

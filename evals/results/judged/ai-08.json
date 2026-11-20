@@ -6,5 +6,32 @@
       "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"x1\",\n      \"valid\": true,\n      \"reason\": \"Specific DoS attack via resource exhaustion; distinct from code execution or goal manipulation in c1/c2.\"\n    },\n    {\n      \"id\": \"x2\",\n      \"valid\": false,\n      \"reason\": \"Generic hygiene ('log everything'); describes missing control, not a plausible attack on this feature.\"\n    },\n    {\n      \"id\": \"x3\",\n      \"valid\": false,\n      \"reason\": \"Too generic; includes user input and stored content not mentioned in design; overlaps c1 for applicable parts.\"\n    },\n    {\n      \"id\": \"x4\",\n      \"valid\": false,\n      \"reason\": \"Design mentions no users, permissions, or authorization; doesn't follow from design as written.\"\n    },\n    {\n      \"id\": \"x5\",\n      \"valid\": false,\n      \"reason\": \"Design mentions no internet-facing endpoint; attack targets component design doesn't describe.\"\n    }\n  ]\n}\n```",
       "modelId": "claude-sonnet-4-5"
     }
+  ],
+  "items": [
+    {
+      "id": "x1",
+      "stride": "DenialOfService",
+      "title": "Malicious MCP server consumes resources and crashes the agent"
+    },
+    {
+      "id": "x2",
+      "stride": "Repudiation",
+      "title": "No audit log of which MCP servers were installed and when"
+    },
+    {
+      "id": "x3",
+      "stride": "ElevationOfPrivilege",
+      "title": "Agent goal hijack through injected instructions"
+    },
+    {
+      "id": "x4",
+      "stride": "Tampering",
+      "title": "Tool misuse by an over-privileged agent"
+    },
+    {
+      "id": "x5",
+      "stride": "DenialOfService",
+      "title": "Unauthenticated endpoint abused for resource exhaustion"
+    }
   ]
 }

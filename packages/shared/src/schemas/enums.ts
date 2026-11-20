@@ -38,7 +38,11 @@ export type DataClass = z.infer<typeof DataClassSchema>;
 export const ExposureSchema = z.enum(['internal', 'partner', 'public']);
 export type Exposure = z.infer<typeof ExposureSchema>;
 
-export const ThreatStateSchema = z.enum(['proposed', 'accepted', 'dismissed', 'needs_human']);
+/**
+ * `covered`: a generic rule-based threat that a trusted, more specific AI threat (`coveredBy`) already covers. It does
+ * not count and has no requirement of its own; it becomes `accepted` again if that AI threat is dismissed.
+ */
+export const ThreatStateSchema = z.enum(['proposed', 'accepted', 'dismissed', 'needs_human', 'covered']);
 export type ThreatState = z.infer<typeof ThreatStateSchema>;
 
 export const DismissReasonSchema = z.enum(['false_positive', 'not_applicable', 'duplicate', 'already_mitigated']);

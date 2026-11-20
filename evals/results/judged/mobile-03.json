@@ -6,5 +6,27 @@
       "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"x1\",\n      \"valid\": true,\n      \"reason\": \"Offline operation prevents server authentication; specific challenge of this feature on shared devices\"\n    },\n    {\n      \"id\": \"x2\",\n      \"valid\": false,\n      \"reason\": \"Generic session management hygiene; harms already covered by c1 (viewing) and c2 (attribution)\"\n    },\n    {\n      \"id\": \"x3\",\n      \"valid\": true,\n      \"reason\": \"Syncing tampered local database to server is specific offline sync risk; attack plausible\"\n    },\n    {\n      \"id\": \"x4\",\n      \"valid\": true,\n      \"reason\": \"Concurrent offline edits causing conflicts is offline-sync-specific; data loss is distinct harm\"\n    }\n  ]\n}\n```",
       "modelId": "claude-sonnet-4-5"
     }
+  ],
+  "items": [
+    {
+      "id": "x1",
+      "stride": "Spoofing",
+      "title": "No device-level authentication for offline access"
+    },
+    {
+      "id": "x2",
+      "stride": "ElevationOfPrivilege",
+      "title": "No session timeout allows unauthorized access on shared devices"
+    },
+    {
+      "id": "x3",
+      "stride": "Tampering",
+      "title": "SQLite database can be modified without detection"
+    },
+    {
+      "id": "x4",
+      "stride": "Tampering",
+      "title": "Malicious sync overwrites legitimate patient data"
+    }
   ]
 }

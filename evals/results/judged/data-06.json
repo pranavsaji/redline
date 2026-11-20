@@ -6,5 +6,17 @@
       "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":false,\"reason\":\"Design doesn't mention developers sharing service account access or using it for manual operations.\"},{\"id\":\"x2\",\"valid\":false,\"reason\":\"Duplicate of c1: both cover ETL process compromise via code vulnerabilities leading to data modification/deletion.\"}]}\n```",
       "modelId": "claude-sonnet-4-5"
     }
+  ],
+  "items": [
+    {
+      "id": "x1",
+      "stride": "Repudiation",
+      "title": "Cannot attribute malicious actions to specific users when using shared service account"
+    },
+    {
+      "id": "x2",
+      "stride": "Tampering",
+      "title": "Compromised ETL process can modify or destroy all production data"
+    }
   ]
 }

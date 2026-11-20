@@ -33,7 +33,7 @@ const base: PanelDto = {
   issueId: '66405', issueKey: 'PAY-6',
   verdict: { state: 'block', reviewId: 'rev_66405_1', revision: 1, blockingCount: 2, maxOpenSeverity: 'Critical', reasons: [{ code: 'open_requirement', message: '2 open security requirements at High or above.', requirementIds: ['req_1', 'req_2'] }], inheritedFrom: [], updatedAt: now, panelUrl: '/browse/PAY-6' },
   review: { id: 'rev_66405_1', issueId: '66405', issueKey: 'PAY-6', revision: 1, status: 'ready', contextHash: 'h', riskScore: 72, partial: false, promptVersion: 'v1.1.0', modelIds: [], samplesExpected: 3, samplesReceived: 3, tokensIn: 0, tokensOut: 0, createdAt: '2026-11-16T05:30:43.000Z', updatedAt: now },
-  threats: THREATS, threatsCursor: null, threatsTotal: THREATS.length, hiddenThreats: 0, hiddenDiscarded: 0, hiddenRequirements: 0,
+  threats: THREATS, threatsCursor: null, threatsTotal: THREATS.length, hiddenThreats: 0, covered: [], hiddenDiscarded: 0, hiddenRequirements: 0,
   discarded: [{ title: 'Quantum computers break the token', stride: 'InformationDisclosure', reason: 'unsupported_citation' }, { title: 'SQL injection in reset form', stride: 'Tampering', reason: 'low_votes' }],
   facts: FACTS,
   requirements: [

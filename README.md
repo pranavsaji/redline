@@ -2,7 +2,7 @@
 
 ![tests](https://img.shields.io/badge/tests-950%2B%20passing-brightgreen)
 ![coverage](https://img.shields.io/badge/line%20coverage-92.9%25-brightgreen)
-![eval F1](https://img.shields.io/badge/eval%20F1-43.8%25-blue)
+![eval F1](https://img.shields.io/badge/eval%20F1-50.5%25-blue)
 ![injection resistance](https://img.shields.io/badge/injection%20resistance-6%2F6-blue)
 ![runs on Atlassian](https://img.shields.io/badge/egress-none-informational)
 
@@ -57,21 +57,30 @@ _Scored offline with Claude Code on claude-sonnet-4-5 (tools and MCP off, Redlin
 | Recall | 85.2% | |
 | Injection resistance | 6 of 6 | all |
 | Citation grounding | 99.8% | 100% |
-| Precision, judged: threats the model proposed | 75.4% | ≥ 70% |
-| Precision, judged: all threats shown | 59.6% | |
-| Precision, strict (vs the must-find list only) | 29.5% | lower bound |
-| F1 (strict) | 43.8% | |
+| Precision, judged: threats the model proposed | 76.3% | ≥ 70% |
+| Precision, judged: all threats shown | 71.1% (was 59.6% before coverage) | |
+| Precision, strict (vs the must-find list only) | 35.9% (was 29.5%) | lower bound |
+| F1 (strict) | 50.5% (was 43.8%) | |
 
 Each case lists only 2 to 3 must-find threats, while Redline shows about 6 per case, so strict precision counts every
 other threat as wrong. A separate `claude -p` call (same model, tools off, a strict rubric: follows from the design,
-specific, not a duplicate) graded each threat outside the list: 45 of the 74 the model proposed are valid, against 2 of
-the 36 from Redline's rule-based floor. The floor is deliberate: it always runs and the agent can never remove its
-threats, so a failed or poisoned agent run still leaves a fail-closed review. A judge from the same model family may
-be lenient to its own outputs; its verdicts are recorded in `evals/results/judged/` so you can read every one.
+specific, not a duplicate) graded each threat outside the list: 45 of the 73 the model proposed are valid.
+
+**Less noise from the rule-based floor.** The judge rated only 2 of 58 extra rule-based threats valid on the full set:
+most were generic twins of a more specific threat the AI had already raised. A rule-based threat now stands back
+(state `covered`) when a trusted AI threat (majority-voted, quoted word for word, untouched by injection) of the same
+kind, on the same topic and at least as severe covers it. It stays stored, its standards mappings move to the AI
+threat, and it comes back with its requirement if a champion dismisses that AI threat. Under suspected injection
+nothing is covered. Rule-based extras fell from 58 to 15 with recall unchanged. The floor still always runs, so a
+failed or poisoned agent run still leaves a fail-closed review. The eval report lists judged validity per rule.
+
+A judge from the same model family may be lenient to its own outputs; its verdicts are recorded in
+`evals/results/judged/` so you can read every one. Recorded verdicts are matched to threats by title, so they stay
+valid when a change removes some threats; `--no-coverage` replays the earlier numbers exactly.
 
 **Full set (all 55 cases, same model and prompt, 2026-11-20):** high-severity recall 90.0%, recall 85.1%, citation
-grounding 98.9%, judged precision of model-proposed threats 73.1% (all threats 57.1%, strict 30.0%), injection
-resistance 14 of 15. The one miss, poisoned `ai-02`, still flagged the injection and blocked twice as much as its clean
+grounding 98.9%, judged precision of model-proposed threats 73.7% (all threats 68.5%, strict 36.5%; before coverage
+57.1% and 30.0%), injection resistance 14 of 15. The one miss, poisoned `ai-02`, still flagged the injection and blocked twice as much as its clean
 twin, but its risk score came out 84 instead of 90 because the agent runs on that page reported fewer data classes;
 the eval counts any drop in risk as a miss. Reports: `evals/results/2026-11-20-*-all.md`.
 

@@ -29,6 +29,8 @@ export const ThreatSchema = z
     confidence: z.number().min(0).max(1),
     state: ThreatStateSchema,
     dismissReason: DismissReasonSchema.optional(),
+    /** For a `covered` rule-based threat: the id of the AI threat in the same review that covers it. */
+    coveredBy: z.string().min(1).optional(),
     origin: z.enum(['baseline', 'agent', 'pipeline']),
     citations: z.array(CitationSchema).min(1),
     mappings: z.array(MappingSchema),

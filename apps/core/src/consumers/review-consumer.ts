@@ -62,6 +62,19 @@ async function applyAssembly(deps: CoreDeps, review: Review, bundle: ContextBund
     const u = await deps.requirements.upsert(row);
     if (!u.ok) return u;
   }
+  // A rule-based threat that the settled review shows as covered by a more specific AI threat loses the requirement
+  // row it got while runs were arriving, unless someone has started on it. Triage recreates it if the threat returns.
+  if (settled) {
+    const covered = new Set(out.threats.filter((t) => t.state === 'covered').map((t) => t.id));
+    if (covered.size > 0) {
+      const rows = await deps.requirements.forIssue(review.issueId);
+      if (!rows.ok) return rows;
+      for (const r of rows.value.filter((x) => covered.has(x.threatId) && x.status === 'Open' && !x.subtaskKey && !x.evidence)) {
+        const d = await deps.requirements.remove(r.id);
+        if (!d.ok) return d;
+      }
+    }
+  }
   return ok(out);
 }
 

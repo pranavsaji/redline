@@ -18,5 +18,9 @@ export function sqlRequirementRepo(x: SqlExecutor): RequirementRepo {
       const r = await x.exec('REPLACE INTO requirements (id, issue_id, status, severity, requirement_json) VALUES (?, ?, ?, ?, ?)', [req.id, req.issueId, req.status, req.severity, JSON.stringify(req)]);
       return r.ok ? ok(undefined) : r;
     },
+    async remove(id) {
+      const r = await x.exec('DELETE FROM requirements WHERE id = ?', [id]);
+      return r.ok ? ok(undefined) : r;
+    },
   };
 }

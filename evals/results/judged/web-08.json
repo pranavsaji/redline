@@ -6,5 +6,22 @@
       "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"x1\",\n      \"valid\": false,\n      \"reason\": \"Attack on authentication generally not on impersonation feature design as written\"\n    },\n    {\n      \"id\": \"x2\",\n      \"valid\": true,\n      \"reason\": \"Follows from design tampering harm distinct from c1 information disclosure\"\n    },\n    {\n      \"id\": \"x3\",\n      \"valid\": true,\n      \"reason\": \"Not duplicate accidental harm admin forgets differs from c1 malicious compromised\"\n    }\n  ]\n}\n```",
       "modelId": "claude-sonnet-4-5"
     }
+  ],
+  "items": [
+    {
+      "id": "x1",
+      "stride": "Spoofing",
+      "title": "Account takeover through weak authentication"
+    },
+    {
+      "id": "x2",
+      "stride": "Tampering",
+      "title": "Admin can modify customer data while impersonated without safeguards"
+    },
+    {
+      "id": "x3",
+      "stride": "ElevationOfPrivilege",
+      "title": "Impersonation sessions may persist indefinitely without time limits"
+    }
   ]
 }

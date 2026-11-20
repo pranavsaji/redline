@@ -27,12 +27,15 @@ export function ThreatCard({
   facts,
   explain,
   children,
+  covers = [],
 }: {
   threat: Threat;
   facts: Map<string, FactDto>;
   explain: (t: Threat) => Promise<ThreatExplanation | null>;
   /** Extra controls inside the card (champion triage). */
   children?: ReactNode;
+  /** Titles of Redline's rule-based checks this threat covers (they are not listed separately). */
+  covers?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [explained, setExplained] = useState<ThreatExplanation | null>(null);
@@ -59,6 +62,11 @@ export function ThreatCard({
             {threat.state === 'needs_human' && <Lozenge appearance="new">Needs a champion</Lozenge>}
             <span style={{ color: token('color.text.subtlest'), font: token('font.body.small') }}>{runs}</span>
           </div>
+          {covers.length > 0 && (
+            <span style={{ color: token('color.text.subtle'), font: token('font.body.small') }}>
+              Also covers Redline's rule-based {covers.length === 1 ? 'check' : 'checks'}: {covers.join('; ')}.
+            </span>
+          )}
           {threat.mappings.length > 0 && (
             <ul aria-label="Standards" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {threat.mappings.map((m) => (
