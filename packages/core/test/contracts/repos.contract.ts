@@ -156,6 +156,30 @@ export function repoContract(name: string, f: RepoFactory): void {
       expect((await l.ofTypes([])).ok && (await l.ofTypes([]))).toEqual({ ok: true, value: [] });
     });
 
+    it('ledger (scale): forIssues reads one work item\'s events through the issue index, plus rows without an issue', async () => {
+      const l = await f.ledger();
+      const clock = fixedClock('2026-11-15T00:00:00Z');
+      await appendLedger(l, clock, 'acceptance.requested', { acceptanceId: 'a', issueId: '1' }, 'u');
+      await appendLedger(l, clock, 'acceptance.requested', { acceptanceId: 'b', issueId: '2' }, 'u');
+      await appendLedger(l, clock, 'acceptance.approved', { acceptanceId: 'a', issueId: '1' }, 'u');
+      await appendLedger(l, clock, 'acceptance.expired', { acceptanceId: 'c' }, 'u');
+      await appendLedger(l, clock, 'override.breakglass', { issueId: '3', until: 'x' }, 'u');
+      await appendLedger(l, clock, 'review.sample', { issueId: '1' }, 'u');
+      const r = await l.forIssues(['acceptance.requested', 'acceptance.approved', 'acceptance.expired', 'override.breakglass'], ['1', '3']);
+      // Rows that name no work item (older entries) are always included, so nothing is missed.
+      expect(r.ok && r.value.map((x) => x.seq)).toEqual([1, 3, 4, 5]);
+      expect((await l.forIssues(['acceptance.requested'], [])).ok && (await l.forIssues(['acceptance.requested'], []))).toEqual({ ok: true, value: [] });
+    });
+
+    it('ledger (scale): latestOfTypes returns the newest rows of those types, in seq order', async () => {
+      const l = await f.ledger();
+      const clock = fixedClock('2026-11-15T00:00:00Z');
+      for (let n = 1; n <= 5; n++) await appendLedger(l, clock, 'review.sample', { n }, 'u');
+      await appendLedger(l, clock, 'policy.changed', { fields: [] }, 'u');
+      const r = await l.latestOfTypes(['review.sample'], 2);
+      expect(r.ok && r.value.map((x) => x.seq)).toEqual([4, 5]);
+    });
+
     it('feedback: dismissals are returned per component', async () => {
       const fb = await f.feedback();
       await fb.record({ threatId: 't1', component: 'agent', title: 'A', stride: 'Spoofing', actor: 'c', action: 'dismiss', reason: 'false_positive' });

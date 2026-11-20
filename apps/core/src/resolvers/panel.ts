@@ -103,7 +103,7 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
     deps.reviews.latest(v.issueId),
     deps.reviews.history(v.issueId),
     deps.requirements.forIssue(v.issueId),
-    deps.ledger.ofTypes(ACCEPTANCE_EVENTS),
+    deps.ledger.forIssues(ACCEPTANCE_EVENTS, [v.issueId]),
     deps.config.site(),
     readVerdict(deps, v.issueId).then((r) => (r.ok ? r.value : undefined)),
   ]);

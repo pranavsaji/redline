@@ -1,4 +1,4 @@
-import { DEFAULT_OWNER_NOTES, extractOwnerNotes, rebuildAcceptances, renderThreatModel } from '@redline/core';
+import { ACCEPTANCE_EVENTS, DEFAULT_OWNER_NOTES, extractOwnerNotes, rebuildAcceptances, renderThreatModel } from '@redline/core';
 import { appError, err, ok, type Result } from '@redline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
@@ -68,7 +68,7 @@ export async function publishThreatModel(deps: CoreDeps, issueId: string): Promi
     deps.reviews.facts(ready.id),
     deps.reviews.threats(ready.id),
     deps.requirements.forIssue(issueId),
-    deps.ledger.all(),
+    deps.ledger.forIssues(ACCEPTANCE_EVENTS, [issueId]),
   ]);
   if (!facts.ok) return facts;
   if (!threats.ok) return threats;
