@@ -62,9 +62,11 @@ flowchart LR
 5. **Enforcement.** The verdict is written to KVS (read by the workflow validator, under 500 ms) and to an issue
    property (for JQL). The Bitbucket merge check verifies an attestation offline with the published public keys.
 
-The **Forge LLM pipeline** (`packages/core/src/pipeline.ts`, the spec's dual-LLM design: a quarantined extract stage
-that sees untrusted text and has no tools, then proposal samples that see only the extracted sketch) is implemented and
-tested with a fake model, but switched off: the live path above runs on the site's Rovo credits instead.
+**Redline Engine** (the default for new sites, `apps/core/src/services/engine.ts`) runs the review on Forge LLMs
+instead of the Rovo agent: a quarantined injection check, three runs of the Redline agent prompt over the fenced context
+in parallel, deterministic assembly, then a verifier. Its calls are billed to the app's developer. See
+[ENGINE.md](ENGINE.md). The earlier dual-LLM design (proposals that saw only an extracted sketch) is kept in
+`packages/core/src/pipeline.ts` for the eval; it measured worse and does not run in the product.
 
 ## Risk score
 
