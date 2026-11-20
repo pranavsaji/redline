@@ -112,6 +112,7 @@ export type LedgerEventType =
   | 'project.purged'
   | 'reviews.resumed'
   | 'review.sample'
+  | 'review.sample_rejected'
   | 'key.rotated';
 
 export interface LedgerInsert {

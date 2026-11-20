@@ -27,6 +27,8 @@ want to use with Redline's MCP tools (optional).
    *Work item created* (condition: type is Story or Epic) → **Use agent: Redline** with **Let this agent take actions**
    on, three times (three independent samples). Connect Automation to Rovo when asked.
    You can skip this step and start a review by hand: open the work item → Redline panel → **Run review**.
+   Then, in Redline admin → **Review mode → Who can submit AI review runs**, choose **Only these accounts** and click
+   **Use** next to the account that ran the rule: a developer can no longer write their own work item's review.
 5. **Open the epic "Add AI support agent"**. Within about a minute the Redline panel shows:
    - the risk score and why Done is blocked;
    - threats in plain language first, each with the quote it rests on and a link to its source;
@@ -54,6 +56,8 @@ before this can merge?".
   Then click **Run review on this work item** in the panel.
 - **Automation audit log says "The agent selected for this rule has been deactivated"**: an app update replaced the
   Redline agent. Open the rule, and in each **Use agent** step choose **⋯ → Switch agent → Redline**, then save.
+- **Reviews time out and the risk ledger shows `review.sample_rejected`**: the Automation rule runs as an account that
+  is not a review author. Add it under Redline admin → **Review mode → Who can submit AI review runs**.
 - **The Redline panel is not on a work item**: add it once from the apps button under the work item title
   (**Redline security review**).
 - **Load demo data says the Confluence space was not found**: create a space (any name) and enter its key.

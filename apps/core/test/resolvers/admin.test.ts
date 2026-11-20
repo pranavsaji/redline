@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SITE_POLICY } from '@redline/core';
+import { appendLedger, DEFAULT_SITE_POLICY } from '@redline/core';
 import { ok, type Review, type SitePolicy } from '@redline/shared';
 import type { ConfluenceClient } from '../../src/adapters/confluence.js';
 import {
@@ -59,7 +59,22 @@ describe('admin: only Jira administrators', () => {
 describe('admin.getPolicy / admin.setPolicy', () => {
   it('first run: returns the policy in force, marked as not yet saved, with no notifications configured', async () => {
     const r = await reviewed();
-    expect(await adminGetPolicy(r.t.deps, A)).toEqual({ policy: await policyOf(r), saved: false, ops: null, digest: null });
+    expect(await adminGetPolicy(r.t.deps, A)).toEqual({ policy: await policyOf(r), saved: false, ops: null, digest: null, recentReviewAuthors: [] });
+  });
+
+  it('security: lists who submitted the latest agent runs, newest first, and rejects a malformed review author', async () => {
+    const r = await reviewed();
+    for (const [actor, at] of [['acc-owner', '2026-11-15T10:00:00Z'], ['acc-dev', '2026-11-15T11:00:00Z'], ['acc-owner', '2026-11-15T12:00:00Z']] as const) {
+      r.t.clock.set(at);
+      await appendLedger(r.t.deps.ledger, r.t.deps.clock, 'review.sample', { issueId: '1' }, actor);
+    }
+    const dto = await adminGetPolicy(r.t.deps, A);
+    expect('recentReviewAuthors' in dto && dto.recentReviewAuthors).toEqual([
+      { accountId: 'acc-owner', runs: 2, lastAt: '2026-11-15T12:00:00.000Z' },
+      { accountId: 'acc-dev', runs: 1, lastAt: '2026-11-15T11:00:00.000Z' },
+    ]);
+    expect(await adminSetPolicy(r.t.deps, A, { policy: { ...(await policyOf(r)), reviewAuthors: ['not an id'] } })).toMatchObject({ error: 'validation' });
+    expect(await adminSetPolicy(r.t.deps, A, { policy: { ...(await policyOf(r)), reviewAuthors: ['712020:abc-123'] } })).toMatchObject({ policy: { reviewAuthors: ['712020:abc-123'] } });
   });
 
   it('round-trips a policy, and ledgers which fields changed', async () => {
