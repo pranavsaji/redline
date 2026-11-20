@@ -1,0 +1,10 @@
+{
+  "caseId": "data-07",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "{\"verdicts\":[{\"id\":\"x1\",\"valid\":false,\"reason\":\"No attacker; describes regulatory audit and consequences, not an attack\"},{\"id\":\"x2\",\"valid\":true,\"reason\":\"Follows design; specific insider threat; not duplicate of external SQL injection attack\"},{\"id\":\"x3\",\"valid\":false,\"reason\":\"Generic auth attack; design doesn't describe authentication mechanisms\"},{\"id\":\"x4\",\"valid\":false,\"reason\":\"Payment processing attack unrelated to logging; design doesn't describe payment handling\"}]}",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

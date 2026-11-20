@@ -1,0 +1,10 @@
+{
+  "caseId": "api-08",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "```json\n{\"verdicts\":[{\"id\":\"x1\",\"valid\":false,\"reason\":\"Assumes missing authorization; c1/c2 establish scope is mass assignment on self-updates, not authorization failure.\"}]}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}

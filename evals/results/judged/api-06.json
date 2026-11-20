@@ -1,0 +1,10 @@
+{
+  "caseId": "api-06",
+  "promptVersion": "judge-v1",
+  "replies": [
+    {
+      "text": "```json\n{\n  \"verdicts\": [\n    {\n      \"id\": \"x1\",\n      \"valid\": false,\n      \"reason\": \"Design is about service authentication, not users. Users, accounts, and session tokens not mentioned in design.\"\n    },\n    {\n      \"id\": \"x2\",\n      \"valid\": true,\n      \"reason\": \"Shared secret means all JWT signatures identical, so cannot attribute calls to specific services after compromise.\"\n    },\n    {\n      \"id\": \"x3\",\n      \"valid\": false,\n      \"reason\": \"Algorithm confusion is generic JWT library vulnerability, not specific to this shared secret design choice.\"\n    },\n    {\n      \"id\": \"x4\",\n      \"valid\": false,\n      \"reason\": \"Same attack as c1: compromised service uses shared secret to call others. Already counted.\"\n    },\n    {\n      \"id\": \"x5\",\n      \"valid\": true,\n      \"reason\": \"Shared secret across all services makes rotation operationally complex, discouraging regular rotation and extending exposure.\"\n    },\n    {\n      \"id\": \"x6\",\n      \"valid\": false,\n      \"reason\": \"Stolen tokens being reusable already covered by c3. Assumes service operations not mentioned in design.\"\n    }\n  ]\n}\n```",
+      "modelId": "claude-sonnet-4-5"
+    }
+  ]
+}
