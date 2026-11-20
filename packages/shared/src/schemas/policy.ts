@@ -18,6 +18,11 @@ export const SitePolicySchema = z
      * sites without Rovo; every review settles at once from Redline's rule-based checks and says so.
      */
     reviewMode: z.enum(['agent', 'rules_only']).optional(),
+    /**
+     * Who may submit AI review runs (Atlassian account IDs, normally the owner of the Automation rule that runs the
+     * Redline agent). Empty or absent: anyone who can edit the work item, which lets a developer fill their own review.
+     */
+    reviewAuthors: z.array(z.string().trim().min(1).max(128)).max(10).optional(),
     warnOnly: z.array(z.object({ projectKey: z.string(), since: z.string(), until: z.string() }).strict()),
     attestationTtlHours: z.number().int().min(1).max(168),
     sensitivePaths: z.array(z.string()),

@@ -102,9 +102,12 @@ export interface AdminPolicyDto {
   saved: boolean;
   ops: OpsConfig | null;
   digest: DigestConfig | null;
+  /** Who submitted the most recent agent runs (newest first, at most 5), from the risk ledger: normally the Automation rule owner. */
+  recentReviewAuthors: Array<{ accountId: string; runs: number; lastAt: string }>;
 }
 
 const name = z.string().trim().min(1).max(255);
+const ACCOUNT_ID = /^[A-Za-z0-9:_-]{1,128}$/;
 const AdminPolicySchema = SitePolicySchema.superRefine((p, ctx) => {
   const bad = p.enabledProjects.find((k) => !PROJECT_KEY.test(k));
   if (bad !== undefined) ctx.addIssue({ code: 'custom', path: ['enabledProjects'], message: `"${bad.slice(0, 40)}" is not a Jira project key (like PAY).` });
@@ -112,6 +115,8 @@ const AdminPolicySchema = SitePolicySchema.superRefine((p, ctx) => {
   if (p.guardedTransitions.length === 0 || p.guardedTransitions.some((t) => !name.safeParse(t).success))
     ctx.addIssue({ code: 'custom', path: ['guardedTransitions'], message: 'Name at least one guarded transition (like Done).' });
   if (p.reviewIssueTypes.some((t) => !name.safeParse(t).success)) ctx.addIssue({ code: 'custom', path: ['reviewIssueTypes'], message: 'Work type names cannot be empty.' });
+  const badAuthor = (p.reviewAuthors ?? []).find((x) => !ACCOUNT_ID.test(x));
+  if (badAuthor !== undefined) ctx.addIssue({ code: 'custom', path: ['reviewAuthors'], message: `"${badAuthor.slice(0, 40)}" is not an Atlassian account ID.` });
   for (const g of ['techLeadGroup', 'championGroup'] as const)
     if (!name.safeParse(p[g]).success) ctx.addIssue({ code: 'custom', path: [g], message: g === 'championGroup' ? 'Name the security champions group.' : 'Name the tech leads group.' });
   if (p.sensitivePaths.length > 200 || p.sensitivePaths.some((s) => !s.trim() || s.length > 300))
@@ -158,8 +163,16 @@ export async function adminGetPolicy(deps: CoreDeps, a: Admin): Promise<AdminPol
   if (denied) return denied;
   const policy = await deps.config.site();
   if (!policy.ok) return apiError(policy.error);
-  const [version, ops, digest] = await Promise.all([policyVersion(deps), readJson(deps, OPS_CONFIG_KEY, OpsSchema), readJson(deps, DIGEST_CONFIG_KEY, DigestSchema)]);
-  return { policy: policy.value, saved: (version ?? 0) > 0, ops, digest };
+  const [version, ops, digest, samples] = await Promise.all([policyVersion(deps), readJson(deps, OPS_CONFIG_KEY, OpsSchema), readJson(deps, DIGEST_CONFIG_KEY, DigestSchema), deps.ledger.ofTypes(['review.sample'])]);
+  const authors = new Map<string, { runs: number; lastAt: string }>();
+  for (const r of samples.ok ? [...samples.value].reverse() : []) {
+    if (!r.actor) continue;
+    const a = authors.get(r.actor);
+    if (a) a.runs++;
+    else if (authors.size < 5) authors.set(r.actor, { runs: 1, lastAt: r.createdAt });
+  }
+  const recentReviewAuthors = [...authors].map(([accountId, v]) => ({ accountId, ...v }));
+  return { policy: policy.value, saved: (version ?? 0) > 0, ops, digest, recentReviewAuthors };
 }
 
 /**
