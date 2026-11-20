@@ -1,11 +1,8 @@
 # Redline terms of use
 
-> **Draft for the Marketplace listing: review before publishing.** Replace `<publisher>`, `<contact>` and
-> `<jurisdiction>`; consider a lawyer's review before a paid listing.
+Last updated: 2026-11-20
 
-Last updated: 2026-11-18
-
-These terms cover Redline for Jira and Redline for Bitbucket ("Redline"), published by `<publisher>`. By installing
+These terms cover Redline for Jira and Redline for Bitbucket ("Redline"), published by Pranav Saji. By installing
 Redline you agree to them, alongside the Atlassian Marketplace Terms of Use.
 
 1. **What Redline is.** Redline helps teams find and track security risks in planned work. Its threat models are written
@@ -20,9 +17,9 @@ Redline you agree to them, alongside the Atlassian Marketplace Terms of Use.
    you set but is not responsible for credits your site's plan provides or charges.
 5. **Availability.** Redline is provided as is. It depends on Atlassian's platform and on features Atlassian marks as
    Preview, which may change. When Redline cannot complete a review, its gate blocks rather than passes.
-6. **Liability.** To the extent the law allows, `<publisher>` is not liable for indirect or consequential losses, or for
+6. **Liability.** To the extent the law allows, Pranav Saji is not liable for indirect or consequential losses, or for
    losses from risks Redline did not find or that you accepted.
 7. **Changes.** We may update these terms; the date above shows the latest version.
-8. **Law.** These terms are governed by the laws of `<jurisdiction>`.
+8. **Law.** These terms are governed by the laws of the United States.
 
-Contact: `<contact>`.
+Contact: [pranavs.mec@gmail.com](mailto:pranavs.mec@gmail.com).

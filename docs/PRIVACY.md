@@ -1,11 +1,8 @@
 # Redline privacy policy
 
-> **Draft for the Marketplace listing: review before publishing.** Replace `<publisher>` and `<contact>` with the
-> publisher's legal name and a support address.
+Last updated: 2026-11-20
 
-Last updated: 2026-11-18
-
-Redline for Jira and Redline for Bitbucket ("Redline") are Forge apps published by `<publisher>`. This policy explains
+Redline for Jira and Redline for Bitbucket ("Redline") are Forge apps published by Pranav Saji. This policy explains
 what Redline processes, where, and for how long.
 
 ## What Redline processes
@@ -48,4 +45,4 @@ item) a viewer cannot open. Admin pages are limited to Jira administrators.
 
 ## Contact
 
-Questions or requests: `<contact>`.
+Questions or requests: [pranavs.mec@gmail.com](mailto:pranavs.mec@gmail.com).
