@@ -219,6 +219,11 @@ export interface TreeHeadRepo {
 export interface UsageRepo {
   add(month: string, delta: { tokensIn: number; tokensOut: number; reviews: number }): Promise<Result<void>>;
   get(month: string): Promise<Result<{ tokensIn: number; tokensOut: number; reviews: number }>>;
+  /**
+   * Security: atomically takes one of `limit` slots in `bucket` for `window` (a different window starts again at zero)
+   * and returns how many are used now, or null when none is left. Parallel callers can never together exceed `limit`.
+   */
+  takeSlot(bucket: string, window: string, limit: number): Promise<Result<number | null>>;
 }
 
 export interface VerdictSink {

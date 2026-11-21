@@ -251,6 +251,7 @@ export function memoryAttestationRepo(): AttestationRepo {
 
 export function memoryUsageRepo(): UsageRepo {
   const m = new Map<string, { tokensIn: number; tokensOut: number; reviews: number }>();
+  const slots = new Map<string, { window: string; used: number }>();
   return {
     async add(month, d) {
       const cur = m.get(month) ?? { tokensIn: 0, tokensOut: 0, reviews: 0 };
@@ -259,6 +260,13 @@ export function memoryUsageRepo(): UsageRepo {
     },
     async get(month) {
       return ok(m.get(month) ?? { tokensIn: 0, tokensOut: 0, reviews: 0 });
+    },
+    async takeSlot(bucket, window, limit) {
+      const cur = slots.get(bucket);
+      const used = cur && cur.window === window ? cur.used : 0;
+      if (used >= limit) return ok(null);
+      slots.set(bucket, { window, used: used + 1 });
+      return ok(used + 1);
     },
   };
 }

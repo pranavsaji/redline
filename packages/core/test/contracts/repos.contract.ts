@@ -240,5 +240,19 @@ export function repoContract(name: string, f: RepoFactory): void {
       expect((await u.get('2026-11')).ok && (await u.get('2026-11'))).toEqual({ ok: true, value: { tokensIn: 15, tokensOut: 3, reviews: 2 } });
       expect((await u.get('2026-10')).ok && (await u.get('2026-10'))).toEqual({ ok: true, value: { tokensIn: 0, tokensOut: 0, reviews: 0 } });
     });
+
+    it('usage.takeSlot hands out at most `limit` slots per bucket and window, even to parallel callers', async () => {
+      const u = await f.usage();
+      const got = await Promise.all(Array.from({ length: 15 }, () => u.takeSlot('rl:acc-1', '2026-11-15T12', 10)));
+      expect(got.every((r) => r.ok)).toBe(true);
+      const taken = got.map((r) => (r.ok ? r.value : 'err')).filter((n) => n !== null);
+      expect(taken.length).toBe(10);
+      expect(taken.every((n) => typeof n === 'number' && n >= 1 && n <= 10)).toBe(true);
+      expect(await u.takeSlot('rl:acc-1', '2026-11-15T12', 10)).toEqual({ ok: true, value: null });
+      expect(await u.takeSlot('rl:acc-2', '2026-11-15T12', 10)).toEqual({ ok: true, value: 1 });
+      // A new window starts from zero again.
+      expect(await u.takeSlot('rl:acc-1', '2026-11-15T13', 10)).toEqual({ ok: true, value: 1 });
+      expect(await u.takeSlot('rl:acc-1', '2026-11-15T13', 10)).toEqual({ ok: true, value: 2 });
+    });
   });
 }
