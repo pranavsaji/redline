@@ -70,6 +70,19 @@ describe('applyVerification (deterministic: the verifier asks, code decides)', (
     expect(out.changed.map((t) => t.id).sort()).toEqual(['thr_base', 'thr_generic', 'thr_loud', 'thr_refund']);
   });
 
+  it('a below-threshold duplicate stands back under the kept threat it repeats; a blocking duplicate still goes to a champion', () => {
+    const twin = threat({ id: 'thr_twin', title: 'Refund abuse, again', severity: 'Medium' });
+    const r = applyVerification([refund, twin], [{ threatId: 'thr_refund', keep: true, reason: 'ok' }, { threatId: 'thr_twin', keep: false, reason: 'same', duplicateOf: 'thr_refund' }], { injectionSuspected: false, blockAtOrAbove: 'High' });
+    expect(r.threats.find((t) => t.id === 'thr_twin')).toMatchObject({ state: 'covered', coveredBy: 'thr_refund' });
+    // Security: a blocking threat is never folded away by the verifier, even as a "duplicate".
+    const highTwin = threat({ id: 'thr_hightwin', title: 'IDOR on export', severity: 'High', likelihood: 4, impact: 4 });
+    const r2 = applyVerification([refund, highTwin], [{ threatId: 'thr_refund', keep: true, reason: 'ok' }, { threatId: 'thr_hightwin', keep: false, reason: 'same', duplicateOf: 'thr_refund' }], { injectionSuspected: false, blockAtOrAbove: 'High' });
+    expect(r2.threats.find((t) => t.id === 'thr_hightwin')!.state).toBe('needs_human');
+    // A cover the verifier rejected covers nothing: the usual rule applies (a Medium is dismissed).
+    const r3 = applyVerification([refund, twin], [{ threatId: 'thr_refund', keep: false, reason: 'no' }, { threatId: 'thr_twin', keep: false, reason: 'same', duplicateOf: 'thr_refund' }], { injectionSuspected: false, blockAtOrAbove: 'High' });
+    expect(r3.threats.find((t) => t.id === 'thr_twin')!.state).toBe('dismissed');
+  });
+
   it('security: under suspected injection nothing changes (attacker text must not steer the verifier)', () => {
     const out = applyVerification([refund, generic, loud, base], verdicts, { injectionSuspected: true });
     expect(out.changed).toEqual([]);

@@ -317,7 +317,7 @@ export function assembleReview(i: AssembleInput): AssembleOutput {
     });
   }
 
-  const carried = i.prior ? carryOver(threats, i.prior, facts, i.review.id, injectionSuspected) : new Set<string>();
+  const carried = i.prior ? carryOver(threats, i.prior, facts, i.review.id, injectionSuspected, i.samples.length >= i.samplesExpected, i.policy) : new Set<string>();
 
   // 3. Noise: a generic rule-based threat stands back (state `covered`) when a trusted AI threat (majority-voted,
   // quoted word for word, untouched by injection) of the same kind, on the same topic and at least as severe covers it.
@@ -361,9 +361,9 @@ export function assembleReview(i: AssembleInput): AssembleOutput {
  * changed source stays new, so new evidence is never hidden behind an old decision. The stricter state wins (a fresh
  * needs_human is never downgraded), and when the material shows injection an earlier dismissal does not suppress the
  * fresh threat. Severity only rises. Prior threats citing a changed or removed source are not carried, nor are rule-based
- * threats the rules no longer raise.
+ * threats the rules no longer raise, nor (once the new runs are all in) AI threats none of them raised again.
  */
-function carryOver(threats: Threat[], prior: NonNullable<AssembleInput['prior']>, facts: readonly ContextFact[], reviewId: string, injectionSuspected: boolean): Set<string> {
+function carryOver(threats: Threat[], prior: NonNullable<AssembleInput['prior']>, facts: readonly ContextFact[], reviewId: string, injectionSuspected: boolean, complete = false, policy?: Pick<SitePolicy, 'blockAtOrAbove'>): Set<string> {
   const present = new Set(facts.map((f) => f.id));
   const unchanged = new Set(prior.facts.map((f) => f.id).filter((id) => present.has(id)));
   const onlyUnchanged = (t: Pick<Threat, 'citations'>) => t.citations.length > 0 && t.citations.every((c) => unchanged.has(c.factId));
@@ -394,6 +394,10 @@ function carryOver(threats: Threat[], prior: NonNullable<AssembleInput['prior']>
       // Rule-based threats are derived afresh each time from the same facts: one the rules no longer raise (a rule was
       // corrected) is gone, not carried. Agent threats carry, because model runs vary from one review to the next.
       if (old.origin === 'baseline') continue;
+      // Once this revision's runs are all in, a below-threshold AI threat none of them raised again goes, unless a
+      // person dismissed it. Blocking ones always carry: re-running until a model misses a Critical must not pass Done
+      // (the verifier can still fold a carried duplicate under the threat it repeats).
+      if (complete && old.state !== 'dismissed' && policy && !isBlockingSeverity(old, policy)) continue;
       // A fresh threat with the same title but new evidence keeps its id; the carried one gets its own.
       const free = threats.some((t) => t.id === id) ? threatId(reviewId, `${old.origin}+prior`, old.stride, old.title) : id;
       if (threats.some((t) => t.id === free)) continue;

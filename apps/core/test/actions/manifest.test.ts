@@ -20,8 +20,9 @@ const VERBS: Record<string, string> = {
   'get-merge-attestation': 'CREATE',
   'request-risk-acceptance': 'CREATE',
   'start-review': 'TRIGGER',
+  'verify-requirement': 'UPDATE',
 };
-const MCP_TOOLS = ['get-review', 'get-security-requirements', 'check-change-risk', 'get-merge-attestation', 'request-risk-acceptance', 'explain-threat', 'posture-summary'];
+const MCP_TOOLS = ['get-review', 'get-security-requirements', 'check-change-risk', 'get-merge-attestation', 'request-risk-acceptance', 'verify-requirement', 'explain-threat', 'posture-summary'];
 
 describe('manifest: Rovo actions, skill and MCP (Task 28)', () => {
   it('shares one installation across Jira and Confluence, so MCP, page events and the agent see Jira data', () => {
@@ -42,7 +43,7 @@ describe('manifest: Rovo actions, skill and MCP (Task 28)', () => {
     }
   });
 
-  it('the agent can call every action; the MCP module exposes the seven MCP actions', () => {
+  it('the agent can call every action; the MCP module exposes the eight MCP actions', () => {
     const agent = m.modules['rovo:agent']![0]!;
     expect(new Set(agent.actions as string[])).toEqual(new Set([...Object.keys(VERBS), 'get-review-context', 'submit-threat-model']));
     expect(agent.skills).toEqual(['threat-model-review']);

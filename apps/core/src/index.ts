@@ -13,6 +13,7 @@ export {
   getSecurityRequirementsHandler,
   checkChangeRiskHandler,
   requestRiskAcceptanceHandler,
+  verifyRequirementHandler,
   explainThreatHandler,
   releaseReadinessHandler,
   startReviewHandler,

@@ -39,7 +39,8 @@ Measured: 6 of 6 poisoned cases held, high-severity recall 91.9% ([eval](#eval),
   signed Merkle tree heads published to Confluence; download an inclusion proof and check it offline with
   `node scripts/verify-ledger-proof.mjs` (Node built-ins only).
 - **For coding agents.** An MCP server and Rovo agent expose the same requirements, so Claude Code or Cursor fix what
-  the gate will check ([skill](mcp-skill/skill.md)). Each requirement also copies as a failing test skeleton
+  the gate will check, then mark a requirement verified with their pull request as evidence ([walkthrough](docs/MCP.md),
+  [skill](mcp-skill/skill.md)). Each requirement also copies as a failing test skeleton
   (TypeScript, Python or Java).
 - **Guardrails for the guardrail.** Review runs can be locked to one account, so developers cannot write their own
   review; break-glass overrides need a written reason and are ledgered; warn-only mode expires after 14 days; a

@@ -4,6 +4,7 @@ import { getReview } from '../../src/actions/get-review.js';
 import { getSecurityRequirements } from '../../src/actions/get-security-requirements.js';
 import { checkChangeRisk } from '../../src/actions/check-change-risk.js';
 import { requestRiskAcceptance } from '../../src/actions/request-risk-acceptance.js';
+import { verifyRequirement } from '../../src/actions/verify-requirement.js';
 import { explainThreat } from '../../src/actions/explain-threat.js';
 import { getReleaseReadiness } from '../../src/actions/release-readiness.js';
 import { startReview } from '../../src/actions/start-review.js';
@@ -372,5 +373,26 @@ describe('a break-glass or warn-only window that has ended is not reported as pa
     t.kv.data.set(verdictKey(ISSUE), lapsed);
     const r = await getReleaseReadiness({ fixVersion: '4.2', ...ctx(ME) }, t.deps);
     expect('answer' in r && r.answer).toBe('No-go');
+  });
+});
+
+describe('verify-requirement: a coding agent closes the loop with the pull request as evidence', () => {
+  it('marks the requirement Verified for the caller, ledgers it as made through an agent, and reports the verdict', async () => {
+    const { t, req } = await reviewed();
+    const r = await verifyRequirement({ requirementId: req.id, prUrl: 'https://bitbucket.org/acme/payments/pull-requests/42', note: 'test_webhook_rejects_bad_signature', ...ctx(ME) }, t.deps);
+    expect(r).toMatchObject({ requirementId: req.id, status: 'Verified', verdict: 'pass', evidence: 'https://bitbucket.org/acme/payments/pull-requests/42' });
+    const saved = await t.deps.requirements.get(req.id);
+    expect(saved.ok && saved.value).toMatchObject({ status: 'Verified', verifiedBy: ME, evidence: { kind: 'pr', attester: ME } });
+    const all = await t.deps.ledger.all();
+    expect(all.ok && all.value.at(-1)).toMatchObject({ eventType: 'requirement.verified', actor: ME, payload: { requirementId: req.id, viaAgent: true } });
+  });
+
+  it('needs an https pull request link and edit permission', async () => {
+    const { t, req } = await reviewed();
+    expect(await verifyRequirement({ requirementId: req.id, prUrl: 'javascript:alert(1)', ...ctx(ME) }, t.deps)).toMatchObject({ error: 'invalid_input', message: expect.stringMatching(/prUrl/) });
+    t.jira.canEdit = async () => ok(false);
+    expect(await verifyRequirement({ requirementId: req.id, prUrl: 'https://x/pr/1', ...ctx(ME) }, t.deps)).toEqual({ error: 'not_found' });
+    const saved = await t.deps.requirements.get(req.id);
+    expect(saved.ok && saved.value?.status).toBe('Open');
   });
 });

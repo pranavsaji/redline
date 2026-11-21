@@ -73,6 +73,11 @@ export const SCHEMAS = {
       .regex(/^[^\0\r\n]+$/, 'fixVersion cannot contain line breaks'),
   }),
   startReview: z.object({ issueKey }),
+  verifyRequirement: z.object({
+    requirementId: z.string({ message: 'requirementId is required' }).trim().regex(/^req_[A-Za-z0-9_]{1,64}$/, 'requirementId must be a Threatline requirement id such as req_1a2b3c'),
+    prUrl: z.string({ message: 'prUrl is required' }).trim().max(2000).regex(/^https:\/\/\S+$/, 'prUrl must be the https link of the pull request that fixes it'),
+    note: trimmed(500).default(''),
+  }),
   postureSummary: z.object({
     project: z
       .string()

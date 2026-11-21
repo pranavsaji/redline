@@ -219,6 +219,27 @@ modules:
           type: integer
           required: true
           description: How many days the acceptance lasts (Critical at most 30, others at most 90 by default)
+    - key: verify-requirement
+      name: Verify requirement with a pull request
+      function: verifyRequirementFn
+      actionVerb: UPDATE
+      description: Marks one Threatline security requirement Verified with the pull request that fixes it as evidence. Needs edit permission on the work item; attributed to the caller and recorded in Threatline's ledger.
+      inputs:
+        requirementId:
+          title: Requirement id
+          type: string
+          required: true
+          description: The Threatline requirement id (req_...) from get-security-requirements
+        prUrl:
+          title: Pull request URL
+          type: string
+          required: true
+          description: The https link of the pull request that fixes the requirement
+        note:
+          title: Note
+          type: string
+          required: false
+          description: Optional, for example the test that proves it
     - key: explain-threat
       name: Explain threat
       function: explainThreatFn
@@ -291,6 +312,7 @@ modules:
         - check-change-risk
         - get-merge-attestation
         - request-risk-acceptance
+        - verify-requirement
         - explain-threat
         - posture-summary
   rovo:agent:
@@ -303,7 +325,7 @@ modules:
         - Is release 4.2 safe to ship?
         - Which acceptances expire this month?
         - Explain threat T-7 like I'm new to security
-      actions: [ get-review-context, submit-threat-model, get-review, get-security-requirements, check-change-risk, get-merge-attestation, request-risk-acceptance, explain-threat, release-readiness, start-review, posture-summary ]
+      actions: [ get-review-context, submit-threat-model, get-review, get-security-requirements, check-change-risk, get-merge-attestation, request-risk-acceptance, verify-requirement, explain-threat, release-readiness, start-review, posture-summary ]
       skills: [ threat-model-review ]
   function:
     - key: lifecycleFn
@@ -337,6 +359,8 @@ modules:
       handler: index.checkChangeRiskHandler
     - key: requestAcceptanceFn
       handler: index.requestRiskAcceptanceHandler
+    - key: verifyRequirementFn
+      handler: index.verifyRequirementHandler
     - key: explainThreatFn
       handler: index.explainThreatHandler
     - key: releaseReadinessFn
