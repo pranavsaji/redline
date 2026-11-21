@@ -5,7 +5,8 @@ import { errorText, isError, type ApiError, type SettingsApi } from './bridge.js
 import { box, field, label } from './styles.js';
 import { TestAttestation } from './TestAttestation.js';
 
-const DEFAULT_PATHS = 'src/auth/**, **/auth/**, **/payments/**, **/crypto/**, infra/**, .github/workflows/**, **/*.pem';
+// DEFAULT_SITE_POLICY.sensitivePaths plus GATE_CONFIG_PATHS (packages/core), which no setting or policy file can remove.
+const DEFAULT_PATHS = 'src/auth/**, **/auth/**, **/payments/**, **/crypto/**, infra/**, **/*.pem, .threatline/**, .redline/**, bitbucket-pipelines.yml, .github/workflows/**, .github/actions/**';
 
 /** Repository settings → Threatline: trusted public keys, extra sensitive paths, mode and diff-score threshold. */
 export function RepoSettings({ api }: { api: SettingsApi }) {

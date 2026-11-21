@@ -174,6 +174,20 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
     expect((await run('', { yaml: 'sensitivePaths: []\nmode: warn\n' })).outcome).toBe('fail_missing');
   });
 
+  it('bug 1: editing, deleting or shadowing the gate configuration is always sensitive (no loosening policy.yml in one PR)', async () => {
+    const f = (path: string, status: 'modified' | 'removed' | 'added' = 'modified') => [{ path, status, linesAdded: status === 'removed' ? 0 : 1 }];
+    for (const files of [
+      f('.threatline/policy.yml'),
+      f('.threatline/policy.yml', 'removed'),
+      f('.threatline/policy.yml', 'added'), // an empty file that shadows a legacy .redline/policy.yml
+      f('.redline/policy.yml', 'removed'),
+      f('bitbucket-pipelines.yml'),
+      f('.github/actions/setup/action.yml'),
+      [{ path: 'docs/old-policy.yml', oldPath: '.threatline/policy.yml', status: 'renamed' as const, linesAdded: 0 }],
+    ])
+      expect((await run('', { files, s: settings({ sensitivePaths: [] }) })).outcome).toBe('fail_missing');
+  });
+
   it('an invalid policy.yml on the target branch fails closed: the change needs an attestation', async () => {
     const r = await run('', { files: DOCS, yaml: 'sensitivePaths: [unclosed' });
     expect(r).toMatchObject({ success: false, outcome: 'fail_missing' });

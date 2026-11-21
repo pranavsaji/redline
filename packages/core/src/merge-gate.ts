@@ -86,9 +86,18 @@ function peek(token: string): Pick<AttestationPayload, 'repo' | 'iat'> | null {
   }
 }
 
+/**
+ * The gate's own configuration, on every platform: the CI that runs it (GitHub workflows and local actions, Bitbucket
+ * Pipelines) and Threatline's policy file (`.redline/` is its name from before the rename). Changing any of it is always
+ * sensitive, so a pull request cannot loosen the gate (edit, delete or shadow policy.yml) and then pass freely: the
+ * loosening itself needs an attestation like any other security change.
+ */
+export const GATE_CONFIG_PATHS = ['.github/workflows/**', '.github/actions/**', '.threatline/**', '.redline/**', 'bitbucket-pipelines.yml'];
+
 function effectivePolicy(settings: RepoSettings, yaml: string | null): { sensitivePaths: string[]; threshold: number; invalid: boolean } {
-  // Site defaults ∪ repo settings ∪ the destination's policy.yml: a file can add paths and lower the threshold, never weaken.
-  const paths = new Set([...DEFAULT_SITE_POLICY.sensitivePaths, ...settings.sensitivePaths]);
+  // Gate config ∪ site defaults ∪ repo settings ∪ the destination's policy.yml: a file can add paths and lower the
+  // threshold, never weaken.
+  const paths = new Set([...GATE_CONFIG_PATHS, ...DEFAULT_SITE_POLICY.sensitivePaths, ...settings.sensitivePaths]);
   let threshold = settings.diffScoreThreshold;
   if (yaml === null) return { sensitivePaths: [...paths], threshold, invalid: false };
   const parsed = parseRepoPolicy(yaml);

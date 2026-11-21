@@ -1,4 +1,4 @@
-import { allAddedText, DIFF_UNREAD_PATH, evaluateMergeCheck, MAX_DIFF_TEXT, TRUNCATED_PATH, type CheckResult, type DiffFile, type RepoSettings } from '@threatline/core';
+import { allAddedText, DIFF_UNREAD_PATH, evaluateMergeCheck, GATE_CONFIG_PATHS, MAX_DIFF_TEXT, TRUNCATED_PATH, type CheckResult, type DiffFile, type RepoSettings } from '@threatline/core';
 import { fromB64url, isValidPublicKey, kidOf } from '@threatline/crypto';
 
 /** What the merge gate needs from GitHub's REST API, read with the workflow's token. */
@@ -26,11 +26,6 @@ export interface GitHubClient {
 }
 
 export const WARN_MAX_DAYS = 14;
-/**
- * Changing the gate's own configuration (the workflow that runs it, local actions, Threatline's policy file) is always
- * sensitive: loosening the gate needs an attestation like any other security change.
- */
-export const GATE_CONFIG_PATHS = ['.github/workflows/**', '.github/actions/**', '.threatline/**', '.redline/**'];
 const KEY_HINT = 'Add it to the public-keys input of the Threatline step in your workflow (Threatline admin → Signing keys → Copy public key).';
 const lines = (v: string | undefined) => (v ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
 
@@ -47,6 +42,7 @@ export function parseInputs(input: Record<string, string | undefined>, nowSec: n
   const rawThreshold = (input['diff-score-threshold'] ?? '').trim();
   const threshold = rawThreshold === '' ? 40 : Number(rawThreshold);
   if (!Number.isFinite(threshold) || threshold < 0 || threshold > 100) return { ok: false, message: 'Threatline: diff-score-threshold must be a number from 0 to 100.' };
+  // The shared gate always adds GATE_CONFIG_PATHS (packages/core); listed here too so the settings show them.
   const settings: RepoSettings = { publicKeys, sensitivePaths: [...GATE_CONFIG_PATHS, ...lines(input['sensitive-paths'])], mode, diffScoreThreshold: threshold, keyHint: KEY_HINT };
   if (mode === 'warn') {
     const until = (input['warn-until'] ?? '').trim();
