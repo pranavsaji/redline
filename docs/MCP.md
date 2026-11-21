@@ -25,8 +25,9 @@ the gate, or write its own review. Those stay with people, and every one is in t
 claude mcp add --transport http threatline https://mcp.atlassian.com/forge/13898a7c-6897-48d3-a512-079d9f9f5f00
 ```
 
-Sign in at the Atlassian consent screen and pick the site. A site admin allows the client under Atlassian
-Administration → Rovo → MCP server. Add the [skill](../mcp-skill/skill.md) so the agent follows the workflow below.
+External MCP access is off by default: a site or org admin first turns on Threatline's tools in Atlassian
+Administration → Apps → Sites → your site → Connected apps → Threatline → View app details → Tools. Then sign in at the
+Atlassian consent screen and pick the site. Add the [skill](../mcp-skill/skill.md) so the agent follows the workflow below.
 
 ## The loop, as it ran
 

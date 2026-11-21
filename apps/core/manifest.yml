@@ -51,7 +51,8 @@ modules:
       resolver:
         function: panelResolverFn
       title: Threatline security review
-      icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+      # The brand icon, bundled (docs/brand/icon.svg); Forge accepts resource:<key>;<path> for module icons.
+      icon: resource:icons;threatline.svg
   jira:adminPage:
     - key: threatline-admin
       resource: panel
@@ -376,6 +377,8 @@ resources:
     path: ui/build
   - key: agent-prompt
     path: agent
+  - key: icons
+    path: icons
 permissions:
   scopes:
     read:jira-work:
