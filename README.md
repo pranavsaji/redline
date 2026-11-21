@@ -6,53 +6,49 @@
 ![injection resistance](https://img.shields.io/badge/injection%20resistance-6%2F6-blue)
 ![runs on Atlassian](https://img.shields.io/badge/egress-none-informational)
 
-**Security review that actually gates Done and merge.** Threatline threat-models every Jira work item with a cited STRIDE
-model, turns the threats that matter into security requirements, and blocks the Done transition and the Bitbucket merge
-until each one is verified with evidence or its risk is accepted by someone allowed to accept it. Every decision goes
-into a hash-chained, Merkle-logged risk ledger anyone can verify offline.
+**Security review that gates Done and merge.** Security review is advisory, so it loses to the deadline. Threatline
+makes it part of "Done": every Jira work item gets a cited threat model, the threats that matter become requirements,
+and neither the Done transition nor the merge goes through until each one is verified or its risk is accepted by
+someone allowed to accept it.
 
-Built for Atlassian Codegeist 2026 on Forge: Forge LLMs (Threatline Engine), Jira, Confluence, Bitbucket, Rovo (agent,
-actions, skill, MCP), Automation and Forge SQL. No egress: nothing leaves Atlassian.
+*Build with context, ship with confidence:* the threat model is the context, the gate is the confidence.
 
 ![Threatline issue panel](docs/screenshots/jira-1-issue-panel.png)
 
-## What it does
+## The story in five steps
 
-- **Threatline Engine: it reviews by itself.** Install, create a story, and within a few minutes the panel shows a cited
-  threat model. Threatline runs it on Atlassian-hosted Claude models (Opus 5): three independent analyses that must
-  agree, each quoting its evidence, then an adversarial verifier that checks every threat against its quotes (doubted
-  High and Critical threats go to a champion instead of disappearing). No Rovo agent, Automation rule or setup, and no
-  developer can write their own review. [How it works, and what we measured](docs/ENGINE.md).
-- **Cited threat models.** Three independent AI runs (Threatline Engine, or your site's Rovo agent) propose STRIDE threats; Threatline keeps only those a
-  majority raised and whose quotes are found word for word in the work item, its pages or incidents. Plain language
-  first ("A stolen link lets an attacker lock the real owner out for good."), then the STRIDE category, ASVS 5 and CWE.
-- **Injection-resistant by construction.** The model never decides anything: code sets the verdict. Text that tries to
-  instruct the AI is treated as data, flagged in the panel, and the threats it touches wait for a security champion.
-- **Requirements with evidence.** Each threat at or above the policy becomes a Given/When/Then requirement and a
-  sub-task; closing it needs a PR, test, Confluence section or note as evidence.
-- **From requirement to test in one click.** Every requirement copies as a ready-to-fill test skeleton (TypeScript,
-  Python or Java) with one failing test per acceptance criterion, in the panel or for coding agents via
-  `get-security-requirements` with `testLanguage`. Requirement text is escaped, so a hostile work item cannot inject
-  code into the skeleton.
-- **Fix-by dates.** Open requirements are due 7 days (Critical), 30 (High) or 90 (Medium) after Threatline raised them;
-  the panel shows "Overdue by N days" and the posture page counts what is overdue.
-- **Works without Rovo.** An admin can switch Review mode to rule-based checks only: every review completes at once from
-  Threatline's built-in checks, clearly labelled, so the gates work on any Jira site.
-- **Developers cannot write their own review.** An admin locks AI review runs to the account that owns the Automation
-  rule (Review mode → Who can submit AI review runs). Anyone else's submission is refused and recorded in the ledger.
-- **Enforcement that fails closed.** A workflow validator blocks Done while anything is open, missing, failed or out of
-  date, with a message saying exactly why and a one-click re-run. Paused at the budget? A champion can confirm.
-- **Risk acceptance with teeth.** Reason, compensating controls, an expiry (at most 30 days for Critical), an approver
-  who is not the requester, and the right role for the severity.
-- **Signed merge attestations.** The Bitbucket merge check accepts a sensitive pull request only with an Ed25519
-  attestation for its exact head commit. One changed character fails.
-- **GitHub too.** The same merge gate runs as a GitHub Action ([setup](docs/GITHUB.md)): add a workflow, paste the
-  public key, require the check.
-- **A ledger you can audit.** Append-only hash chain, daily signed Merkle tree heads published to Confluence, and
-  downloadable inclusion proofs checked with `node scripts/verify-ledger-proof.mjs` (Node built-ins only).
-- **For everyone involved.** Issue panel, admin page with a first-run wizard, security posture page and dashboard
-  gadget, Confluence threat-model pages and a weekly digest, the Threatline Rovo agent, and an MCP server so coding agents
-  (Claude Code, Cursor) see the same requirements ([skill](mcp-skill/skill.md)).
+1. **Create a story.** Within a few minutes Threatline Engine has reviewed it by itself on Atlassian-hosted Claude
+   models: three independent analyses that must agree and quote their evidence word for word, then a verifier that
+   checks each threat against its quotes. No setup, no Rovo agent, no Automation rule.
+2. **Read the threats in plain language.** "Anyone with the link can download another customer's orders", with the
+   sentence it rests on, its STRIDE category, ASVS 5 and CWE, and a Given/When/Then requirement.
+3. **Try to move it to Done.** Blocked, with the open requirements listed and a link back. Missing, failed or
+   out-of-date reviews block too, with a one-click re-run: the gate fails closed.
+4. **Fix or accept.** Verify a requirement with a PR link, or accept the risk with a reason, controls, an expiry and an
+   approver who is not you. Done passes.
+5. **Merge.** Paste the signed attestation into the pull request: the Bitbucket merge check (or the
+   [GitHub Action](docs/GITHUB.md)) passes for that exact commit. Change one character and it fails.
+
+**And the AI cannot be talked into approving.** Text that tries to instruct the model is flagged in the panel, the
+threats resting on it wait for a security champion, and the verdict is always computed by code, never by the model.
+Measured: 6 of 6 poisoned cases held, high-severity recall 91.9% ([eval](#eval), [how the engine works](docs/ENGINE.md)).
+
+## Also in the box
+
+- **A ledger you can audit.** Every acceptance, override and refusal goes into an append-only hash chain with daily
+  signed Merkle tree heads published to Confluence; download an inclusion proof and check it offline with
+  `node scripts/verify-ledger-proof.mjs` (Node built-ins only).
+- **For coding agents.** An MCP server and Rovo agent expose the same requirements, so Claude Code or Cursor fix what
+  the gate will check ([skill](mcp-skill/skill.md)). Each requirement also copies as a failing test skeleton
+  (TypeScript, Python or Java).
+- **Guardrails for the guardrail.** Review runs can be locked to one account, so developers cannot write their own
+  review; break-glass overrides need a written reason and are ledgered; warn-only mode expires after 14 days; a
+  budget pause needs a champion's confirmation; changes that touch no sensitive paths merge freely.
+- **Where people already work.** Issue panel, admin wizard, posture page and dashboard gadget, Confluence threat-model
+  pages, fix-by dates (7, 30, 90 days by severity), and a rule-based mode for sites without AI.
+
+Built for Atlassian Codegeist 2026 on Forge: Forge LLMs, Jira, Confluence, Bitbucket, Rovo (agent, actions, MCP) and
+Forge SQL. No egress: nothing leaves Atlassian.
 
 ## Eval
 
