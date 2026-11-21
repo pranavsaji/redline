@@ -10,6 +10,27 @@ export const VerifySchema = z
   .strict();
 export type VerifyOutput = z.infer<typeof VerifySchema>;
 
+/**
+ * Fits a strong model's verdicts to the contract before validation: extra keys dropped, "keep" given as text read as a
+ * boolean, ids normalised ("t3" → "T3"), reasons shortened. Which threats are kept is never changed: an unreadable
+ * "keep" stays unreadable and fails validation.
+ */
+export function fitVerify(raw: unknown): unknown {
+  if (typeof raw !== 'object' || raw === null || !Array.isArray((raw as { verdicts?: unknown }).verdicts)) return raw;
+  const verdicts = (raw as { verdicts: unknown[] }).verdicts.map((v) => {
+    if (typeof v !== 'object' || v === null) return v;
+    const o = v as Record<string, unknown>;
+    const id = typeof o.id === 'string' ? o.id.trim().toUpperCase() : o.id;
+    const keep = o.keep === 'true' ? true : o.keep === 'false' ? false : o.keep;
+    const reason = typeof o.reason === 'string' ? (o.reason.length > 300 ? `${o.reason.slice(0, 299).trimEnd()}…` : o.reason) : '';
+    return { id, keep, reason };
+  });
+  return { verdicts };
+}
+
+/** VerifySchema after fitVerify: what the engine validates a verifier reply against. */
+export const FittedVerifySchema = z.preprocess(fitVerify, VerifySchema);
+
 export interface VerifyItem {
   id: string;
   stride: string;

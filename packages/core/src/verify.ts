@@ -1,5 +1,5 @@
 import { severityRank, type Result, type Severity, type Threat } from '@threatline/shared';
-import { verifyPrompt, VerifySchema } from '@threatline/prompts';
+import { FittedVerifySchema, verifyPrompt } from '@threatline/prompts';
 import { appError, err, ok } from '@threatline/shared';
 import { callStage, type PipelineDeps, type Usage } from './pipeline.js';
 
@@ -24,7 +24,7 @@ export async function engineVerify(deps: Pick<PipelineDeps, 'llm' | 'policy'>, t
     items.map((t, n) => ({ id: ids[n]!, stride: t.stride, severity: t.severity, title: t.title, scenario: t.scenario, component: t.component, quotes: t.citations.map((c) => c.quote) })),
     nonce,
   );
-  const r = await callStage(deps, usage, { ...p, purpose: 'verify', tier: 'deep', maxOutputTokens: 6000 }, VerifySchema, null);
+  const r = await callStage(deps, usage, { ...p, purpose: 'verify', tier: 'deep', maxOutputTokens: 6000 }, FittedVerifySchema, null);
   if (!r.ok) return r;
   const byId = new Map(r.value.verdicts.map((v) => [v.id, v]));
   if (byId.size !== ids.length || ids.some((id) => !byId.has(id))) return err(appError('schema', 'verifier must give one verdict per threat'));
