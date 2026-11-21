@@ -3,7 +3,7 @@
  * Offline harness: `pnpm threatline <command>`.
  *   review <caseId> [--llm fake|claude-code] [--samples 3] [--model m] [--path agent|pipeline] [--yes]
  *   eval [--subset 30|all] [--llm fake|claude-code|recorded] [--samples 3] [--model m] [--path agent|pipeline] [--concurrency 1] [--yes]
- *        [--write-baseline] [--gate evals/results/baseline.json] [--resume] [--judge claude-code|recorded]
+ *        [--write-baseline] [--gate evals/results/baseline.json] [--resume] [--judge claude-code|recorded] [--record-set name] [--judge-model m]
  *     --judge grades every reported threat outside a case's must-find list with a separate claude -p call (recorded
  *     into evals/results/judged/), so the report shows judged precision next to strict precision.
  *     claude-code runs record every raw reply into evals/results/recorded/; `--llm recorded` replays them offline (CI).
@@ -51,9 +51,13 @@ async function main() {
   // Threatline Engine (pipeline path) keeps its own recordings, so the agent path's offline CI gate is never overwritten.
   // Path `engine` replays the agent runs (same recordings) and adds the verifier; the earlier extract→propose design
   // (`pipeline`) keeps its own. Judge verdicts are matched by threat title, so `engine` reuses the agent path's.
-  const RECORDED = path === 'pipeline' ? 'evals/results/recorded-pipeline' : AGENT_RECORDED;
-  const JUDGED = path === 'pipeline' ? 'evals/results/judged-pipeline' : AGENT_JUDGED;
-  const VERIFIED = 'evals/results/verified-engine';
+  // `--record-set <name>` keeps a model's recordings in evals/results/<name>/, so measuring another model (for example
+  // the Engine's production model) never overwrites the recordings the offline CI gate replays.
+  const set = flag('record-set');
+  if (set !== undefined && !/^[a-z0-9][a-z0-9.-]*$/.test(set)) throw new Error('--record-set takes a lowercase name like opus-5');
+  const RECORDED = set ? `evals/results/${set}/recorded` : path === 'pipeline' ? 'evals/results/recorded-pipeline' : AGENT_RECORDED;
+  const JUDGED = set ? `evals/results/${set}/judged` : path === 'pipeline' ? 'evals/results/judged-pipeline' : AGENT_JUDGED;
+  const VERIFIED = set ? `evals/results/${set}/verified` : 'evals/results/verified-engine';
   if (cmd === 'review') {
     const id = argv[1];
     const c = [...CLEAN_CASES, ...POISONED_CASES].find((x) => x.id === id);
@@ -81,7 +85,8 @@ async function main() {
     const recorded = flag('llm') === 'recorded';
     const judgeWith = flag('judge');
     // The judge always runs on a real model, even when the reviews are replayed (`--llm recorded` has model "none").
-    const judgeModel = flag('model', 'claude-sonnet-4-5')!;
+    // `--judge-model` keeps the judge fixed while the reviewed model changes, so judged precision stays comparable.
+    const judgeModel = flag('judge-model', flag('model', 'claude-sonnet-4-5'))!;
     const judgeLive = judgeWith === 'claude-code' ? claudeCodeLlm({ model: judgeModel }) : null;
     if (judgeLive && !(await confirm(sel.clean.length, `${judgeModel} (judge, at most one call per clean case)`))) return;
     const judgeFor = (id: string) => {
@@ -128,7 +133,7 @@ async function main() {
     process.stderr.write('\n');
     if (!r.ok) throw new Error(`${r.error.code}: ${r.error.message}`);
     mkdirSync('evals/results', { recursive: true });
-    const base = `evals/results/${r.value.date}-${recorded ? 'recorded' : name}-${subset}${path === 'pipeline' ? '-pipeline' : path === 'engine' ? '-engine' : ''}`;
+    const base = `evals/results/${r.value.date}-${recorded ? 'recorded' : name}-${subset}${path === 'pipeline' ? '-pipeline' : path === 'engine' ? '-engine' : ''}${set ? `-${set}` : ''}`;
     writeFileSync(`${base}.json`, JSON.stringify(r.value, null, 2));
     writeFileSync(`${base}.md`, reportMarkdown(r.value));
     console.log(reportMarkdown(r.value));
