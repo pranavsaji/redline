@@ -38,6 +38,21 @@ describe('Repository settings (Task 27)', () => {
     expect(await screen.findByText('Saved.')).toBeTruthy();
   });
 
+  it('bug 2: an expired warn-only window shows as ended with Block selected; saving sends block (no new window)', async () => {
+    const save = vi.fn(async (s: { mode: 'warn' | 'block' }) => ({ ...saved, mode: s.mode }));
+    // Both shapes: a server that reports the end (warnEnded), and an older one that still says mode: warn.
+    for (const loaded of [{ ...saved, mode: 'block' as const, warnEnded: '2025-11-01T10:00:00.000Z' }, { ...saved, mode: 'warn' as const, warnUntil: '2025-11-01T10:00:00.000Z' }]) {
+      save.mockClear();
+      render(<RepoSettings api={api({ get: async () => structuredClone(loaded), save })} />);
+      const form = await screen.findByRole('form', { name: 'Threatline settings' });
+      expect(await within(form).findByText(/Warn-only ended 2025-11-01 10:00 UTC/)).toBeTruthy();
+      expect((within(form).getByRole('radio', { name: /Block/ }) as HTMLInputElement).checked).toBe(true);
+      await userEvent.click(within(form).getByRole('button', { name: 'Save' }));
+      expect(save).toHaveBeenCalledWith(expect.objectContaining({ mode: 'block' }));
+      cleanup();
+    }
+  });
+
   it('a failed load says so (not "could not save")', async () => {
     render(<RepoSettings api={api({ get: async () => ({ error: 'unavailable' }) })} />);
     expect(await screen.findByText('Threatline could not load this repository’s settings. Reload the page to try again.')).toBeTruthy();

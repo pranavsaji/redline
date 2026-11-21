@@ -68,4 +68,25 @@ describe('settings resolvers', () => {
     expect(blocked).toMatchObject({ mode: 'block' });
     expect(blocked).not.toHaveProperty('warnUntil');
   });
+
+  it('bug 2: an expired warn window reads as block (with when it ended), so saving other settings does not restart it', async () => {
+    const kv = memory();
+    const store = kvsSettingsStore(kv);
+    const ctx = { accountId: 'acc', workspaceUuid: REPO, repoUuid: REPO };
+    await store.set(REPO, { publicKeys: {}, sensitivePaths: [], mode: 'warn', warnUntil: '2026-11-01T10:00:00.000Z', diffScoreThreshold: 40 });
+    const later = () => new Date('2026-11-19T10:00:00Z');
+    const got = await settingsGet({ store, now: later }, { repoUuid: REPO });
+    expect(got).toEqual({ publicKeys: {}, sensitivePaths: [], mode: 'block', warnEnded: '2026-11-01T10:00:00.000Z', diffScoreThreshold: 40 });
+    // The page now sends block, as loaded: adding a key saves block, with no new window.
+    const saved = await settingsSave({ store, isRepoAdmin: async () => true, now: later }, ctx, { ...input, mode: (got as { mode: string }).mode });
+    expect(saved).toMatchObject({ mode: 'block' });
+    expect(await store.get(REPO)).not.toHaveProperty('warnUntil');
+    // Choosing warn-only explicitly starts a new 14-day window.
+    expect(await settingsSave({ store, isRepoAdmin: async () => true, now: later }, ctx, { ...input, mode: 'warn' })).toMatchObject({ mode: 'warn', warnUntil: '2026-12-03T10:00:00.000Z' });
+    // A running window reads as is.
+    expect(await settingsGet({ store, now: later }, { repoUuid: REPO })).toMatchObject({ mode: 'warn', warnUntil: '2026-12-03T10:00:00.000Z' });
+    // A warn mode with no end date (never written by Threatline) reads as block too.
+    await store.set(REPO, { publicKeys: {}, sensitivePaths: [], mode: 'warn', diffScoreThreshold: 40 });
+    expect(await settingsGet({ store, now: later }, { repoUuid: REPO })).toMatchObject({ mode: 'block' });
+  });
 });

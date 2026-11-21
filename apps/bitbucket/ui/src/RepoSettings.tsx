@@ -6,6 +6,7 @@ import { box, field, label } from './styles.js';
 import { TestAttestation } from './TestAttestation.js';
 
 // DEFAULT_SITE_POLICY.sensitivePaths plus GATE_CONFIG_PATHS (packages/core), which no setting or policy file can remove.
+const utc = (iso: string) => `${iso.slice(0, 16).replace('T', ' ')} UTC`;
 const DEFAULT_PATHS = 'src/auth/**, **/auth/**, **/payments/**, **/crypto/**, infra/**, **/*.pem, .threatline/**, .redline/**, bitbucket-pipelines.yml, .github/workflows/**, .github/actions/**';
 
 /** Repository settings → Threatline: trusted public keys, extra sensitive paths, mode and diff-score threshold. */
@@ -17,6 +18,7 @@ export function RepoSettings({ api }: { api: SettingsApi }) {
   const [mode, setMode] = useState<'warn' | 'block'>('block');
   const [threshold, setThreshold] = useState(40);
   const [warnUntil, setWarnUntil] = useState<string | null>(null);
+  const [warnEnded, setWarnEnded] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -29,8 +31,12 @@ export function RepoSettings({ api }: { api: SettingsApi }) {
         if (isError(r)) return setError(r.message ?? 'Threatline could not load this repository’s settings. Reload the page to try again.');
         setKeys(Object.values(r.publicKeys).join('\n'));
         setPaths(r.sensitivePaths.join('\n'));
-        setMode(r.mode);
-        setWarnUntil(r.warnUntil ?? null);
+        // An ended warn-only window loads as Block (the check already blocks), so saving anything else cannot quietly
+        // start a new window; the admin must choose Warn only again. Older servers still report mode: warn here.
+        const ended = r.warnEnded ?? (r.mode === 'warn' && !(r.warnUntil && Date.parse(r.warnUntil) > Date.now()) ? (r.warnUntil ?? '') : null);
+        setMode(ended === null ? r.mode : 'block');
+        setWarnEnded(ended);
+        setWarnUntil(ended === null ? (r.warnUntil ?? null) : null);
         setThreshold(r.diffScoreThreshold);
         setLoaded(true);
       });
@@ -45,6 +51,7 @@ export function RepoSettings({ api }: { api: SettingsApi }) {
     if (isError(r)) return setError(errorText(r));
     setError(null);
     setWarnUntil(r.warnUntil ?? null);
+    if (r.mode === 'warn') setWarnEnded(null);
     setNotice('Saved.');
   };
 
@@ -72,7 +79,11 @@ export function RepoSettings({ api }: { api: SettingsApi }) {
             <input type="radio" name={`${id}-mode`} checked={mode === 'warn'} onChange={() => setMode('warn')} /> Warn only (14 days, then block)
           </label>
         </fieldset>
-        {mode === 'warn' && warnUntil && <span style={{ font: token('font.body.small'), color: token('color.text.subtle') }}>{`Warn-only ends ${warnUntil.slice(0, 16).replace('T', ' ')} UTC.`}</span>}
+        {mode === 'warn' && warnUntil && <span style={{ font: token('font.body.small'), color: token('color.text.subtle') }}>{`Warn-only ends ${utc(warnUntil)}.`}</span>}
+        {mode === 'warn' && !warnUntil && <span style={{ font: token('font.body.small'), color: token('color.text.subtle') }}>Saving starts a new 14-day warn-only window.</span>}
+        {mode === 'block' && warnEnded !== null && (
+          <span style={{ font: token('font.body.small'), color: token('color.text.subtle') }}>{`Warn-only ended${warnEnded ? ` ${utc(warnEnded)}` : ''}, so the check blocks. Choose Warn only and save to start a new 14-day window.`}</span>
+        )}
         <label style={label} htmlFor={`${id}-t`}>
           Diff score threshold (0–100; changes scoring this or more need an attestation even outside sensitive paths)
         </label>

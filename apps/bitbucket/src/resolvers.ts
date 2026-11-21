@@ -3,14 +3,26 @@ import { parseSettingsInput, REPO_UUID, type SettingsStore } from './settings-st
 
 export type ApiError = { error: 'forbidden' | 'validation' | 'unavailable'; message?: string };
 
-/** `settings.get`: the repository's Threatline settings (defaults before the first save). */
-export async function settingsGet(deps: { store: SettingsStore }, ctx: { repoUuid: string }): Promise<RepoSettings | ApiError> {
+/** What the settings page shows: `warnEnded` is set when a warn-only window has run out (the check blocks again). */
+export type SettingsView = RepoSettings & { warnEnded?: string };
+
+/**
+ * `settings.get`: the repository's Threatline settings (defaults before the first save). An ended warn-only window reads
+ * as block, with when it ended: the merge check already blocks, and the page must not load "Warn only" selected, or
+ * saving anything else (a new public key) would silently start another 14-day window.
+ */
+export async function settingsGet(deps: { store: SettingsStore; now?: () => Date }, ctx: { repoUuid: string }): Promise<SettingsView | ApiError> {
   if (!REPO_UUID.test(ctx.repoUuid)) return { error: 'validation', message: 'Unknown repository.' };
+  let s: RepoSettings;
   try {
-    return (await deps.store.get(ctx.repoUuid)) ?? { ...DEFAULT_REPO_SETTINGS };
+    s = (await deps.store.get(ctx.repoUuid)) ?? { ...DEFAULT_REPO_SETTINGS };
   } catch {
     return { error: 'unavailable' };
   }
+  const now = (deps.now ?? (() => new Date()))().getTime();
+  if (s.mode !== 'warn' || (s.warnUntil && Date.parse(s.warnUntil) > now)) return s;
+  const { warnUntil, ...rest } = s;
+  return { ...rest, mode: 'block', ...(warnUntil ? { warnEnded: warnUntil } : {}) };
 }
 
 /** `settings.save`: repository admins only (checked with Bitbucket as the user; any failure refuses). */

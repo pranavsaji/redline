@@ -4,6 +4,8 @@ export interface Settings {
   mode: 'warn' | 'block';
   /** When warn mode ends (at most 14 days after it was switched on); then the check blocks again. */
   warnUntil?: string;
+  /** When an earlier warn-only window ended (the check blocks again; mode reads as block). */
+  warnEnded?: string;
   diffScoreThreshold: number;
 }
 export interface SettingsInput {
