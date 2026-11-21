@@ -7,7 +7,7 @@ await build({
   outfile: 'dist/index.mjs',
   bundle: true,
   platform: 'node',
-  target: 'node20',
+  target: 'node24',
   format: 'esm',
   legalComments: 'none',
   logLevel: 'warning',

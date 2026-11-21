@@ -17,6 +17,15 @@ describe('parseSettingsInput', () => {
     expect(r).toEqual({ ok: true, value: { publicKeys: { [a.kid]: a.publicKey, [b.kid]: b.publicKey }, sensitivePaths: ['billing/**', 'src/admin/**'], mode: 'warn', diffScoreThreshold: 30 } });
   });
 
+  it('bug 4b: a key line can carry a retire date (`<key> until=<ISO date>`); bare keys still work', () => {
+    const a = generateKeyPair();
+    const b = generateKeyPair();
+    const r = parseSettingsInput({ publicKeys: `${a.publicKey}\n${b.publicKey}   until=2026-12-01`, sensitivePaths: '', mode: 'block', diffScoreThreshold: 40 });
+    expect(r).toEqual({ ok: true, value: { publicKeys: { [a.kid]: a.publicKey, [b.kid]: b.publicKey }, keyRetireAt: { [b.kid]: '2026-12-01T00:00:00.000Z' }, sensitivePaths: [], mode: 'block', diffScoreThreshold: 40 } });
+    for (const bad of [`${b.publicKey} until=someday`, `${b.publicKey} until=`, `${b.publicKey} after=2026-12-01`, `${b.publicKey} until=2026-12-01 extra`])
+      expect(parseSettingsInput({ publicKeys: bad, sensitivePaths: '', mode: 'block', diffScoreThreshold: 40 })).toMatchObject({ ok: false, error: { message: expect.stringMatching(/line 1/) } });
+  });
+
   it('rejects a key that is not a base64url 32-byte Ed25519 public key, and says which line', () => {
     const r = parseSettingsInput({ publicKeys: `${generateKeyPair().publicKey}\nnot-a-key`, sensitivePaths: '', mode: 'block', diffScoreThreshold: 40 });
     expect(r).toMatchObject({ ok: false, error: { code: 'validation', message: expect.stringMatching(/line 2/) } });
@@ -53,6 +62,22 @@ describe('settings resolvers', () => {
     expect(await kvsSettingsStore(kv).get(REPO.toUpperCase())).toMatchObject({ mode: 'block' });
   });
 
+  it('bug 3: a stored value that no longer parses is an error for the merge check, but the page still loads defaults to re-save', async () => {
+    const kv = memory();
+    const store = kvsSettingsStore(kv);
+    await store.set(REPO, { publicKeys: {}, sensitivePaths: ['billing/**'], mode: 'block', diffScoreThreshold: 40 });
+    const [k] = [...kv.data.keys()];
+    kv.data.set(k!, { ...(kv.data.get(k!) as object), mode: 'sideways' });
+    await expect(store.get(REPO)).rejects.toThrow(/stored Threatline settings/);
+    expect(await settingsGet({ store }, { repoUuid: REPO })).toEqual({ publicKeys: {}, sensitivePaths: [], mode: 'block', diffScoreThreshold: 40 });
+    // Saving fresh settings over the corrupt value works (warn mode reads the previous value first).
+    expect(await settingsSave({ store, isRepoAdmin: async () => true }, { accountId: 'acc', workspaceUuid: REPO, repoUuid: REPO }, { ...input, mode: 'warn' })).toMatchObject({ mode: 'warn' });
+    expect(await store.get(REPO)).toMatchObject({ mode: 'warn', sensitivePaths: ['billing/**'] });
+    // Storage that is down is "unavailable" on the page, not defaults.
+    const down = kvsSettingsStore({ get: async () => Promise.reject(new Error('down')), set: async () => undefined });
+    expect(await settingsGet({ store: down }, { repoUuid: REPO })).toEqual({ error: 'unavailable' });
+  });
+
   it('a malformed repository id is refused', async () => {
     const store = kvsSettingsStore(memory());
     expect(await settingsSave({ store, isRepoAdmin: async () => true }, { accountId: 'acc', workspaceUuid: REPO, repoUuid: 'x/../y' }, input)).toMatchObject({ error: 'validation' });
@@ -67,5 +92,26 @@ describe('settings resolvers', () => {
     const blocked = await settingsSave(deps, ctx, { ...input, mode: 'block' });
     expect(blocked).toMatchObject({ mode: 'block' });
     expect(blocked).not.toHaveProperty('warnUntil');
+  });
+
+  it('bug 2: an expired warn window reads as block (with when it ended), so saving other settings does not restart it', async () => {
+    const kv = memory();
+    const store = kvsSettingsStore(kv);
+    const ctx = { accountId: 'acc', workspaceUuid: REPO, repoUuid: REPO };
+    await store.set(REPO, { publicKeys: {}, sensitivePaths: [], mode: 'warn', warnUntil: '2026-11-01T10:00:00.000Z', diffScoreThreshold: 40 });
+    const later = () => new Date('2026-11-19T10:00:00Z');
+    const got = await settingsGet({ store, now: later }, { repoUuid: REPO });
+    expect(got).toEqual({ publicKeys: {}, sensitivePaths: [], mode: 'block', warnEnded: '2026-11-01T10:00:00.000Z', diffScoreThreshold: 40 });
+    // The page now sends block, as loaded: adding a key saves block, with no new window.
+    const saved = await settingsSave({ store, isRepoAdmin: async () => true, now: later }, ctx, { ...input, mode: (got as { mode: string }).mode });
+    expect(saved).toMatchObject({ mode: 'block' });
+    expect(await store.get(REPO)).not.toHaveProperty('warnUntil');
+    // Choosing warn-only explicitly starts a new 14-day window.
+    expect(await settingsSave({ store, isRepoAdmin: async () => true, now: later }, ctx, { ...input, mode: 'warn' })).toMatchObject({ mode: 'warn', warnUntil: '2026-12-03T10:00:00.000Z' });
+    // A running window reads as is.
+    expect(await settingsGet({ store, now: later }, { repoUuid: REPO })).toMatchObject({ mode: 'warn', warnUntil: '2026-12-03T10:00:00.000Z' });
+    // A warn mode with no end date (never written by Threatline) reads as block too.
+    await store.set(REPO, { publicKeys: {}, sensitivePaths: [], mode: 'warn', diffScoreThreshold: 40 });
+    expect(await settingsGet({ store, now: later }, { repoUuid: REPO })).toMatchObject({ mode: 'block' });
   });
 });

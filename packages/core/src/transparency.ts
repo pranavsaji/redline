@@ -1,4 +1,4 @@
-import { consistencyProof, entryHash, entryLeafHash, inclusionProof, merkleRoot, signB64, utf8, verifyB64, verifyConsistency, verifyInclusion, type KeyPair } from '@threatline/crypto';
+import { consistencyProof, entryHash, entryLeafHash, fromB64url, inclusionProof, kidOf, merkleRoot, signB64, utf8, verifyB64, verifyConsistency, verifyInclusion, type KeyPair } from '@threatline/crypto';
 import { appError, err, ok, type Result } from '@threatline/shared';
 import type { LedgerRow, TreeHead } from './ports.js';
 
@@ -85,9 +85,19 @@ export function buildLedgerProofFromHashes(
   return ok(proof);
 }
 
-export type ProofVerdict = { ok: true; treeSize: number; seq: number } | { ok: false; reason: 'format' | 'entry_hash' | 'signature' | 'inclusion' | 'consistency' };
+export type ProofVerdict = { ok: true; treeSize: number; seq: number } | { ok: false; reason: 'format' | 'entry_hash' | 'kid' | 'signature' | 'inclusion' | 'consistency' };
 
-/** Everything an auditor checks, in order: the entry's own hash, the head's signature, inclusion, then consistency. */
+/** The key id a public key has (sha256 of the raw key, first 16 hex), or null for something that is not a key. */
+const kidOfKey = (publicKey: unknown): string | null => {
+  const raw = typeof publicKey === 'string' ? fromB64url(publicKey) : null;
+  return raw && raw.length === 32 ? kidOf(raw) : null;
+};
+
+/**
+ * Everything an auditor checks, in order: the entry's own hash, that each head's key id is the embedded public key's (a
+ * self-signed forgery cannot borrow Threatline's kid), the head's signature, inclusion, then consistency. The embedded
+ * key itself must still be compared with the published one (the offline script's --public-key does that).
+ */
 export function verifyLedgerProof(p: LedgerProof): ProofVerdict {
   if ((p?.format !== LEDGER_PROOF_FORMAT && p?.format !== LEGACY_LEDGER_PROOF_FORMAT) || !p.entry || !p.treeHead || !Array.isArray(p.auditPath)) return { ok: false, reason: 'format' };
   const e = p.entry;
@@ -98,6 +108,8 @@ export function verifyLedgerProof(p: LedgerProof): ProofVerdict {
     return { ok: false, reason: 'entry_hash' };
   }
   if (recomputed !== e.entryHash || !HEX64.test(e.entryHash)) return { ok: false, reason: 'entry_hash' };
+  const kid = kidOfKey(p.publicKey);
+  if (!kid || p.treeHead.kid !== kid || (p.consistency && p.consistency.fromTreeHead?.kid !== kid)) return { ok: false, reason: 'kid' };
   if (!verifyTreeHead(p.treeHead, p.publicKey)) return { ok: false, reason: 'signature' };
   if (!verifyInclusion(entryLeafHash(e.entryHash), p.leafIndex, p.treeHead.treeSize, p.auditPath, p.treeHead.rootHash)) return { ok: false, reason: 'inclusion' };
   if (p.consistency) {
@@ -106,4 +118,28 @@ export function verifyLedgerProof(p: LedgerProof): ProofVerdict {
     if (!verifyConsistency(from.treeSize, p.treeHead.treeSize, from.rootHash, p.treeHead.rootHash, p.consistency.proof)) return { ok: false, reason: 'consistency' };
   }
   return { ok: true, treeSize: p.treeHead.treeSize, seq: e.seq };
+}
+
+export type TreeHeadCheck =
+  | { ok: true; checked: number }
+  | { ok: false; reason: 'truncated' | 'tree_head_mismatch' | 'tree_head_signature'; firstBrokenSeq: number; treeSize: number };
+
+/**
+ * The ledger against its stored signed tree heads. The hash chain alone cannot see the newest entries dropped, nor an
+ * entry changed with every later hash recomputed; a signed head can: its size must not exceed the ledger and its root
+ * must equal the root of the ledger's first `treeSize` entries. Heads are checked smallest first, so a mismatch names the
+ * first entry after the last head that still matches. A head whose key is still published must also verify, or a
+ * rewritten stored root could hide a rewritten ledger (heads from retired keys are checked on size and root only).
+ */
+export function checkTreeHeads(rows: readonly Pick<LedgerRow, 'seq' | 'entryHash'>[], heads: readonly TreeHead[], publicKeys: Record<string, string>): TreeHeadCheck {
+  const leaves = ledgerLeafHashes(rows);
+  let good = 0;
+  for (const h of [...heads].sort((a, b) => a.treeSize - b.treeSize)) {
+    const key = publicKeys[h.kid];
+    if (key && !verifyTreeHead(h, key)) return { ok: false, reason: 'tree_head_signature', firstBrokenSeq: good + 1, treeSize: h.treeSize };
+    if (h.treeSize > leaves.length) return { ok: false, reason: 'truncated', firstBrokenSeq: leaves.length + 1, treeSize: h.treeSize };
+    if (merkleRoot(leaves.slice(0, h.treeSize)) !== h.rootHash) return { ok: false, reason: 'tree_head_mismatch', firstBrokenSeq: good + 1, treeSize: h.treeSize };
+    good = h.treeSize;
+  }
+  return { ok: true, checked: heads.length };
 }

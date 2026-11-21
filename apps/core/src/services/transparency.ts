@@ -80,7 +80,7 @@ export async function publishTreeHead(deps: CoreDeps): Promise<Result<PublishOut
     .join('');
   const storage = [
     `<p>Signed heads of the Merkle tree over Threatline's risk ledger (RFC 9162 hashing; leaves are the ledger entry hashes in order). Each head signs the text <code>threatline-tree-head-v1</code>, the tree size, the root hash and the time, one per line, with Ed25519. Keep a copy: a later inclusion proof must be consistent with every head here.</p>`,
-    `<p>Check a proof downloaded from the Threatline admin page offline with <code>node scripts/verify-ledger-proof.mjs proof.json</code>, and compare its public key with the one below.</p>`,
+    `<p>Check a proof downloaded from the Threatline admin page offline with <code>node scripts/verify-ledger-proof.mjs proof.json --public-key &lt;the active key below&gt;</code>; it fails unless the proof is signed by that key.</p>`,
     '<h2>Signing keys</h2>',
     `<table><tbody><tr><th>Key id</th><th>Public key (Ed25519, base64url)</th></tr>${keyRows}</tbody></table>`,
     '<h2>Tree heads</h2>',

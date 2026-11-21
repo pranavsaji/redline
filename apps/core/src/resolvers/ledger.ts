@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { checkTreeHeads, type TreeHeadCheck } from '@threatline/core';
 import { verifyChain, type ChainVerdict } from '@threatline/crypto';
 import type { CoreDeps } from '../deps.js';
 import { evidencePack } from '../services/evidence-pack.js';
@@ -11,12 +12,28 @@ const ExportSchema = z
   .object({ projectKey: z.string().regex(/^[A-Z][A-Z0-9_]{0,254}$/, 'a Jira project key like PAY'), from: DATE, to: DATE })
   .refine((q) => q.from <= q.to, { message: 'the start date must be on or before the end date', path: ['from'] });
 
-/** `ledger.verify` (RL-4): Jira administrators only. */
-export async function ledgerVerify(deps: CoreDeps, a: Admin): Promise<ChainVerdict | ApiError> {
+/** How many stored signed tree heads "Verify the ledger" checks (newest first; one per ledger size that was signed). */
+const VERIFY_HEADS = 200;
+export type LedgerVerdict = (ChainVerdict & { treeHeads?: number }) | Extract<TreeHeadCheck, { ok: false }>;
+
+/**
+ * `ledger.verify` (RL-4): Jira administrators only. The hash chain, then the chain against the signed tree heads: the
+ * chain alone reads "intact" after the newest entries are dropped, or after an entry is changed and every later hash
+ * recomputed.
+ */
+export async function ledgerVerify(deps: CoreDeps, a: Admin): Promise<LedgerVerdict | ApiError> {
   const denied = await requireAdmin(deps, a);
   if (denied) return denied;
   const rows = await deps.ledger.all();
-  return rows.ok ? verifyChain(rows.value) : apiError(rows.error);
+  if (!rows.ok) return apiError(rows.error);
+  const chain = verifyChain(rows.value);
+  if (!chain.ok) return chain;
+  const [heads, keys] = await Promise.all([deps.treeHeads.list(VERIFY_HEADS), deps.keys.publicKeys()]);
+  if (!heads.ok) return apiError(heads.error);
+  if (!keys.ok) return apiError(keys.error);
+  const checked = checkTreeHeads(rows.value, heads.value, keys.value);
+  if (!checked.ok) return checked;
+  return checked.checked > 0 ? { ...chain, treeHeads: checked.checked } : chain;
 }
 
 /** `ledger.export` (RL-7): the evidence pack. Jira administrators only. */

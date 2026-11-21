@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { generateKeyPair } from '@threatline/crypto';
@@ -42,6 +42,60 @@ describe('offline verifier script (no Threatline code, Node built-ins only)', ()
       expect(verifyProof(x)).toEqual(verifyLedgerProof(x));
       expect((verifyProof(x) as { ok: boolean }).ok).toBe(false);
     }
+  });
+
+  it('bug 5: a self-signed proof that claims the real key id fails in both verifiers (kid must match the embedded key)', async () => {
+    const { verifyProof } = (await import(SCRIPT)) as { verifyProof: (p: unknown) => unknown };
+    const real = await proof();
+    const forger = generateKeyPair();
+    const repo = memoryLedgerRepo();
+    await appendLedger(repo, fixedClock('2026-11-15T00:00:00Z'), 'acceptance.approved', { acceptanceId: 'acc_forged' }, 'u1');
+    const rows = [...repo._rows];
+    const forged = buildLedgerProof(rows, 1, { ...signTreeHead(rows, forger, new Date('2026-11-18T00:00:00Z')), kid: real.treeHead.kid }, forger.publicKey);
+    if (!forged.ok) throw new Error('proof');
+    expect(verifyLedgerProof(forged.value)).toEqual({ ok: false, reason: 'kid' });
+    expect(verifyProof(forged.value)).toEqual({ ok: false, reason: 'kid' });
+    // The earlier head in a consistency proof is checked too.
+    const x = structuredClone(real) as unknown as { consistency: { fromTreeHead: { kid: string } } };
+    x.consistency.fromTreeHead.kid = forger.kid;
+    expect(verifyLedgerProof(x as unknown as LedgerProof)).toEqual({ ok: false, reason: 'kid' });
+    expect(verifyProof(x)).toEqual({ ok: false, reason: 'kid' });
+  });
+
+  it('bug 5: --public-key pins the expected key; the output shows the full key and its id', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'threatline-proof-'));
+    const file = join(dir, 'proof.json');
+    const p = await proof();
+    writeFileSync(file, JSON.stringify(p));
+    const out = execFileSync(process.execPath, [SCRIPT, file, '--public-key', p.publicKey], { encoding: 'utf8' });
+    expect(out).toContain(`Public key ${p.publicKey} (key id ${p.treeHead.kid})`);
+    expect(out).toMatch(/matches the pinned --public-key/);
+    let failed: { status: number; stderr: string } | null = null;
+    try {
+      execFileSync(process.execPath, [SCRIPT, file, '--public-key', generateKeyPair().publicKey], { encoding: 'utf8', stdio: 'pipe' });
+    } catch (e) {
+      failed = e as { status: number; stderr: string };
+    }
+    expect(failed?.status).toBe(1);
+    expect(failed?.stderr).toMatch(/^FAILED: the proof is signed with key .* not the pinned --public-key/);
+  });
+
+  it('bug 10: the committed example proof verifies (OK) and its tampered copy fails (FAILED, exit 1), as docs/ARCHITECTURE.md says', () => {
+    const examples = resolve(__dirname, '../../../docs/examples');
+    const good = JSON.parse(readFileSync(join(examples, 'ledger-proof.json'), 'utf8')) as LedgerProof;
+    // A throwaway demo key, never the key a real Threatline install (or this repository's CI) uses.
+    expect(readFileSync(resolve(__dirname, '../../../.github/workflows/ci.yml'), 'utf8')).not.toContain(good.publicKey);
+    expect(verifyLedgerProof(good)).toEqual({ ok: true, treeSize: 8, seq: 6 });
+    const out = execFileSync(process.execPath, [SCRIPT, join(examples, 'ledger-proof.json'), '--public-key', good.publicKey], { encoding: 'utf8' });
+    expect(out).toMatch(/^OK: ledger entry 6 \(attestation.issued\) is in the signed tree of 8 entries\.\n/);
+    expect(out).toMatch(/Consistent with the earlier head of 4 entries/);
+    let failed: { status: number; stderr: string } | null = null;
+    try {
+      execFileSync(process.execPath, [SCRIPT, join(examples, 'ledger-proof-tampered.json')], { encoding: 'utf8', stdio: 'pipe' });
+    } catch (e) {
+      failed = e as { status: number; stderr: string };
+    }
+    expect(failed).toMatchObject({ status: 1, stderr: 'FAILED: entry_hash\n' });
   });
 
   it('runs from the command line', async () => {

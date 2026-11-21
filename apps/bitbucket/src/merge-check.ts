@@ -27,7 +27,14 @@ export async function runMergeCheck(
   event: PRCheckEvent,
   deps: { client: BitbucketClient; settings: (repoUuid: string) => Promise<RepoSettings | null>; nowSec: () => number },
 ): Promise<{ success: boolean; message: string }> {
-  const settings = (await deps.settings(event.repository.uuid).catch(() => null)) ?? DEFAULT_REPO_SETTINGS;
+  // null: no settings were ever saved, so the defaults apply. A failed or corrupt read fails closed instead: the defaults
+  // would drop the admin's sensitive paths and pass a change that touches them.
+  const read = await deps.settings(event.repository.uuid).then(
+    (s) => ({ ok: true as const, s }),
+    () => ({ ok: false as const }),
+  );
+  if (!read.ok) return { success: false, message: "Threatline: could not read this repository's Threatline settings, so this pull request cannot be checked. Re-run the check in a minute." };
+  const settings = read.s ?? DEFAULT_REPO_SETTINGS;
   const warnActive = settings.mode === 'warn' && !!settings.warnUntil && Date.parse(settings.warnUntil) / 1000 > deps.nowSec();
   const unreadable = (why: string) => {
     const message = `Threatline: could not read this pull request from Bitbucket (${why}), so it cannot be checked. Re-run the check in a minute.`;
@@ -42,10 +49,15 @@ export async function runMergeCheck(
   ]);
   if (!pr.ok) return unreadable('pull request');
   if (!diff.ok) return unreadable('changed files');
-  const head = pr.value.source?.commit?.hash ?? '';
+  const shortHead = pr.value.source?.commit?.hash ?? '';
   const dest = pr.value.destination?.commit?.hash ?? '';
   const fullName = pr.value.destination?.repository?.full_name ?? '';
-  if (!head || !dest || !fullName) return unreadable('commits');
+  if (!shortHead || !dest || !fullName) return unreadable('commits');
+  // The pull request API reports 12-character hashes; the gate matches the attestation's full hash exactly. The full
+  // hash comes from the pull request's own commit list (forks included); anything that does not match fails closed.
+  const resolved = /^[0-9a-f]{40}$/.test(shortHead) ? { ok: true as const, value: shortHead } : await deps.client.headCommit(ws, repo, event.pullrequest.id, shortHead);
+  if (!resolved.ok || !resolved.value.startsWith(shortHead.toLowerCase())) return unreadable('head commit');
+  const head = resolved.value;
   // `.redline/policy.yml`: the name before the rename to Threatline, still read when the new file is absent.
   const current = await deps.client.fileAt(ws, repo, dest, '.threatline/policy.yml');
   const policy = current.ok && current.value === null ? await deps.client.fileAt(ws, repo, dest, '.redline/policy.yml') : current;
