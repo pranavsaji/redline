@@ -146,6 +146,16 @@ describe('combineVerdicts', () => {
     expect(v.overridden).toBeUndefined();
   });
 
+  it('security: a child that passes only because its ancestor is overridden carries the override window', () => {
+    const parent = computeVerdict(input({ breakGlass: [{ issueId: '10001', until: '2026-11-16T00:00:00Z' }] }));
+    const own = computeVerdict(input({ threats: [], requirements: [] }));
+    const v = combineVerdicts(own, [{ issueKey: 'PROJ-1', verdict: parent }]);
+    expect(v).toMatchObject({ state: 'pass', overridden: true, validUntil: '2026-11-16T00:00:00.000Z', inheritedFrom: ['PROJ-1'] });
+    expect(verdictLapsed(v, new Date('2026-11-16T00:00:00Z'))).toBe(true);
+    // A child that blocks on its own still blocks.
+    expect(combineVerdicts(computeVerdict(input()), [{ issueKey: 'PROJ-1', verdict: parent }]).state).toBe('block');
+  });
+
   it('security: a lenient ancestor without an end time makes the child block', () => {
     const own = computeVerdict(input({ threats: [], requirements: [] }));
     const ancestor = { ...computeVerdict(input()), state: 'warn' as const };

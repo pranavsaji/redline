@@ -223,14 +223,23 @@ async function writeFailClosed(deps: CoreDeps, issueId: string, panelUrl: string
 
 /**
  * A Threatline requirement sub-task follows its own requirement rather than inheriting the whole story's block: it blocks
- * only while the story's verdict lists that requirement as open (and is lenient when the story is).
+ * only while the story's verdict lists that requirement as open (and is lenient when the story is, for as long as the
+ * story is: an overridden story's sub-task passes only until the override ends).
  */
 function requirementSubtaskVerdict(req: Requirement, story: Verdict, storyKey: string, now: Date): Verdict {
   const open = story.reasons.some((r) => r.code === 'open_requirement' && (r.requirementIds ?? []).includes(req.id));
   const base = { reviewId: story.reviewId, revision: story.revision, inheritedFrom: [], updatedAt: now.toISOString() };
-  if (!open || story.state === 'pass') return { state: 'pass', blockingCount: 0, maxOpenSeverity: null, reasons: [], ...base };
+  if (!open) return { state: 'pass', blockingCount: 0, maxOpenSeverity: null, reasons: [], ...base };
   const reasons: BlockReason[] = [{ code: 'open_requirement', message: `This security requirement is not verified yet. Add evidence on ${storyKey} in the Threatline panel.` }];
-  return { state: story.state, ...(story.validUntil ? { validUntil: story.validUntil } : {}), blockingCount: 1, maxOpenSeverity: req.severity, reasons, ...base };
+  return {
+    state: story.state,
+    ...(story.overridden ? { overridden: true } : {}),
+    ...(story.validUntil ? { validUntil: story.validUntil } : {}),
+    blockingCount: 1,
+    maxOpenSeverity: req.severity,
+    reasons,
+    ...base,
+  };
 }
 
 /** App storage first (the gate reads it; failure is an error so the job retries), then the issue property (display). */
@@ -299,7 +308,9 @@ export async function refreshVerdict(deps: CoreDeps, issueId: string): Promise<R
       const sv = await ownVerdict(deps, story.value, policy.value, ledgered, storyUrl, now);
       if (!sv.ok) return fail(sv);
       const v = requirementSubtaskVerdict(mine, sv.value.verdict, story.value.key, now);
-      const w = await write(deps, issue.id, { ...v, panelUrl: storyUrl, message: gateMessage(v, new Map(), storyUrl, guarded) }, version);
+      // Same M1 recheck as the story: the sub-task passes on its acceptance only until that acceptance runs out.
+      const due = recheckAt(ledgered.acceptances, new Set([mine.id]), now);
+      const w = await write(deps, issue.id, { ...v, panelUrl: storyUrl, message: gateMessage(v, new Map(), storyUrl, guarded), ...(due ? { recheckAt: due } : {}) }, version);
       return w.ok ? ok(v) : w;
     }
   }

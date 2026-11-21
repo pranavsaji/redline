@@ -147,25 +147,34 @@ export function verdictLapsed(v: Pick<Verdict, 'state' | 'overridden' | 'validUn
   return Number.isNaN(end) || now.getTime() >= end;
 }
 
-/** A child inherits blocks (and warnings) from reviewed ancestors; reasons are prefixed with the ancestor key. */
+/**
+ * A child inherits blocks (and warnings) from reviewed ancestors; reasons are prefixed with the ancestor key. An
+ * ancestor passing on a break-glass override is lenient too: a child that would pass only holds until that override
+ * ends, after which the ancestor blocks again and so must the child.
+ */
 export function combineVerdicts(own: Verdict, ancestors: Array<{ issueKey: string; verdict: Verdict }>): Verdict {
-  const relevant = ancestors.filter((a) => a.verdict.state !== 'pass');
-  if (relevant.length === 0) return own;
+  const lenientAncestor = ancestors.filter((a) => a.verdict.state !== 'pass' || a.verdict.overridden);
+  if (lenientAncestor.length === 0) return own;
+  const lenient = [...(own.state === 'warn' || own.overridden ? [own] : []), ...lenientAncestor.map((a) => a.verdict)];
+  // Leniency is only as long as its shortest window; a lenient party with no end time cannot be trusted at all.
+  const missingEnd = lenient.some((v) => !v.validUntil);
+  const anyBlock = own.state === 'block' || lenientAncestor.some((a) => a.verdict.state === 'block') || missingEnd;
+  const anyWarn = own.state === 'warn' || lenientAncestor.some((a) => a.verdict.state === 'warn');
+  const state = anyBlock ? 'block' : anyWarn ? 'warn' : 'pass';
+  // A block lists only what blocks now; an overridden ancestor's reasons are shown while its override is what passes.
+  const relevant = state === 'block' ? lenientAncestor.filter((a) => a.verdict.state !== 'pass') : lenientAncestor;
   let maxOpen = own.maxOpenSeverity;
   for (const a of relevant) {
     const s = a.verdict.maxOpenSeverity;
     if (s && (maxOpen === null || severityRank(s) > severityRank(maxOpen))) maxOpen = s;
   }
-  const lenient = [...(own.state === 'warn' || own.overridden ? [own] : []), ...relevant.map((a) => a.verdict)];
-  // Leniency is only as long as its shortest window; a lenient party with no end time cannot be trusted at all.
-  const missingEnd = lenient.some((v) => !v.validUntil);
-  const anyBlock = own.state === 'block' || relevant.some((a) => a.verdict.state === 'block') || missingEnd;
   const { validUntil: _vu, overridden: _ov, ...rest } = own;
   const windowEnd = anyBlock ? undefined : new Date(Math.min(...lenient.map((v) => new Date(v.validUntil!).getTime()))).toISOString();
   return {
     ...rest,
     ...(windowEnd ? { validUntil: windowEnd } : {}),
-    state: anyBlock ? 'block' : 'warn',
+    ...(state === 'pass' ? { overridden: true } : {}),
+    state,
     reasons: [...own.reasons, ...relevant.flatMap((a) => a.verdict.reasons.map((r) => ({ ...r, message: `${a.issueKey}: ${r.message}` })))],
     inheritedFrom: [...own.inheritedFrom, ...relevant.map((a) => a.issueKey)],
     blockingCount: own.blockingCount + relevant.reduce((n, a) => n + a.verdict.blockingCount, 0),
