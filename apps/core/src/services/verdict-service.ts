@@ -154,10 +154,13 @@ async function ownVerdict(
   panelUrl: string,
   now: Date,
 ): Promise<Result<{ verdict: Verdict; reviewed: boolean; notApplicable: boolean; requirements: Requirement[]; riskScore?: number }>> {
-  if (!policy.enabledProjects.includes(issue.project.key) || !policy.reviewIssueTypes.includes(issue.issueType.name)) return ok({ verdict: notApplicable(now), reviewed: false, notApplicable: true, requirements: [] });
+  const scope = outOfScope(issue, policy);
   const latest = await deps.reviews.latest(issue.id);
   if (!latest.ok) return latest;
   const review = latest.value;
+  // Only never-reviewed items of other types or projects pass freely. Re-typing or moving a reviewed item must not
+  // shed its review: it is judged as before, and the gate says why.
+  if (scope && !review) return ok({ verdict: notApplicable(now), reviewed: false, notApplicable: true, requirements: [] });
   let threats: Awaited<ReturnType<CoreDeps['reviews']['threats']>> = ok([]);
   let injectionSuspected = false;
   if (review) {
@@ -194,7 +197,19 @@ async function ownVerdict(
     now,
     panelUrl,
   });
+  const [first, ...more] = verdict.reasons;
+  if (scope && first) verdict.reasons = [{ ...first, message: `Threatline reviewed this work item before it ${scope}, so its review and security requirements still apply. ${first.message}` }, ...more];
   return ok({ verdict, reviewed: review !== null, notApplicable: false, requirements: requirements.value, ...(review ? { riskScore: review.riskScore } : {}) });
+}
+
+/** Why Threatline would not review this item today (its type or project), worded for the gate; null when it would. */
+function outOfScope(issue: JiraIssue, policy: SitePolicy): string | null {
+  const type = issue.issueType.name;
+  const why = [
+    policy.reviewIssueTypes.includes(type) ? null : `became ${/^[aeiou]/i.test(type) ? 'an' : 'a'} ${type}, a work type Threatline does not review`,
+    policy.enabledProjects.includes(issue.project.key) ? null : `moved to ${issue.project.key}, a project Threatline is not turned on for`,
+  ].filter((w): w is string => w !== null);
+  return why.length > 0 ? why.join(' and ') : null;
 }
 
 /**

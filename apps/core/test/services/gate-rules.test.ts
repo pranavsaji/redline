@@ -3,6 +3,7 @@ import { ok } from '@threatline/shared';
 import { acceptanceDecide, acceptanceRequest, breakGlassOverride } from '../../src/resolvers/acceptances.js';
 import { refreshVerdict, verdictKey } from '../../src/services/verdict-service.js';
 import { validateTransition } from '../../src/validators/validate-transition.js';
+import type { JiraIssue } from '../../src/adapters/jira.js';
 import { jiraIssue } from '../support/core-deps.js';
 import { ADMIN, CHAMP, DEV, ISSUE, reviewed } from '../support/reviewed.js';
 
@@ -57,5 +58,38 @@ describe('a child that passes on its parent’s leniency stops passing when that
     expect(await gate()).toEqual({ result: true });
     t.clock.advance(7 * DAY + 60_000);
     expect(await gate()).toMatchObject({ result: false });
+  });
+});
+
+describe('a reviewed work item keeps its review when it stops being a reviewed type or project', () => {
+  const moved = async (over: Partial<JiraIssue>, o: { allVerified?: boolean } = {}) => {
+    const r = await reviewed(o);
+    const base = r.t.jira.issue;
+    r.t.jira.issue = async (ref) => {
+      const got = await base(ref);
+      return got.ok && got.value.id === ISSUE ? ok({ ...got.value, ...over }) : got;
+    };
+    await refreshVerdict(r.t.deps, ISSUE);
+    return { ...r, gate: () => validateTransition(r.t.deps, { issue: { key: 'PAY-7', id: ISSUE } }) };
+  };
+
+  it('security: changing a blocked Story to a Task does not pass Done', async () => {
+    const { gate } = await moved({ issueType: { id: '10005', name: 'Task', subtask: false } });
+    expect(await gate()).toEqual({
+      result: false,
+      errorMessage: expect.stringMatching(
+        /^Threatline blocks Done: Threatline reviewed this work item before it became a Task, a work type Threatline does not review, so its review and security requirements still apply\. 1 open security requirement/,
+      ),
+    });
+  });
+
+  it('security: moving a blocked work item to a project Threatline is not on for does not pass Done', async () => {
+    const { gate } = await moved({ key: 'OPS-3', project: { id: '10001', key: 'OPS' } });
+    expect(await gate()).toMatchObject({ result: false, errorMessage: expect.stringMatching(/before it moved to OPS, a project Threatline is not turned on for, so its review and security requirements still apply/) });
+  });
+
+  it('a reviewed work item with nothing open passes after the change', async () => {
+    const { gate } = await moved({ issueType: { id: '10005', name: 'Task', subtask: false } }, { allVerified: true });
+    expect(await gate()).toEqual({ result: true });
   });
 });
