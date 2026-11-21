@@ -5,6 +5,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEventLib from '@testing-library/user-event';
 import axe from 'axe-core';
 import { IssuePanel } from '../src/panel/IssuePanel.js';
+import { approverPreview } from '../src/panel/AcceptRiskModal.js';
 import { AdminPage } from '../src/admin/AdminPage.js';
 import { mockAdminApi, mockApi } from '../src/mock-bridge.js';
 import { FIXTURES } from '../src/fixtures.js';
@@ -57,10 +58,13 @@ describe('Accept risk (RL-1, RL-2)', () => {
 
     await userEvent.click(within(form).getByRole('textbox', { name: 'Reason' }));
     await userEvent.paste('Flag is off.');
-    await userEvent.click(within(form).getByRole('textbox', { name: 'Compensating controls' }));
-    await userEvent.paste('WAF');
     await userEvent.click(within(form).getByRole('button', { name: 'Request acceptance' }));
-    expect(request).toHaveBeenCalledWith({ requirementId: 'req_1', reason: 'Flag is off.', controls: 'WAF', expiryDays: 30 });
+    expect(within(form).getByRole('alert').textContent).toMatch(/compensating controls.*at least 8 characters/i);
+    expect(request).not.toHaveBeenCalled();
+    await userEvent.click(within(form).getByRole('textbox', { name: 'Compensating controls' }));
+    await userEvent.paste('WAF rule on /refunds');
+    await userEvent.click(within(form).getByRole('button', { name: 'Request acceptance' }));
+    expect(request).toHaveBeenCalledWith({ requirementId: 'req_1', reason: 'Flag is off.', controls: 'WAF rule on /refunds', expiryDays: 30 });
     expect(await screen.findByText(/Ledger entry/)).toBeTruthy();
     expect(screen.getByText('abc123def456')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Copy ledger entry hash' })).toBeTruthy();
@@ -73,8 +77,31 @@ describe('Accept risk (RL-1, RL-2)', () => {
     const item = screen.getByText('Magic links expire after 15 minutes').closest('li')!;
     await userEvent.click(within(item).getByRole('button', { name: 'Accept risk' }));
     const form = screen.getByRole('form', { name: 'Accept risk' });
-    expect(within(form).getByText(/No second approval needed/)).toBeTruthy();
+    expect(within(form).getByText(/No second approval needed: you can accept Medium and lower risks yourself\. High and Critical always need a security champion\./)).toBeTruthy();
     expect([...(within(form).getByRole('combobox', { name: 'Expires after' }) as HTMLSelectElement).options].map((o) => o.value)).toEqual(['7', '14', '30', '60', '90']);
+  });
+
+  it('the approver preview never promises a tech lead more than the server allows (High and above need a champion)', () => {
+    const policy = { ...FIXTURES.ready!.acceptancePolicy, techLeadMaxSeverity: 'Critical' as const };
+    expect(approverPreview('Medium', ['developer', 'tech_lead'], policy)).toBe('No second approval needed: you can accept Medium and lower risks yourself. High and Critical always need a security champion.');
+    expect(approverPreview('High', ['developer', 'tech_lead'], policy)).toBe(`Needs a security champion (${policy.championGroup}) to approve.`);
+    expect(approverPreview('High', ['developer', 'champion'], policy)).toBe(`Needs another security champion (${policy.championGroup}) to approve: you cannot approve your own request.`);
+    expect(approverPreview('Low', ['developer', 'tech_lead'], { ...policy, techLeadMaxSeverity: 'Low' })).toMatch(/^No second approval needed: you can accept Low risks yourself\./);
+  });
+
+  it.each([
+    [5, ['5'], '5'],
+    [45, ['7', '14', '30', '45'], '45'],
+  ])('a %i-day cap is itself a choice and the default, so the form never submits a length nobody picked', async (cap, options, chosen) => {
+    const dto: PanelDto = { ...structuredClone(FIXTURES.ready!), roles: ['viewer', 'developer'], viewerAccountId: 'acc-dev' };
+    dto.requirements[1] = { ...dto.requirements[1]!, severity: 'Medium' };
+    dto.acceptancePolicy = { ...dto.acceptancePolicy, maxExpiryDays: { Critical: 30, default: cap } };
+    await open({ ...mockApi('ready'), get: async () => structuredClone(dto) }, /Requirements/);
+    const item = screen.getByText('Magic links expire after 15 minutes').closest('li')!;
+    await userEvent.click(within(item).getByRole('button', { name: 'Accept risk' }));
+    const select = within(screen.getByRole('form', { name: 'Accept risk' })).getByRole('combobox', { name: 'Expires after' }) as HTMLSelectElement;
+    expect([...select.options].map((o) => o.value)).toEqual(options);
+    expect(select.value).toBe(chosen);
   });
 
   it('a viewer who cannot edit sees no Accept risk button', async () => {

@@ -213,8 +213,8 @@ modules:
         controls:
           title: Compensating controls
           type: string
-          required: false
-          description: What reduces the risk meanwhile, for example a WAF rule
+          required: true
+          description: What reduces the risk meanwhile, for example a WAF rule or a feature flag, at least 8 characters
         expiryDays:
           title: Expiry in days
           type: integer

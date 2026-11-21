@@ -142,20 +142,24 @@ export async function decideAcceptance(
   const { a } = found.value;
   const policy = await deps.config.site();
   if (!policy.ok) return policy;
-  const roles = await rolesOf(deps, v.accountId, v.issueId, policy.value);
-  const allowed = canApprove(a, { accountId: v.accountId, roles }, policy.value);
-  if (!allowed.ok) return allowed;
   const approve = input.decision === 'approve';
+  const req = await deps.requirements.get(a.requirementId);
+  if (!req.ok) return req;
+  if (approve && !req.value) return err(appError('not_found', 'This requirement no longer exists, so there is nothing to accept. Reject the request.'));
+  // Approving is judged on the requirement as it is now (a re-review or triage may have raised it), not as it was requested.
+  const severity = approve && req.value ? req.value.severity : a.severity;
+  const roles = await rolesOf(deps, v.accountId, v.issueId, policy.value);
+  const allowed = canApprove(a, { accountId: v.accountId, roles }, policy.value, severity);
+  if (!allowed.ok) return allowed;
   const row = await appendLedger(
     deps.ledger,
     deps.clock,
     approve ? 'acceptance.approved' : 'acceptance.rejected',
-    { acceptanceId: a.id, requirementId: a.requirementId, issueId: v.issueId, ...(input.note?.trim() ? { note: input.note.trim() } : {}) },
+    { acceptanceId: a.id, requirementId: a.requirementId, issueId: v.issueId, ...(approve ? { severity } : {}), ...(input.note?.trim() ? { note: input.note.trim() } : {}) },
     v.accountId,
   );
   if (!row.ok) return row;
-  const req = await deps.requirements.get(a.requirementId);
-  const name = req.ok && req.value ? label(req.value) : `a ${a.severity} security requirement`;
+  const name = req.value ? label(req.value) : `a ${a.severity} security requirement`;
   if (approve) {
     const s = await setStatus(deps, a.requirementId, ['Open', 'InProgress'], 'AcceptedRisk');
     if (!s.ok) log('acceptance.status_failed', { requirementId: a.requirementId, code: s.error.code });

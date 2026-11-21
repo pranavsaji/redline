@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ok, type Requirement } from '@threatline/shared';
+import { ok } from '@threatline/shared';
 import { postureDrill, postureDrill as drill, postureGet, releaseReport } from '../../src/resolvers/posture.js';
 import { handleJob } from '../../src/consumers/review-consumer.js';
 import { setRequirementStatus } from '../../src/services/requirements-service.js';
@@ -165,8 +165,8 @@ describe('requirement timestamps (for mean time to verify)', () => {
     const { t, req } = await reviewed();
     t.jira.canBrowse = async () => ok(true);
     const v = await setRequirementStatus(t.deps, { accountId: 'acc-dev', issueId: ISSUE }, { requirementId: req.id, status: 'Verified', evidence: { kind: 'manual', ref: 'tested' } });
-    expect(v.ok && v.value.verifiedAt).toBe('2026-11-15T12:00:00.000Z');
+    expect(v.ok && v.value.requirement.verifiedAt).toBe('2026-11-15T12:00:00.000Z');
     const back = await setRequirementStatus(t.deps, { accountId: 'acc-dev', issueId: ISSUE }, { requirementId: req.id, status: 'Open' });
-    expect(back.ok && (back.value as Requirement).verifiedAt).toBeUndefined();
+    expect(back.ok && back.value.requirement.verifiedAt).toBeUndefined();
   });
 });

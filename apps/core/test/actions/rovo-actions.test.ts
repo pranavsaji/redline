@@ -236,13 +236,19 @@ describe('request-risk-acceptance', () => {
 
   it('a refused request says why (e.g. expiry above the cap)', async () => {
     const { t, req } = await reviewed();
-    const r = await requestRiskAcceptance({ requirementId: req.id, reason: 'Provider signs payloads; we verify next sprint', controls: '', expiryDays: 200, ...ctx(ME) }, t.deps);
+    const r = await requestRiskAcceptance({ requirementId: req.id, reason: 'Provider signs payloads; we verify next sprint', controls: 'IP allow-list', expiryDays: 200, ...ctx(ME) }, t.deps);
     expect(r).toMatchObject({ error: 'refused', message: expect.stringMatching(/at most \d+ days/) });
+  });
+
+  it('a request without compensating controls is refused and says what to add', async () => {
+    const { t, req } = await reviewed();
+    const r = await requestRiskAcceptance({ requirementId: req.id, reason: 'Provider signs payloads; we verify next sprint', expiryDays: 14, ...ctx(ME) }, t.deps);
+    expect(r).toMatchObject({ error: 'refused', message: expect.stringMatching(/compensating controls/) });
   });
 
   it('an unknown requirement is not_found', async () => {
     const { t } = await reviewed();
-    expect(await requestRiskAcceptance({ requirementId: 'req_nope', reason: 'Provider signs payloads; we verify next sprint', controls: '', expiryDays: 14, ...ctx(ME) }, t.deps)).toEqual({ error: 'not_found' });
+    expect(await requestRiskAcceptance({ requirementId: 'req_nope', reason: 'Provider signs payloads; we verify next sprint', controls: 'IP allow-list', expiryDays: 14, ...ctx(ME) }, t.deps)).toEqual({ error: 'not_found' });
   });
 });
 

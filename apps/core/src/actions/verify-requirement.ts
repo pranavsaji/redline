@@ -1,4 +1,3 @@
-import { appendLedger } from '@threatline/core';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { setRequirementStatus } from '../services/requirements-service.js';
@@ -31,19 +30,12 @@ export async function verifyRequirement(payload: ActionPayload & Record<string, 
   if (!who.ok) return who.error;
   // The link stays the evidence ref (the panel opens it); the note is stored beside it, not appended to the URL.
   const evidence = { kind: 'pr' as const, ref: input.value.prUrl, ...(input.value.note ? { note: input.value.note } : {}) };
-  const r = await setRequirementStatus(deps, who.viewer, { requirementId: found.value.id, status: 'Verified', evidence });
+  // The service ledgers the change (as made through an agent) before saving it.
+  const r = await setRequirementStatus(deps, who.viewer, { requirementId: found.value.id, status: 'Verified', evidence }, { viaAgent: true });
   if (!r.ok) {
     log('action.verify.refused', { issueId: who.viewer.issueId, code: r.error.code });
     return actionError(r.error);
   }
-  const row = await appendLedger(
-    deps.ledger,
-    deps.clock,
-    'requirement.verified',
-    { requirementId: found.value.id, issueId: who.viewer.issueId, evidence: input.value.prUrl, viaAgent: true },
-    who.viewer.accountId,
-  );
-  if (!row.ok) return { error: 'unavailable' };
   const verdict = await readVerdict(deps, who.viewer.issueId);
   const state: VerifyRequirementResult['verdict'] = verdict.ok && verdict.value ? verdict.value.state : 'block';
   return {
@@ -51,7 +43,7 @@ export async function verifyRequirement(payload: ActionPayload & Record<string, 
     status: 'Verified',
     evidence: input.value.prUrl,
     verdict: state,
-    entryHash: row.value.entryHash,
+    entryHash: r.value.entryHash,
     message: `Marked ${found.value.subtaskKey ?? found.value.id} (${found.value.severity}) Verified with ${input.value.prUrl} as evidence; recorded in Threatline's ledger. ${state === 'pass' ? 'Nothing else blocks Done.' : 'Other requirements still block Done.'} Panel: ${await issueUrl(deps, who.issue.key)}`,
   };
 }
