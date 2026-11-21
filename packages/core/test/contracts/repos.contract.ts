@@ -79,6 +79,44 @@ export function repoContract(name: string, f: RepoFactory): void {
       expect((await r.stage('rev_1', 'none')).ok && (await r.stage('rev_1', 'none'))).toEqual({ ok: true, value: null });
     });
 
+    it('reviews: saveThreats refuses duplicate threat ids (conflict) and leaves the stored set as it was', async () => {
+      const r = await f.reviews();
+      await r.create(review());
+      await r.saveThreats('rev_1', [threat(), threat({ id: 'thr_2', title: 'U' })], []);
+      const dup = await r.saveThreats('rev_1', [threat({ title: 'new' }), threat({ id: 'thr_3' }), threat({ component: 'other' })], [{ title: 'z', reason: 'schema' }]);
+      expect(!dup.ok && dup.error.code).toBe('conflict');
+      const ts = await r.threats('rev_1');
+      expect(ts.ok && ts.value.map((t) => [t.id, t.title])).toEqual([['thr_1', 'T'], ['thr_2', 'U']]);
+      // Saving the same set again is idempotent.
+      await r.saveThreats('rev_1', [threat({ id: 'thr_2', title: 'U' }), threat()], []);
+      await r.saveThreats('rev_1', [threat({ id: 'thr_2', title: 'U' }), threat()], []);
+      const again = await r.threats('rev_1');
+      expect(again.ok && again.value.map((t) => t.id)).toEqual(['thr_2', 'thr_1']);
+    });
+
+    it('reviews: updatedSince lists one status updated in a window, newest first, bounded', async () => {
+      const r = await f.reviews();
+      await r.create(review({ id: 'rev_a', issueId: '1', status: 'failed', createdAt: '2026-11-15T09:00:00.000Z', updatedAt: '2026-11-15T09:00:00.000Z' }));
+      await r.create(review({ id: 'rev_b', issueId: '2', status: 'failed', createdAt: '2026-11-15T11:10:00.000Z', updatedAt: '2026-11-15T11:20:00.000Z' }));
+      await r.create(review({ id: 'rev_c', issueId: '3', status: 'failed', createdAt: '2026-11-15T11:30:00.000Z', updatedAt: '2026-11-15T11:40:00.000Z' }));
+      await r.create(review({ id: 'rev_d', issueId: '4', status: 'ready', createdAt: '2026-11-15T11:30:00.000Z', updatedAt: '2026-11-15T11:45:00.000Z' }));
+      const w = await r.updatedSince('failed', '2026-11-15T11:00:00.000Z', 10);
+      expect(w.ok && w.value.map((x) => x.id)).toEqual(['rev_c', 'rev_b']);
+      const one = await r.updatedSince('failed', '2026-11-15T11:00:00.000Z', 1);
+      expect(one.ok && one.value.map((x) => x.id)).toEqual(['rev_c']);
+    });
+
+    it('reviews: updateWhere writes only while the stored review still matches (compare-and-set)', async () => {
+      const r = await f.reviews();
+      await r.create(review({ samplesReceived: 2 }));
+      expect(await r.updateWhere('rev_1', { status: 'ready' }, { status: 'agent_timeout' })).toEqual({ ok: true, value: false });
+      expect(await r.updateWhere('rev_1', { status: 'awaiting_agent', samplesReceivedAtMost: 1 }, { status: 'ready', samplesReceived: 1 })).toEqual({ ok: true, value: false });
+      expect(await r.updateWhere('rev_1', { status: 'awaiting_agent', samplesReceivedAtMost: 3 }, { status: 'ready', samplesReceived: 3, riskScore: 7 })).toEqual({ ok: true, value: true });
+      const g = await r.get('rev_1');
+      expect(g.ok && g.value).toMatchObject({ status: 'ready', samplesReceived: 3, riskScore: 7 });
+      expect(await r.updateWhere('missing', {}, { status: 'ready' })).toEqual({ ok: true, value: false });
+    });
+
     it('reviews: recent lists newest first (optionally since a time); stages lists the trace in time order', async () => {
       const r = await f.reviews();
       await r.create(review({ id: 'rev_a', issueId: '1', createdAt: '2026-11-01T00:00:00.000Z' }));
@@ -254,6 +292,17 @@ export function repoContract(name: string, f: RepoFactory): void {
       await i.linkPage('10002', 'p1');
       const pages = await i.issuesForPage('p1');
       expect(pages.ok && [...pages.value].sort()).toEqual(['10001', '10002']);
+    });
+
+    it('usage: reserveReview counts a review atomically, only while the month stays within the cap', async () => {
+      const u = await f.usage();
+      await u.add('2026-11', { tokensIn: 0, tokensOut: 0, reviews: 4 });
+      const tries = await Promise.all([1, 2, 3].map(() => u.reserveReview('2026-11', 5)));
+      expect(tries.filter((x) => x.ok && x.value)).toHaveLength(1);
+      expect((await u.get('2026-11')).ok && (await u.get('2026-11'))).toMatchObject({ value: { reviews: 5 } });
+      const fresh = await Promise.all([1, 2].map(() => u.reserveReview('2026-12', 1)));
+      expect(fresh.filter((x) => x.ok && x.value)).toHaveLength(1);
+      expect(await u.reserveReview('2027-01', 0)).toEqual({ ok: true, value: false });
     });
 
     it('attestations and usage', async () => {

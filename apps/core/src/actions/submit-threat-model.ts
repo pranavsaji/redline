@@ -17,12 +17,14 @@ export interface IngestResult {
   valid: boolean;
 }
 
-async function recordIngest(deps: CoreDeps, nonEmpty: boolean): Promise<void> {
+async function recordIngest(deps: CoreDeps, nonEmpty: boolean, creditsSignal: boolean): Promise<void> {
   try {
-    const prev = await deps.state.get<unknown>(RECENT_INGESTS_KEY);
-    const list = Array.isArray(prev) ? prev.filter((x): x is boolean => typeof x === 'boolean') : [];
-    await deps.state.set(RECENT_INGESTS_KEY, [...list, nonEmpty].slice(-10));
-    await deps.state.set(RECENT_INGESTS_AT_KEY, deps.clock.now().toISOString());
+    if (creditsSignal) {
+      const prev = await deps.state.get<unknown>(RECENT_INGESTS_KEY);
+      const list = Array.isArray(prev) ? prev.filter((x): x is boolean => typeof x === 'boolean') : [];
+      await deps.state.set(RECENT_INGESTS_KEY, [...list, nonEmpty].slice(-10));
+      await deps.state.set(RECENT_INGESTS_AT_KEY, deps.clock.now().toISOString());
+    }
     if (nonEmpty) await deps.state.set(INGEST_LAST_AT_KEY, deps.clock.now().toISOString());
   } catch {
     // the budget signal is best-effort
@@ -34,7 +36,14 @@ async function recordIngest(deps: CoreDeps, nonEmpty: boolean): Promise<void> {
  * the review cannot hang), then queues `assemble`. With no open review, one is created first (a synchronous gather,
  * rate-limited per caller like a re-run).
  */
-export async function ingestSample(deps: CoreDeps, issueKey: string, raw: string, via: 'agent' | 'automation' | 'chat', actor?: string): Promise<Result<IngestResult>> {
+export async function ingestSample(
+  deps: CoreDeps,
+  issueKey: string,
+  raw: string,
+  via: 'agent' | 'automation' | 'chat',
+  actor?: string,
+  opts: { revision?: number; creditsSignal?: boolean } = {},
+): Promise<Result<IngestResult>> {
   const issue = await deps.jira.issue(issueKey);
   if (!issue.ok) return issue;
   const policy = await deps.config.site();
@@ -55,6 +64,8 @@ export async function ingestSample(deps: CoreDeps, issueKey: string, raw: string
   }
   const review = latest.value;
   if (!review || review.status !== 'awaiting_agent') return err(appError('conflict', review?.failureReason === 'budget' ? 'budget' : 'no_open_review'));
+  // The submission token names the revision it was issued for; a run never files into another one.
+  if (opts.revision !== undefined && review.revision !== opts.revision) return err(appError('conflict', 'wrong_revision'));
 
   const extracted = extractAgentJson(raw, issue.value.key);
   const sample: Sample = extracted.ok ? extracted.value : { failed: extracted.error.code };
@@ -67,7 +78,7 @@ export async function ingestSample(deps: CoreDeps, issueKey: string, raw: string
     const row = await appendLedger(deps.ledger, deps.clock, 'review.sample', { issueId: issue.value.id, reviewId: review.id, n, valid: extracted.ok, threats: extracted.ok ? extracted.value.threats.length : 0 }, actor);
     if (!row.ok) log('sample.ledger_failed', { reviewId: review.id, code: row.error.code });
   }
-  await recordIngest(deps, raw.trim().length > 0);
+  await recordIngest(deps, raw.trim().length > 0, opts.creditsSignal !== false);
   const pushed = await deps.queue.push([{ kind: 'assemble', reviewId: review.id }]);
   if (!pushed.ok) return pushed;
   log('sample.ingested', { reviewId: review.id, n, valid: extracted.ok, via, ...(extracted.ok ? {} : { code: extracted.error.code }) });
@@ -109,14 +120,22 @@ export async function submitThreatModel(payload: ActionPayload & { issueKey?: un
     if (!row.ok) log('sample.reject_ledger_failed', { code: row.error.code });
     return deny('not_review_author', 'not_review_author');
   }
-  if (!(await consumeSubmissionToken(deps, payload.submissionToken, { issueId: issue.value.id, accountId: caller }))) {
+  // The revision this submission files into: the open review's, or the next one it will create. The token must be for it.
+  const latest = await deps.reviews.latest(issue.value.id);
+  if (!latest.ok) return deny(`latest_${latest.error.code}`, 'unavailable');
+  const revision = latest.value?.status === 'awaiting_agent' ? latest.value.revision : (latest.value?.revision ?? 0) + 1;
+  if (!(await consumeSubmissionToken(deps, payload.submissionToken, { issueId: issue.value.id, accountId: caller, revision }))) {
     log('action.submit.invalid_token', { issueId: issue.value.id });
     return { saved: false, error: 'invalid_token' };
   }
 
-  const r = await ingestSample(deps, issue.value.key, payload.threatModelJson, 'agent', caller);
+  // Security: the "out of Rovo credits" pause (3 empty runs in a row) is a site-wide switch, so only configured review
+  // authors (the Automation rule owner) feed it. With none configured, any editor could submit empty runs, so the
+  // signal is not collected at all: an arbitrary caller can never pause the site's reviews.
+  const r = await ingestSample(deps, issue.value.key, payload.threatModelJson, 'agent', caller, { revision, creditsSignal: authors.includes(caller) });
   if (!r.ok) {
     const m = r.error.message;
+    if (m === 'wrong_revision') return { saved: false, error: 'invalid_token' };
     if (m === 'project_not_enabled' || m === 'complete' || m === 'budget') return { saved: false, error: m };
     if (r.error.code === 'budget') return { saved: false, error: 'rate_limited' };
     return { saved: false, error: 'unavailable' };

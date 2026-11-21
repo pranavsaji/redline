@@ -114,6 +114,21 @@ export function sqlUsageRepo(x: SqlExecutor): UsageRepo {
       if (!again.ok) return again;
       return again.value.affectedRows > 0 ? used() : ok(null);
     },
+    async reserveReview(month, cap) {
+      // Increment-then-check in one conditional UPDATE, so parallel gathers at cap - 1 cannot all pass.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const u = await x.exec('UPDATE usage_monthly SET reviews = reviews + 1 WHERE month = ? AND reviews + 1 <= ?', [month, cap]);
+        if (!u.ok) return u;
+        if (u.value.affectedRows > 0) return ok(true);
+        const g = await x.query<{ reviews: number }>('SELECT reviews FROM usage_monthly WHERE month = ?', [month]);
+        if (!g.ok) return g;
+        if (g.value[0] || cap < 1) return ok(false);
+        const i = await x.exec('INSERT INTO usage_monthly (month, tokens_in, tokens_out, reviews) VALUES (?, 0, 0, 1)', [month]);
+        if (i.ok) return ok(true);
+        if (i.error.code !== 'conflict') return i;
+      }
+      return ok(false);
+    },
   };
 }
 

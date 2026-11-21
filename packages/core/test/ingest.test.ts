@@ -58,9 +58,25 @@ describe('assembleReview', () => {
     expect(out.discarded.filter((d) => d.reason === 'schema')).toHaveLength(3);
   });
 
-  it('final mode with no valid samples is agent_timeout; with some valid samples it is ready', () => {
+  it('final mode with no valid samples is agent_timeout; with a majority of the expected runs valid it is ready', () => {
     expect(assemble([], { mode: 'final' }).status).toBe('agent_timeout');
-    expect(assemble([model([refundAbuse])], { mode: 'final' }).status).toBe('ready');
+    expect(assemble([model([refundAbuse]), model([refundAbuse])], { mode: 'final' }).status).toBe('ready');
+    // One unchecked run of three never decides (AI errors and missing runs count as missing).
+    const one = assemble([model([refundAbuse])], { mode: 'final' });
+    expect(one.status).toBe('agent_timeout');
+    expect(one.failureReason).toBe('only 1 of 3 analyses completed');
+    expect(assemble([model([refundAbuse]), { failed: 'schema' }], { mode: 'final' }).status).toBe('agent_timeout');
+  });
+
+  it('fails closed when all runs are in but fewer than a majority of the expected runs are valid', () => {
+    const s = model([refundAbuse]);
+    const out = assemble([{ failed: 'upstream' }, { failed: 'timeout' }, s]);
+    expect(out.status).toBe('failed');
+    expect(out.failureReason).toBe('only 1 of 3 analyses completed');
+    // Nothing more is dropped than before: the threats are assembled as usual.
+    expect(out.threats.some((t) => t.title === refundAbuse.title)).toBe(true);
+    expect(assemble([{ failed: 'upstream' }, s, s]).status).toBe('ready');
+    expect(assemble([{ failed: 'upstream' }, s, s]).failureReason).toBeUndefined();
   });
 
   it('keeps majority threats with resolved citations and drops minority ones as low_votes', () => {
@@ -176,6 +192,18 @@ describe('assembleReview', () => {
   it('is deterministic: assembling twice gives identical threat ids', () => {
     const s = model([refundAbuse, transcriptLeak]);
     expect(assemble([s, s, s]).threats.map((t) => t.id)).toEqual(assemble([s, s, s]).threats.map((t) => t.id));
+  });
+
+  it('two distinct threats with the same kind and title on different components get distinct, stable ids', () => {
+    const a = { ...transcriptLeak, title: 'Sensitive data exposed', component: 'support database' };
+    const b = { ...refundAbuse, stride: 'InformationDisclosure' as const, title: 'Sensitive data exposed', component: 'refund tool' };
+    const s = model([a, b]);
+    const out = assemble([s, s, s]);
+    const same = out.threats.filter((t) => t.title === 'Sensitive data exposed');
+    expect(same).toHaveLength(2);
+    expect(new Set(out.threats.map((t) => t.id)).size).toBe(out.threats.length);
+    // Stable across re-assemblies of the same samples.
+    expect(assemble([s, s, s]).threats.map((t) => t.id)).toEqual(out.threats.map((t) => t.id));
   });
 
   it('the agent sketch can raise exposure and data classes but never lower them', () => {

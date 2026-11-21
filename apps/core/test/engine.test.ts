@@ -107,6 +107,15 @@ describe('Threatline Engine (Threatline runs the review itself on Forge LLMs)', 
     expect(threats.find((x) => x.title === 'No audit of refund events')!.state).not.toBe('dismissed');
   });
 
+  it('security: an injection check that failed or never completed counts as suspected at assembly (fail closed)', async () => {
+    const llm = new FakeLlm({ propose: RUN });
+    const { threats, review } = await run(llm);
+    expect(review.status).toBe('ready');
+    const ai = threats.filter((x) => x.origin === 'agent');
+    expect(ai.length).toBeGreaterThan(0);
+    expect(ai.every((x) => x.state === 'needs_human')).toBe(true);
+  });
+
   it('in engine mode, Rovo agent submissions are refused (Threatline writes the review itself)', async () => {
     const t = coreDeps({ policy: enginePolicy, llm: new FakeLlm({}) });
     const ctx = { context: { accountId: 'acc-1', agentId: 'a', cloudId: 'c' } };

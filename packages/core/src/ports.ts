@@ -65,6 +65,13 @@ export interface ReviewRepo {
   byStatus(status: ReviewStatus, olderThan?: string): Promise<Result<Review[]>>;
   create(r: Review): Promise<Result<Review>>;
   update(id: string, patch: Partial<Review>): Promise<Result<void>>;
+  /**
+   * Compare-and-set: writes the patch only while the stored review still has `expect.status` and at most
+   * `expect.samplesReceivedAtMost` samples assembled; true when it was written (false too when there is no such review).
+   */
+  updateWhere(id: string, expect: { status?: ReviewStatus; samplesReceivedAtMost?: number }, patch: Partial<Review>): Promise<Result<boolean>>;
+  /** Reviews in this status updated at or after `since`, newest first, at most `limit` (capped at 500). Indexed. */
+  updatedSince(status: ReviewStatus, since: string, limit: number): Promise<Result<Review[]>>;
   /** Atomically adds token counts (negative to settle a reservation) and merges model ids. */
   addUsage(id: string, delta: { tokensIn: number; tokensOut: number; modelIds: readonly string[] }): Promise<Result<void>>;
   /**
@@ -74,6 +81,11 @@ export interface ReviewRepo {
   reserveUsage(id: string, est: { tokensIn: number; tokensOut: number }, cap: { tokensIn: number; tokensOut: number }): Promise<Result<boolean>>;
   saveFacts(reviewId: string, facts: ContextFact[]): Promise<Result<void>>;
   facts(reviewId: string): Promise<Result<ContextFact[]>>;
+  /**
+   * Replaces the review's threat set. Threat ids must be unique (a duplicate is a `conflict` and nothing is written).
+   * Never leaves a partial set: a failure part-way leaves the old set (possibly plus some of the new one), so a retry
+   * or a later assembly completes it.
+   */
   saveThreats(reviewId: string, threats: Threat[], discarded: DiscardedThreat[]): Promise<Result<void>>;
   threats(reviewId: string): Promise<Result<Threat[]>>;
   discarded(reviewId: string): Promise<Result<DiscardedThreat[]>>;
@@ -231,6 +243,8 @@ export interface UsageRepo {
    * and returns how many are used now, or null when none is left. Parallel callers can never together exceed `limit`.
    */
   takeSlot(bucket: string, window: string, limit: number): Promise<Result<number | null>>;
+  /** Atomically counts one review for the month only while the count stays within `cap`; false when it would not. */
+  reserveReview(month: string, cap: number): Promise<Result<boolean>>;
 }
 
 export interface VerdictSink {

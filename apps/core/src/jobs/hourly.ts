@@ -7,6 +7,7 @@ import { OPS_CONFIG_KEY, opsAlert } from '../services/ops-alert.js';
 export { OPS_CONFIG_KEY };
 const STATUSES: ReviewStatus[] = ['queued', 'gathering', 'awaiting_agent', 'modeling', 'ready', 'failed', 'agent_timeout'];
 const FAILURE_RATE = 0.2;
+const WINDOW_LIMIT = 500;
 
 /**
  * Hourly: expire overdue risk acceptances (RL-5); then, if more than 20% of the reviews created in the last hour failed
@@ -40,7 +41,8 @@ async function failRateAlert(deps: CoreDeps): Promise<void> {
   let bad = 0;
   let silent = 0;
   for (const s of STATUSES) {
-    const r = await deps.reviews.byStatus(s);
+    // Created in the last hour, so updated in it too: the newest rows of each status (indexed on status, updated_at).
+    const r = await deps.reviews.updatedSince(s, since, WINDOW_LIMIT);
     if (!r.ok) return;
     const recent = r.value.filter((x) => x.createdAt >= since);
     total += recent.length;

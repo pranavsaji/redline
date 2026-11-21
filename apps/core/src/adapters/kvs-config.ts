@@ -7,6 +7,8 @@ export interface KvsPort {
   get<T>(key: string): Promise<T | undefined>;
   set<T>(key: string, value: T): Promise<void>;
   delete(key: string): Promise<void>;
+  /** Atomically writes `value` and returns what the key held before (undefined if nothing): a get-and-set. */
+  swap<T>(key: string, value: unknown): Promise<T | undefined>;
   getSecret<T>(key: string): Promise<T | undefined>;
   setSecret<T>(key: string, value: T): Promise<void>;
   deleteSecret(key: string): Promise<void>;
@@ -16,6 +18,7 @@ export const forgeKvs = (): KvsPort => ({
   get: (k) => kvs.get(k),
   set: (k, v) => kvs.set(k, v),
   delete: (k) => kvs.delete(k),
+  swap: async <T>(k: string, v: unknown) => (await kvs.set<unknown, T>(k, v, { keyPolicy: 'OVERRIDE', returnValue: 'PREVIOUS' }))?.value,
   getSecret: (k) => kvs.getSecret(k),
   setSecret: (k, v) => kvs.setSecret(k, v),
   deleteSecret: (k) => kvs.deleteSecret(k),

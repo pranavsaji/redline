@@ -41,7 +41,9 @@ export function memoryReviewRepo(): ReviewRepo & { _reviews: Map<string, Review>
       return ok([...reviews.values()].filter((r) => r.issueId === issueId).sort((a, b) => a.revision - b.revision).map(clone));
     },
     async byStatus(status, olderThan) {
-      return ok([...reviews.values()].filter((r) => r.status === status && (!olderThan || r.updatedAt < olderThan)).map(clone));
+      // Like SQL: oldest first, at most 200.
+      const list = [...reviews.values()].filter((r) => r.status === status && (!olderThan || r.updatedAt < olderThan)).sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+      return ok(list.slice(0, 200).map(clone));
     },
     async create(r) {
       if (reviews.has(r.id)) return err(appError('conflict', `review ${r.id} exists`));
@@ -53,6 +55,19 @@ export function memoryReviewRepo(): ReviewRepo & { _reviews: Map<string, Review>
       if (!r) return err(appError('not_found', `review ${id}`));
       reviews.set(id, { ...r, ...clone(patch) });
       return ok(undefined);
+    },
+    async updateWhere(id, expect, patch) {
+      const r = reviews.get(id);
+      if (!r) return ok(false);
+      if (expect.status !== undefined && r.status !== expect.status) return ok(false);
+      if (expect.samplesReceivedAtMost !== undefined && r.samplesReceived > expect.samplesReceivedAtMost) return ok(false);
+      reviews.set(id, { ...r, ...clone(patch) });
+      return ok(true);
+    },
+    async updatedSince(status, since, limit) {
+      const n = Math.max(1, Math.min(500, Math.floor(limit)));
+      const list = [...reviews.values()].filter((r) => r.status === status && r.updatedAt >= since).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      return ok(list.slice(0, n).map(clone));
     },
     async reserveUsage(id, est, cap) {
       const r = reviews.get(id);
@@ -75,6 +90,8 @@ export function memoryReviewRepo(): ReviewRepo & { _reviews: Map<string, Review>
       return ok(clone(facts.get(reviewId) ?? []));
     },
     async saveThreats(reviewId, t, d) {
+      // Like the SQL primary key: threat ids are unique, and a refused save writes nothing.
+      if (new Set(t.map((x) => x.id)).size !== t.length) return err(appError('conflict', 'duplicate threat id'));
       threats.set(reviewId, clone(t));
       discarded.set(reviewId, clone(d));
       return ok(undefined);
@@ -274,6 +291,12 @@ export function memoryUsageRepo(): UsageRepo {
       if (used >= limit) return ok(null);
       slots.set(bucket, { window, used: used + 1 });
       return ok(used + 1);
+    },
+    async reserveReview(month, cap) {
+      const cur = m.get(month) ?? { tokensIn: 0, tokensOut: 0, reviews: 0 };
+      if (cur.reviews + 1 > cap) return ok(false);
+      m.set(month, { ...cur, reviews: cur.reviews + 1 });
+      return ok(true);
     },
   };
 }
