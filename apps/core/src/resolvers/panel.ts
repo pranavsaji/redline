@@ -143,6 +143,13 @@ async function scopeVerdict<V extends Verdict & { message?: unknown }>(deps: Cor
   } as V;
 }
 
+/** The stored verdict carries the unscoped score (indexed for JQL): the panel's copy gets the viewer's score, or none. */
+function viewerVerdict<V extends object>(verdict: V | null, score: number | undefined): V | null {
+  if (!verdict || !('riskScore' in verdict)) return verdict;
+  const { riskScore: _r, ...rest } = verdict as V & { riskScore: unknown };
+  return (score === undefined ? rest : { ...rest, riskScore: score }) as V;
+}
+
 export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | Denied> {
   const auth = await authorise(deps, v, 'browse');
   if ('error' in auth) return auth;
@@ -216,7 +223,7 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
   return {
     issueId: v.issueId,
     issueKey: auth.issueKey,
-    verdict,
+    verdict: viewerVerdict(verdict, review ? score : undefined),
     review: review ? { ...review, riskScore: score } : null,
     threats: threats.slice(0, PAGE_SIZE),
     threatsCursor: threats.length > PAGE_SIZE ? PAGE_SIZE : null,

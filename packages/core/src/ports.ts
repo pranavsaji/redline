@@ -150,6 +150,13 @@ export interface LedgerRepo {
   forIssues(types: readonly LedgerEventType[], issueIds: readonly string[]): Promise<Result<LedgerRow[]>>;
   /** Scale: the newest `limit` rows of these types, in seq order. */
   latestOfTypes(types: readonly LedgerEventType[], limit: number): Promise<Result<LedgerRow[]>>;
+  /** Scale: rows of these types created at or after `sinceIso`, in seq order (indexed on type and time). */
+  ofTypesSince(types: readonly LedgerEventType[], sinceIso: string): Promise<Result<LedgerRow[]>>;
+  /**
+   * Scale: one page of the Merkle leaves' inputs — seq and entry hash only, for seq > `afterSeq`, in seq order, at most
+   * `limit` (capped at 5000). The tree head pages through these instead of reading every full entry.
+   */
+  entryHashes(afterSeq: number, limit: number): Promise<Result<Array<{ seq: number; entryHash: string }>>>;
 }
 
 export interface FeedbackRow {

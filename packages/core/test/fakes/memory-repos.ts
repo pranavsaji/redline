@@ -184,6 +184,13 @@ export function memoryLedgerRepo(): LedgerRepo & { _rows: LedgerRow[] } {
     async latestOfTypes(types, limit) {
       return ok(rows.filter((r) => types.includes(r.eventType)).slice(-Math.max(0, limit)).map((r) => ({ ...r, payload: { ...r.payload } })));
     },
+    async ofTypesSince(types, sinceIso) {
+      return ok(rows.filter((r) => types.includes(r.eventType) && r.createdAt >= sinceIso).map(clone));
+    },
+    async entryHashes(afterSeq, limit) {
+      const n = Math.max(0, Math.min(5000, Math.floor(limit)));
+      return ok(rows.filter((r) => r.seq > afterSeq).sort((a, b) => a.seq - b.seq).slice(0, n).map((r) => ({ seq: r.seq, entryHash: r.entryHash })));
+    },
   };
 }
 

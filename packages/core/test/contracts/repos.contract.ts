@@ -205,6 +205,32 @@ export function repoContract(name: string, f: RepoFactory): void {
       expect(r.ok && r.value.map((x) => x.seq)).toEqual([4, 5]);
     });
 
+    it('ledger (scale): entryHashes pages seq and entry hash only, in seq order after a seq', async () => {
+      const l = await f.ledger();
+      const clock = fixedClock('2026-11-15T00:00:00Z');
+      for (let n = 1; n <= 5; n++) await appendLedger(l, clock, 'review.sample', { n }, 'u');
+      const all = (await l.all()) as { ok: true; value: Array<{ seq: number; entryHash: string }> };
+      const first = await l.entryHashes(0, 2);
+      expect(first).toEqual({ ok: true, value: all.value.slice(0, 2).map((r) => ({ seq: r.seq, entryHash: r.entryHash })) });
+      const rest = await l.entryHashes(2, 10);
+      expect(rest.ok && rest.value.map((r) => r.seq)).toEqual([3, 4, 5]);
+      expect(rest.ok && Object.keys(rest.value[0]!).sort()).toEqual(['entryHash', 'seq']);
+      expect(await l.entryHashes(5, 10)).toEqual({ ok: true, value: [] });
+    });
+
+    it('ledger (scale): ofTypesSince returns only rows of those types created at or after a time, in seq order', async () => {
+      const l = await f.ledger();
+      const clock = fixedClock('2025-01-01T00:00:00Z');
+      await appendLedger(l, clock, 'acceptance.requested', { acceptanceId: 'old' }, 'u');
+      clock.set('2026-11-01T00:00:00Z');
+      await appendLedger(l, clock, 'acceptance.requested', { acceptanceId: 'new' }, 'u');
+      await appendLedger(l, clock, 'review.sample', { n: 1 }, 'u');
+      await appendLedger(l, clock, 'acceptance.approved', { acceptanceId: 'new' }, 'u');
+      const r = await l.ofTypesSince(['acceptance.requested', 'acceptance.approved'], '2026-01-01T00:00:00.000Z');
+      expect(r.ok && r.value.map((x) => x.seq)).toEqual([2, 4]);
+      expect(await l.ofTypesSince([], '2020-01-01T00:00:00.000Z')).toEqual({ ok: true, value: [] });
+    });
+
     it('feedback: dismissals are returned per component', async () => {
       const fb = await f.feedback();
       await fb.record({ threatId: 't1', component: 'agent', title: 'A', stride: 'Spoofing', actor: 'c', action: 'dismiss', reason: 'false_positive' });

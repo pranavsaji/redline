@@ -178,6 +178,12 @@ describe('panel.get security: discarded threats and history are viewer-scoped', 
     if ('error' in dto) throw new Error(dto.error);
     expect(dto.review?.riskScore).toBeLessThan(97);
     expect(dto.history[0]!.riskScore).toBe(dto.review?.riskScore);
+    // The stored verdict (which carries the unscoped score for JQL) must not leak it either.
+    t.kv.data.set('verdict:10042', { ...(t.kv.data.get('verdict:10042') as object), riskScore: 97 });
+    const again = await panelGet(t.deps, viewer());
+    if ('error' in again) throw new Error(again.error);
+    expect(JSON.stringify(again.verdict)).not.toContain('"riskScore":97');
+    expect((again.verdict as { riskScore?: number } | null)?.riskScore).toBe(again.review?.riskScore);
     // A viewer who can see every source gets the stored score.
     t.deps.confluence = { canRead: async () => ok(true) } as never;
     const full = await panelGet(t.deps, viewer());
