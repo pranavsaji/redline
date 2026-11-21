@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { generateKeyPair } from '@threatline/crypto';
@@ -78,6 +78,24 @@ describe('offline verifier script (no Threatline code, Node built-ins only)', ()
     }
     expect(failed?.status).toBe(1);
     expect(failed?.stderr).toMatch(/^FAILED: the proof is signed with key .* not the pinned --public-key/);
+  });
+
+  it('bug 10: the committed example proof verifies (OK) and its tampered copy fails (FAILED, exit 1), as docs/ARCHITECTURE.md says', () => {
+    const examples = resolve(__dirname, '../../../docs/examples');
+    const good = JSON.parse(readFileSync(join(examples, 'ledger-proof.json'), 'utf8')) as LedgerProof;
+    // A throwaway demo key, never the key a real Threatline install (or this repository's CI) uses.
+    expect(readFileSync(resolve(__dirname, '../../../.github/workflows/ci.yml'), 'utf8')).not.toContain(good.publicKey);
+    expect(verifyLedgerProof(good)).toEqual({ ok: true, treeSize: 8, seq: 6 });
+    const out = execFileSync(process.execPath, [SCRIPT, join(examples, 'ledger-proof.json'), '--public-key', good.publicKey], { encoding: 'utf8' });
+    expect(out).toMatch(/^OK: ledger entry 6 \(attestation.issued\) is in the signed tree of 8 entries\.\n/);
+    expect(out).toMatch(/Consistent with the earlier head of 4 entries/);
+    let failed: { status: number; stderr: string } | null = null;
+    try {
+      execFileSync(process.execPath, [SCRIPT, join(examples, 'ledger-proof-tampered.json')], { encoding: 'utf8', stdio: 'pipe' });
+    } catch (e) {
+      failed = e as { status: number; stderr: string };
+    }
+    expect(failed).toMatchObject({ status: 1, stderr: 'FAILED: entry_hash\n' });
   });
 
   it('runs from the command line', async () => {

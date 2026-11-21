@@ -137,7 +137,28 @@ Every acceptance, approval, revocation, confirmation, break-glass, warn-only swi
 builds an RFC 9162 Merkle tree over the entry hashes, signs the tree head with the attestation key, stores it and posts
 it to a Confluence page. An admin can download a proof for any entry (inclusion in the signed tree, plus consistency
 with the last published head) and anyone can check it offline with `node scripts/verify-ledger-proof.mjs proof.json`,
-which uses only Node built-ins.
+which uses only Node built-ins. A proof carries its own public key, so pin Threatline's published key with
+`--public-key <key>` (from the Confluence tree-head page or **Threatline admin → Signing keys**); the verifier also
+refuses a tree head whose key id is not the embedded key's.
+
+**Try it.** `docs/examples/ledger-proof.json` is a real proof built with Threatline's own code
+(`pnpm tsx scripts/make-example-ledger-proof.ts`), signed with a throwaway demo key that is not a Threatline key;
+`ledger-proof-tampered.json` is the same proof with one payload field changed. From the repository root:
+
+```console
+$ node scripts/verify-ledger-proof.mjs docs/examples/ledger-proof.json --public-key ihXDX_OHPt0TIxhax2CBCqgc4lgjU8TzrlQThOzz6g8
+OK: ledger entry 6 (attestation.issued) is in the signed tree of 8 entries.
+Root c2326c75743bb5f5153ba85be52d7ce417d287c73cf1fb797952e43eceecdb6a, signed 2026-11-02T17:00:00.000Z.
+Consistent with the earlier head of 4 entries (nothing before it was rewritten).
+Public key ihXDX_OHPt0TIxhax2CBCqgc4lgjU8TzrlQThOzz6g8 (key id f4dc95a1eb1902e4).
+It matches the pinned --public-key.
+
+$ node scripts/verify-ledger-proof.mjs docs/examples/ledger-proof-tampered.json; echo "exit $?"
+FAILED: entry_hash
+exit 1
+```
+
+`packages/core/test/offline-verifier.test.ts` runs both commands.
 
 ## Surfaces
 
