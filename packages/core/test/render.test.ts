@@ -72,6 +72,20 @@ describe('renderThreatModel (RQ-5)', () => {
     expect(out).toMatch(/details in the Threatline panel/i);
   });
 
+  it('an acceptance of a redacted threat’s requirement shows no reason or controls (as in the panel)', () => {
+    const out = renderThreatModel(dto({ redactedThreatIds: ['thr_2'] }));
+    expect(out).not.toContain('Legacy client');
+    expect(out).not.toContain('IP allow-list');
+    expect(out).toContain('PAY-102');
+    expect(valid(out)).toBe(true);
+  });
+
+  it('an acceptance whose requirement is not on the page (another revision) shows no reason or controls', () => {
+    const out = renderThreatModel(dto({ requirements: [requirement(1)] }));
+    expect(out).not.toContain('Legacy client');
+    expect(out).not.toContain('IP allow-list');
+  });
+
   it('a page older than the latest revision gets a "stale" info macro', () => {
     expect(renderThreatModel(dto())).not.toContain('ac:name="info"');
     const stale = renderThreatModel(dto({ latestRevision: 3 }));
