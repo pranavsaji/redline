@@ -360,7 +360,8 @@ export function assembleReview(i: AssembleInput): AssembleOutput {
  * threat is folded into its carried counterpart only when it too cites only unchanged facts; one citing a new or
  * changed source stays new, so new evidence is never hidden behind an old decision. The stricter state wins (a fresh
  * needs_human is never downgraded), and when the material shows injection an earlier dismissal does not suppress the
- * fresh threat. Severity only rises. Prior threats citing a changed or removed source are not carried.
+ * fresh threat. Severity only rises. Prior threats citing a changed or removed source are not carried, nor are rule-based
+ * threats the rules no longer raise.
  */
 function carryOver(threats: Threat[], prior: NonNullable<AssembleInput['prior']>, facts: readonly ContextFact[], reviewId: string, injectionSuspected: boolean): Set<string> {
   const present = new Set(facts.map((f) => f.id));
@@ -390,6 +391,9 @@ function carryOver(threats: Threat[], prior: NonNullable<AssembleInput['prior']>
           : {}),
       };
     } else {
+      // Rule-based threats are derived afresh each time from the same facts: one the rules no longer raise (a rule was
+      // corrected) is gone, not carried. Agent threats carry, because model runs vary from one review to the next.
+      if (old.origin === 'baseline') continue;
       // A fresh threat with the same title but new evidence keeps its id; the carried one gets its own.
       const free = threats.some((t) => t.id === id) ? threatId(reviewId, `${old.origin}+prior`, old.stride, old.title) : id;
       if (threats.some((t) => t.id === free)) continue;

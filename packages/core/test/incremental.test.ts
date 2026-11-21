@@ -119,6 +119,14 @@ describe('R7: incremental re-review (assembleReview with the previous revision)'
     expect(out.threats.some((t) => t.title === transcriptLeak.title)).toBe(false);
   });
 
+  it('a rule-based threat the rules no longer raise is not carried (a corrected rule takes effect on the next run)', () => {
+    const fromOldRule = { ...triaged.find((t) => t.origin === 'baseline')!, title: 'A rule that has since been corrected', stride: 'Repudiation' as const };
+    expect(fromOldRule.origin).toBe('baseline');
+    const out = run(2, next, [1, 2, 3].map(() => model([refundAbuse])), { threats: [...triaged, fromOldRule], facts: base });
+    expect(out.threats.some((t) => t.title === fromOldRule.title)).toBe(false);
+    expect(out.threats.some((t) => t.title === transcriptLeak.title)).toBe(true);
+  });
+
   it('a carried threat’s severity can rise with new agent evidence, never fall', () => {
     const louder = { ...refundAbuse, likelihood: 5, impact: 5 };
     const out = run(2, next, [1, 2, 3].map(() => model([louder])), { threats: triaged, facts: base });
