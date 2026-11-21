@@ -44,6 +44,42 @@ describe('offline verifier script (no Threatline code, Node built-ins only)', ()
     }
   });
 
+  it('bug 5: a self-signed proof that claims the real key id fails in both verifiers (kid must match the embedded key)', async () => {
+    const { verifyProof } = (await import(SCRIPT)) as { verifyProof: (p: unknown) => unknown };
+    const real = await proof();
+    const forger = generateKeyPair();
+    const repo = memoryLedgerRepo();
+    await appendLedger(repo, fixedClock('2026-11-15T00:00:00Z'), 'acceptance.approved', { acceptanceId: 'acc_forged' }, 'u1');
+    const rows = [...repo._rows];
+    const forged = buildLedgerProof(rows, 1, { ...signTreeHead(rows, forger, new Date('2026-11-18T00:00:00Z')), kid: real.treeHead.kid }, forger.publicKey);
+    if (!forged.ok) throw new Error('proof');
+    expect(verifyLedgerProof(forged.value)).toEqual({ ok: false, reason: 'kid' });
+    expect(verifyProof(forged.value)).toEqual({ ok: false, reason: 'kid' });
+    // The earlier head in a consistency proof is checked too.
+    const x = structuredClone(real) as unknown as { consistency: { fromTreeHead: { kid: string } } };
+    x.consistency.fromTreeHead.kid = forger.kid;
+    expect(verifyLedgerProof(x as unknown as LedgerProof)).toEqual({ ok: false, reason: 'kid' });
+    expect(verifyProof(x)).toEqual({ ok: false, reason: 'kid' });
+  });
+
+  it('bug 5: --public-key pins the expected key; the output shows the full key and its id', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'threatline-proof-'));
+    const file = join(dir, 'proof.json');
+    const p = await proof();
+    writeFileSync(file, JSON.stringify(p));
+    const out = execFileSync(process.execPath, [SCRIPT, file, '--public-key', p.publicKey], { encoding: 'utf8' });
+    expect(out).toContain(`Public key ${p.publicKey} (key id ${p.treeHead.kid})`);
+    expect(out).toMatch(/matches the pinned --public-key/);
+    let failed: { status: number; stderr: string } | null = null;
+    try {
+      execFileSync(process.execPath, [SCRIPT, file, '--public-key', generateKeyPair().publicKey], { encoding: 'utf8', stdio: 'pipe' });
+    } catch (e) {
+      failed = e as { status: number; stderr: string };
+    }
+    expect(failed?.status).toBe(1);
+    expect(failed?.stderr).toMatch(/^FAILED: the proof is signed with key .* not the pinned --public-key/);
+  });
+
   it('runs from the command line', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'threatline-proof-'));
     const file = join(dir, 'proof.json');

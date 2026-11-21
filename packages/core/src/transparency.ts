@@ -1,4 +1,4 @@
-import { consistencyProof, entryHash, entryLeafHash, inclusionProof, merkleRoot, signB64, utf8, verifyB64, verifyConsistency, verifyInclusion, type KeyPair } from '@threatline/crypto';
+import { consistencyProof, entryHash, entryLeafHash, fromB64url, inclusionProof, kidOf, merkleRoot, signB64, utf8, verifyB64, verifyConsistency, verifyInclusion, type KeyPair } from '@threatline/crypto';
 import { appError, err, ok, type Result } from '@threatline/shared';
 import type { LedgerRow, TreeHead } from './ports.js';
 
@@ -70,9 +70,19 @@ export function buildLedgerProof(rows: readonly LedgerRow[], seq: number, head: 
   return ok(proof);
 }
 
-export type ProofVerdict = { ok: true; treeSize: number; seq: number } | { ok: false; reason: 'format' | 'entry_hash' | 'signature' | 'inclusion' | 'consistency' };
+export type ProofVerdict = { ok: true; treeSize: number; seq: number } | { ok: false; reason: 'format' | 'entry_hash' | 'kid' | 'signature' | 'inclusion' | 'consistency' };
 
-/** Everything an auditor checks, in order: the entry's own hash, the head's signature, inclusion, then consistency. */
+/** The key id a public key has (sha256 of the raw key, first 16 hex), or null for something that is not a key. */
+const kidOfKey = (publicKey: unknown): string | null => {
+  const raw = typeof publicKey === 'string' ? fromB64url(publicKey) : null;
+  return raw && raw.length === 32 ? kidOf(raw) : null;
+};
+
+/**
+ * Everything an auditor checks, in order: the entry's own hash, that each head's key id is the embedded public key's (a
+ * self-signed forgery cannot borrow Threatline's kid), the head's signature, inclusion, then consistency. The embedded
+ * key itself must still be compared with the published one (the offline script's --public-key does that).
+ */
 export function verifyLedgerProof(p: LedgerProof): ProofVerdict {
   if ((p?.format !== LEDGER_PROOF_FORMAT && p?.format !== LEGACY_LEDGER_PROOF_FORMAT) || !p.entry || !p.treeHead || !Array.isArray(p.auditPath)) return { ok: false, reason: 'format' };
   const e = p.entry;
@@ -83,6 +93,8 @@ export function verifyLedgerProof(p: LedgerProof): ProofVerdict {
     return { ok: false, reason: 'entry_hash' };
   }
   if (recomputed !== e.entryHash || !HEX64.test(e.entryHash)) return { ok: false, reason: 'entry_hash' };
+  const kid = kidOfKey(p.publicKey);
+  if (!kid || p.treeHead.kid !== kid || (p.consistency && p.consistency.fromTreeHead?.kid !== kid)) return { ok: false, reason: 'kid' };
   if (!verifyTreeHead(p.treeHead, p.publicKey)) return { ok: false, reason: 'signature' };
   if (!verifyInclusion(entryLeafHash(e.entryHash), p.leafIndex, p.treeHead.treeSize, p.auditPath, p.treeHead.rootHash)) return { ok: false, reason: 'inclusion' };
   if (p.consistency) {
