@@ -1,4 +1,4 @@
-import { decodeAttestation, findAttestations, fromB64url, fromUtf8 } from '@threatline/crypto';
+import { decodeAttestation, findAttestations, fromB64url, fromUtf8, isValidPublicKey, kidOf } from '@threatline/crypto';
 import type { AttestationPayload } from '@threatline/shared';
 import { DEFAULT_SITE_POLICY, parseRepoPolicy } from './policy.js';
 import { scoreDiff, type DiffFile } from './diffscore.js';
@@ -34,6 +34,11 @@ export interface RepoSettings {
   keyHint?: string;
   /** kid → base64url Ed25519 public key, copied from Threatline's admin page. */
   publicKeys: Record<string, string>;
+  /**
+   * kid → ISO time a trusted key retires (from a `<key> until=<date>` line). From then on tokens signed by it fail: set
+   * it on the old key after a rotation's 7-day overlap, or just remove the key.
+   */
+  keyRetireAt?: Record<string, string>;
   sensitivePaths: string[];
   mode: 'warn' | 'block';
   /** Warn mode ends here (set when an admin saves warn mode, at most 14 days); after it, or without it, the check blocks. */
@@ -95,19 +100,42 @@ export function namedIssueKeys(...texts: string[]): string[] {
   return [...new Set(keys)];
 }
 const FULL_SHA = /^[0-9a-f]{40}$/;
+
+/**
+ * Trusted public keys as an admin pastes them, one per line: `<base64url key>` or `<base64url key> until=<ISO date or
+ * time>` (a date alone means 00:00 UTC that day). Shared by Threatline for Bitbucket's settings and the GitHub Action's
+ * `public-keys` input. Bare keys are trusted until removed.
+ */
+export function parseTrustedKeys(lines: string[]): { ok: true; publicKeys: Record<string, string>; keyRetireAt: Record<string, string> } | { ok: false; line: number; reason: 'key' | 'until'; message: string } {
+  const publicKeys: Record<string, string> = {};
+  const keyRetireAt: Record<string, string> = {};
+  for (const [n, line] of lines.entries()) {
+    const [key = '', ...rest] = line.trim().split(/\s+/);
+    if (!isValidPublicKey(key)) return { ok: false, line: n + 1, reason: 'key', message: `"${key.slice(0, 12)}…" is not a Threatline public key` };
+    const kid = kidOf(fromB64url(key)!);
+    publicKeys[kid] = key;
+    if (rest.length === 0) continue;
+    const until = rest.length === 1 && rest[0]!.startsWith('until=') ? rest[0]!.slice('until='.length) : '';
+    // A time without a zone is UTC (JavaScript would otherwise read it in the runner's local time).
+    const at = /^\d{4}-\d{2}-\d{2}/.test(until) ? Date.parse(/T[\d:.]+$/.test(until) ? `${until}Z` : until) : NaN;
+    if (Number.isNaN(at)) return { ok: false, line: n + 1, reason: 'until', message: 'after the key, only until=<ISO date> (for example until=2026-12-01) is allowed' };
+    keyRetireAt[kid] = new Date(at).toISOString();
+  }
+  return { ok: true, publicKeys, keyRetireAt };
+}
 const MSG_SIGNATURE = 'Threatline: attestation signature invalid. Copy a fresh attestation from the Jira issue panel.';
 /** Bitbucket stores descriptions as Markdown and escapes punctuation (`\_`, `\-`); undo that before looking for tokens. */
 export const unescapeMarkdown = (text: string) => text.replace(/\\([\\`*_{}[\]()#+\-.!|~<>])/g, '$1');
 const utcMinute = (sec: number) => `${new Date(sec * 1000).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 
-/** The payload's repo, commit and iat, read without trusting it (only to choose which token to verify). */
-function peek(token: string): Pick<AttestationPayload, 'repo' | 'iat'> | null {
+/** The payload's repo, iat and kid, read without trusting them (only to choose which token to verify and explain why). */
+function peek(token: string): (Pick<AttestationPayload, 'repo' | 'iat'> & { kid?: string }) | null {
   const body = token.split('.')[2];
   const bytes = body ? fromB64url(body) : null;
   if (!bytes) return null;
   try {
-    const p = JSON.parse(fromUtf8(bytes)) as { repo?: unknown; iat?: unknown };
-    return typeof p.repo === 'string' && typeof p.iat === 'number' ? { repo: p.repo, iat: p.iat } : null;
+    const p = JSON.parse(fromUtf8(bytes)) as { repo?: unknown; iat?: unknown; kid?: unknown };
+    return typeof p.repo === 'string' && typeof p.iat === 'number' ? { repo: p.repo, iat: p.iat, ...(typeof p.kid === 'string' ? { kid: p.kid } : {}) } : null;
   } catch {
     return null;
   }
@@ -183,8 +211,20 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
 
   if (Object.keys(i.settings.publicKeys).length === 0)
     return { success: false, outcome: 'fail_signature', message: `Threatline: no Threatline public key is configured for this repository. ${i.settings.keyHint ?? 'A repository admin must paste it in Repository settings → Threatline.'}` };
-  const v = decodeAttestation(mine[0]!.t, i.settings.publicKeys, i.nowSec);
+  // Keys past their retire date are no longer trusted (rotated keys must stop verifying at some point).
+  const retiredAt = (kid: string | undefined) => {
+    const at = kid ? i.settings.keyRetireAt?.[kid] : undefined;
+    const sec = at ? Date.parse(at) / 1000 : NaN;
+    return sec <= i.nowSec ? sec : null;
+  };
+  const trusted = Object.fromEntries(Object.entries(i.settings.publicKeys).filter(([kid]) => retiredAt(kid) === null));
+  const v = decodeAttestation(mine[0]!.t, trusted, i.nowSec);
   if (!v.ok) {
+    const retired = retiredAt(mine[0]!.p!.kid);
+    if (retired !== null && (v.error.code === 'bad_signature' || v.error.code === 'unknown_key'))
+      return { success: false, outcome: 'fail_signature', message: `Threatline: this attestation is signed with key ${mine[0]!.p!.kid}, which this repository retired at ${utcMinute(retired)}. Request a new attestation (it is signed with Threatline's current key).` };
+    if (v.error.code === 'lifetime')
+      return { success: false, outcome: 'fail_signature', message: 'Threatline: this attestation is valid for longer than Threatline ever issues (7 days), so it is refused. Request a new one from the Jira issue panel.' };
     if (v.error.code === 'expired') {
       const exp = (() => {
         try {
@@ -214,7 +254,7 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
   // item named next to a blocked one ("PAY-6 …, see PAY-7") would carry the blocked change.
   const attested = (key: string) =>
     mine.some((x) => {
-      const d = decodeAttestation(x.t, i.settings.publicKeys, i.nowSec);
+      const d = decodeAttestation(x.t, trusted, i.nowSec);
       return d.ok && d.value.issueKey === key && d.value.commitSha === head;
     });
   const unattested = named.find((k) => k !== p.issueKey && !attested(k));

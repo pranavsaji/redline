@@ -5,7 +5,13 @@ import { signB64, verifyB64, type KeyPair } from './ed25519.js';
 export const ATTESTATION_PREFIX = 'threatline-att.v1.';
 /** Tokens issued before the rename to Threatline. The signature covers only the payload, so they verify the same way. */
 const LEGACY_ATTESTATION_PREFIX = 'redline-att.v1.';
-export type AttestationError = 'malformed' | 'unknown_key' | 'bad_signature' | 'expired' | 'not_yet_valid' | 'schema';
+export type AttestationError = 'malformed' | 'unknown_key' | 'bad_signature' | 'expired' | 'not_yet_valid' | 'schema' | 'lifetime';
+/**
+ * The longest lifetime (exp - iat) Threatline issues: the site policy's attestationTtlHours is at most 168 (7 days;
+ * SitePolicySchema in @threatline/shared). Verifiers refuse anything longer, so a token cannot outlive a key rotation's
+ * 7-day overlap by much, however its payload was produced.
+ */
+export const MAX_ATTESTATION_LIFETIME_SEC = 168 * 3600;
 
 /** `threatline-att.v1.<b64url(canonicalJson(payload))>.<b64url(ed25519 signature over those payload bytes)>` */
 export function encodeAttestation(p: AttestationPayload, key: KeyPair): string {
@@ -45,6 +51,7 @@ export function decodeAttestation(
   const p = parsed.data;
   if (nowSec >= p.exp) return fail('expired', `expired at ${new Date(p.exp * 1000).toISOString()}`);
   if (p.iat > nowSec + skewSec) return fail('not_yet_valid', 'issued in the future');
+  if (p.exp - p.iat > MAX_ATTESTATION_LIFETIME_SEC + skewSec) return fail('lifetime', 'valid for longer than Threatline issues attestations');
   return ok(p);
 }
 

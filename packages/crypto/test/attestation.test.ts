@@ -26,6 +26,16 @@ describe('attestations', () => {
     expect(r).toEqual({ ok: true, value: payload });
   });
 
+  it('bug 4a: refuses a token whose lifetime (exp - iat) is longer than Threatline ever issues (168 h, plus clock skew)', async () => {
+    const { MAX_ATTESTATION_LIFETIME_SEC } = await import('../src/index.js');
+    expect(MAX_ATTESTATION_LIFETIME_SEC).toBe(168 * 3600);
+    const at = (exp: number) => decodeAttestation(encodeAttestation({ ...payload, exp }, key), keys, now + 10);
+    expect(at(now + 168 * 3600)).toMatchObject({ ok: true });
+    expect(at(now + 168 * 3600 + 300)).toMatchObject({ ok: true });
+    expect(at(now + 168 * 3600 + 301)).toMatchObject({ ok: false, error: { code: 'lifetime' } });
+    expect(at(now + 10 * 365 * 86_400)).toMatchObject({ ok: false, error: { code: 'lifetime' } });
+  });
+
   it('rejects every single-character edit of the payload, never as unknown_key (R4 demo)', () => {
     const token = encodeAttestation(payload, key);
     const parts = token.split('.');

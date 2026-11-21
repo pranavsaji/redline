@@ -29,7 +29,7 @@ export function RepoSettings({ api }: { api: SettingsApi }) {
       .catch((): ApiError => ({ error: 'unavailable' }))
       .then((r) => {
         if (isError(r)) return setError(r.message ?? 'Threatline could not load this repository’s settings. Reload the page to try again.');
-        setKeys(Object.values(r.publicKeys).join('\n'));
+        setKeys(Object.entries(r.publicKeys).map(([kid, k]) => (r.keyRetireAt?.[kid] ? `${k} until=${r.keyRetireAt[kid]}` : k)).join('\n'));
         setPaths(r.sensitivePaths.join('\n'));
         // An ended warn-only window loads as Block (the check already blocks), so saving anything else cannot quietly
         // start a new window; the admin must choose Warn only again. Older servers still report mode: warn here.
@@ -63,7 +63,7 @@ export function RepoSettings({ api }: { api: SettingsApi }) {
       </p>
       <form aria-label="Threatline settings" onSubmit={save} style={box}>
         <label style={label} htmlFor={`${id}-keys`}>
-          Threatline public keys (one per line, from Threatline's admin page in Jira)
+          Threatline public keys (one per line, from Threatline's admin page in Jira; after a key rotation, remove the old key or add until=YYYY-MM-DD after it)
         </label>
         <textarea id={`${id}-keys`} value={keys} onChange={(e) => setKeys(e.target.value)} rows={3} style={{ ...field, fontFamily: token('font.family.code') }} disabled={!loaded} />
         <label style={label} htmlFor={`${id}-paths`}>

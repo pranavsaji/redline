@@ -112,6 +112,30 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
     });
   });
 
+  it('bug 4a: a token with a lifetime longer than Threatline issues is refused, saying why', async () => {
+    expect(await run(token({ iat: NOW - 60, exp: NOW + 400 * 86_400 }))).toEqual({
+      success: false,
+      outcome: 'fail_signature',
+      message: 'Threatline: this attestation is valid for longer than Threatline ever issues (7 days), so it is refused. Request a new one from the Jira issue panel.',
+    });
+  });
+
+  it('bug 4b: a trusted key with a retire date stops verifying from then on, with a clear message', async () => {
+    const old = generateKeyPair();
+    const retiring = (at: number) => settings({ publicKeys: { [key.kid]: key.publicKey, [old.kid]: old.publicKey }, keyRetireAt: { [old.kid]: new Date(at * 1000).toISOString() } });
+    expect(await run(token({}, old), { s: retiring(NOW + 60) })).toMatchObject({ success: true, outcome: 'pass_attested' });
+    expect(await run(token({}, old), { s: retiring(NOW - 60) })).toEqual({
+      success: false,
+      outcome: 'fail_signature',
+      message: `Threatline: this attestation is signed with key ${old.kid}, which this repository retired at 2025-11-15 11:59 UTC. Request a new attestation (it is signed with Threatline's current key).`,
+    });
+    // The current key still works next to a retired one.
+    expect(await run(token(), { s: retiring(NOW - 60) })).toMatchObject({ success: true });
+    // A second work item's token signed by the retired key does not count either.
+    const multi = await evaluateMergeCheck({ pr: { ...pr(`${token()}\n${token({ issueKey: 'PAY-6', nonce: 'n0nce2' }, old)}`), title: 'PAY-7 and PAY-6' }, files: AUTH, repoPolicyYaml: null, settings: retiring(NOW - 60), nowSec: NOW });
+    expect(multi).toMatchObject({ success: false, outcome: 'fail_other_issue' });
+  });
+
   it('an expired attestation → fail_expired with the time', async () => {
     expect(await run(token({ iat: NOW - 90_000, exp: NOW - 3600 }))).toEqual({ success: false, outcome: 'fail_expired', message: 'Threatline: attestation expired at 2025-11-15 11:00 UTC. Request a new one.' });
   });

@@ -23,6 +23,16 @@ describe('issueAttestation', () => {
     const d = decodeAttestation(r.value.token, { [key.kid]: key.publicKey }, nowSec + 60);
     expect(d.ok && d.value.commitSha).toBe(sha);
   });
+  it('bug 4a: the longest TTL the site policy allows is exactly the lifetime verifiers accept', async () => {
+    const { MAX_ATTESTATION_LIFETIME_SEC } = await import('@threatline/crypto');
+    const { SitePolicySchema } = await import('@threatline/shared');
+    const maxHours = MAX_ATTESTATION_LIFETIME_SEC / 3600;
+    expect(SitePolicySchema.safeParse({ ...DEFAULT_SITE_POLICY, attestationTtlHours: maxHours }).success).toBe(true);
+    expect(SitePolicySchema.safeParse({ ...DEFAULT_SITE_POLICY, attestationTtlHours: maxHours + 1 }).success).toBe(false);
+    const reqs = [requirement({ status: 'Verified' })];
+    const r = issueAttestation({ issueKey: 'PROJ-1', repo: 'acme/shop', commitSha: sha, verdict: computeVerdict(input({ requirements: reqs })), requirements: reqs, key, nowSec, ttlHours: maxHours });
+    expect(r.ok && decodeAttestation(r.value.token, { [key.kid]: key.publicKey }, nowSec + 60).ok).toBe(true);
+  });
   it('rejects a malformed commit sha', () => {
     const reqs = [requirement({ status: 'Verified' })];
     const r = issueAttestation({ issueKey: 'PROJ-1', repo: 'acme/shop', commitSha: 'abc', verdict: computeVerdict(input({ requirements: reqs })), requirements: reqs, key, nowSec, ttlHours: 24 });

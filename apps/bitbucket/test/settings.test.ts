@@ -17,6 +17,15 @@ describe('parseSettingsInput', () => {
     expect(r).toEqual({ ok: true, value: { publicKeys: { [a.kid]: a.publicKey, [b.kid]: b.publicKey }, sensitivePaths: ['billing/**', 'src/admin/**'], mode: 'warn', diffScoreThreshold: 30 } });
   });
 
+  it('bug 4b: a key line can carry a retire date (`<key> until=<ISO date>`); bare keys still work', () => {
+    const a = generateKeyPair();
+    const b = generateKeyPair();
+    const r = parseSettingsInput({ publicKeys: `${a.publicKey}\n${b.publicKey}   until=2026-12-01`, sensitivePaths: '', mode: 'block', diffScoreThreshold: 40 });
+    expect(r).toEqual({ ok: true, value: { publicKeys: { [a.kid]: a.publicKey, [b.kid]: b.publicKey }, keyRetireAt: { [b.kid]: '2026-12-01T00:00:00.000Z' }, sensitivePaths: [], mode: 'block', diffScoreThreshold: 40 } });
+    for (const bad of [`${b.publicKey} until=someday`, `${b.publicKey} until=`, `${b.publicKey} after=2026-12-01`, `${b.publicKey} until=2026-12-01 extra`])
+      expect(parseSettingsInput({ publicKeys: bad, sensitivePaths: '', mode: 'block', diffScoreThreshold: 40 })).toMatchObject({ ok: false, error: { message: expect.stringMatching(/line 1/) } });
+  });
+
   it('rejects a key that is not a base64url 32-byte Ed25519 public key, and says which line', () => {
     const r = parseSettingsInput({ publicKeys: `${generateKeyPair().publicKey}\nnot-a-key`, sensitivePaths: '', mode: 'block', diffScoreThreshold: 40 });
     expect(r).toMatchObject({ ok: false, error: { code: 'validation', message: expect.stringMatching(/line 2/) } });

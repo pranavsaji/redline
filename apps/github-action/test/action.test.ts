@@ -42,6 +42,15 @@ describe('parseInputs (GitHub Action inputs)', () => {
     const other = generateKeyPair();
     expect(inputs({ 'public-keys': `${key.publicKey}\n\n  ${other.publicKey}  ` }).publicKeys).toEqual({ [key.kid]: key.publicKey, [other.kid]: other.publicKey });
   });
+  it('bug 4b: a public-keys line can carry a retire date; tokens signed by that key fail after it', async () => {
+    const old = generateKeyPair();
+    const s = inputs({ 'public-keys': `${key.publicKey}\n${old.publicKey} until=2025-11-15T11:00:00Z` });
+    expect(s.keyRetireAt).toEqual({ [old.kid]: '2025-11-15T11:00:00.000Z' });
+    const signedByOld = encodeAttestation({ v: 1, kid: old.kid, issueKey: 'PAY-7', repo: REPO, commitSha: HEAD, verdict: 'pass', requirements: [], iat: NOW - 60, exp: NOW + 3600, nonce: 'n0nce9' }, old);
+    expect(await runGitHubCheck({ settings: s, client: client({ pr: PR(signedByOld) }), nowSec: NOW })).toMatchObject({ success: false, message: expect.stringMatching(/retired at 2025-11-15 11:00 UTC/) });
+    expect(parseInputs({ 'public-keys': `${old.publicKey} until=soon` }, NOW)).toMatchObject({ ok: false, message: expect.stringMatching(/until=/) });
+  });
+
   it('rejects a malformed key, an unknown mode, and a bad threshold', () => {
     expect(parseInputs({ 'public-keys': 'not-a-key' }, NOW)).toMatchObject({ ok: false, message: expect.stringMatching(/public key/) });
     expect(parseInputs({ 'public-keys': key.publicKey, mode: 'off' }, NOW)).toMatchObject({ ok: false, message: expect.stringMatching(/mode/) });

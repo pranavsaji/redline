@@ -40,14 +40,16 @@ author could swap in their own key, switch to warn mode, or replace the step. `p
 branch's workflow. The action warns if it runs on `pull_request`. Do not add a checkout of the pull request's code to
 this job. For organisation-wide enforcement, add the workflow as a required workflow in an organisation ruleset.
 
-Changes to `.github/workflows/**`, `.github/actions/**` and `.threatline/**` always count as sensitive, so loosening the
-gate needs an attestation like any other security change.
+Changes to the gate's own configuration always count as sensitive, on GitHub and Bitbucket alike: `.github/workflows/**`,
+`.github/actions/**`, `bitbucket-pipelines.yml`, `.threatline/**` and `.redline/**` (the policy file's name before the
+rename). Editing, deleting or shadowing `policy.yml` therefore needs an attestation like any other security change; no
+setting or policy file can remove these paths (`GATE_CONFIG_PATHS` in `packages/core/src/merge-gate.ts`).
 
 ## Inputs
 
 | Input | Default | Meaning |
 | --- | --- | --- |
-| `public-keys` | (required) | Threatline public keys, one per line. During a key rotation, list both. |
+| `public-keys` | (required) | Threatline public keys, one per line: `<key>` or `<key> until=<ISO date>`. During a key rotation, list both (see below). |
 | `sensitive-paths` | none | Extra path globs, one per line, on top of Threatline's defaults. |
 | `diff-score-threshold` | `40` | A change scoring at or above this needs an attestation even outside sensitive paths. |
 | `mode` | `block` | `warn` reports failures but passes, until `warn-until`. |
@@ -56,12 +58,41 @@ gate needs an attestation like any other security change.
 The base branch's `.threatline/policy.yml` can add sensitive paths and lower the threshold. It can never weaken them, and
 an unreadable policy file makes every changed file count as sensitive.
 
+## Rotating the signing key
+
+**Threatline admin → Signing keys → Rotate key** makes a new key active; Threatline keeps publishing the old one for
+7 days so attestations signed just before the rotation still verify. A merge gate, though, trusts every key pasted into
+it until it is removed. So:
+
+1. Add the new public key to every repository (the `public-keys` input here, Repository settings → Threatline on
+   Bitbucket), next to the old one.
+2. After the 7-day overlap, remove the old key, or mark when it retires so you can do both edits at once:
+
+   ```yaml
+   public-keys: |
+     NEW-PUBLIC-KEY
+     OLD-PUBLIC-KEY until=2026-12-08
+   ```
+
+   From that time (a date alone means 00:00 UTC; a time without a zone is UTC) attestations signed by the old key fail
+   with "signed with key …, which this repository retired at …". Bitbucket's settings page takes the same syntax.
+
+Independently of keys, the gate refuses any attestation whose lifetime (`exp - iat`) is longer than Threatline ever issues
+(168 hours, the largest `attestationTtlHours`, plus 5 minutes of clock skew).
+
 ## How a developer gets through the gate
 
 1. Finish the work item's security requirements in Jira (or get a risk acceptance).
 2. In the Threatline panel, use **Merge attestation** with the repository as `owner/repository` and the pull request's
    head commit. An IDE agent can call `get-merge-attestation` over MCP instead.
 3. Paste the attestation into the pull request description. Put the work item key in the title or branch name.
+
+Every work item the title or branch names needs its own valid attestation for the head commit (one passing item cannot
+carry another). A key is a project key, `-` and a number, not touching another letter or digit: `PAY-7`, `MY_PROJ-12`,
+and also `PAY-7_fix` or `fix_PAY-7` (an underscore separates). A lowercase key such as `pay-7-fix` counts only when the
+title or branch also names an uppercase key of the same project (`PAY-6 …` with branch `pay-7-fix` names PAY-6 and
+PAY-7); on its own, lowercase text like `utf-8` or `sha-256` is never treated as a work item. The attestation must be for
+exactly the head commit (all 40 characters).
 
 The check fails, saying exactly why, when the attestation is missing, for another commit or repository, for a
 different work item than the one the pull request names, expired, or not signed by a listed key. It also fails closed

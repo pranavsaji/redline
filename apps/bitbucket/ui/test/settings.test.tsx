@@ -53,6 +53,16 @@ describe('Repository settings (Task 27)', () => {
     }
   });
 
+  it('bug 4b: a key with a retire date loads as `<key> until=<date>` and round-trips on save', async () => {
+    const save = vi.fn(async (s: { mode: 'warn' | 'block' }) => ({ ...saved, mode: s.mode }));
+    render(<RepoSettings api={api({ get: async () => ({ ...structuredClone(saved), keyRetireAt: { [key.kid]: '2026-12-01T00:00:00.000Z' } }), save })} />);
+    const form = await screen.findByRole('form', { name: 'Threatline settings' });
+    const box = within(form).getByRole('textbox', { name: /Threatline public keys/ }) as HTMLTextAreaElement;
+    await waitFor(() => expect(box.value).toBe(`${key.publicKey} until=2026-12-01T00:00:00.000Z`));
+    await userEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ publicKeys: `${key.publicKey} until=2026-12-01T00:00:00.000Z` }));
+  });
+
   it('a failed load says so (not "could not save")', async () => {
     render(<RepoSettings api={api({ get: async () => ({ error: 'unavailable' }) })} />);
     expect(await screen.findByText('Threatline could not load this repository’s settings. Reload the page to try again.')).toBeTruthy();

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { fromB64url, kidOf } from '@threatline/crypto';
+import { parseTrustedKeys } from '@threatline/core';
 import { appError, err, ok, type Result } from '@threatline/shared';
 import type { RepoSettings } from './merge-check.js';
 
@@ -20,6 +20,7 @@ const MAX_GLOBS = 50;
 const Stored = z
   .object({
     publicKeys: z.record(z.string().max(64), z.string().max(64)),
+    keyRetireAt: z.record(z.string().max(64), z.string().datetime()).optional(),
     sensitivePaths: z.array(z.string().min(1).max(200)).max(MAX_GLOBS),
     mode: z.enum(['warn', 'block']),
     warnUntil: z.string().datetime().optional(),
@@ -29,17 +30,18 @@ const Stored = z
 
 const lines = (s: unknown) => (typeof s === 'string' ? s : Array.isArray(s) ? s.join('\n') : '').split('\n').map((l) => l.trim()).filter(Boolean);
 
-/** Settings page input → RepoSettings. Public keys are one per line (base64url, 32 bytes); the kid is derived from each. */
+/**
+ * Settings page input → RepoSettings. Public keys are one per line (base64url, 32 bytes), optionally followed by
+ * `until=<ISO date>` when the key retires; the kid is derived from each.
+ */
 export function parseSettingsInput(input: { publicKeys?: unknown; sensitivePaths?: unknown; mode?: unknown; diffScoreThreshold?: unknown }): Result<RepoSettings> {
   const keys = lines(input.publicKeys);
   if (keys.length > MAX_KEYS) return err(appError('validation', `Paste at most ${MAX_KEYS} public keys.`));
-  const publicKeys: Record<string, string> = {};
-  for (const [n, k] of keys.entries()) {
-    const bytes = fromB64url(k);
-    if (!bytes || bytes.length !== 32) return err(appError('validation', `Public key on line ${n + 1} is not a Threatline public key (copy it from Threatline's admin page in Jira).`));
-    publicKeys[kidOf(bytes)] = k;
-  }
-  const s = Stored.safeParse({ publicKeys, sensitivePaths: lines(input.sensitivePaths), mode: input.mode, diffScoreThreshold: input.diffScoreThreshold });
+  const parsed = parseTrustedKeys(keys);
+  if (!parsed.ok)
+    return err(appError('validation', parsed.reason === 'until' ? `Public key on line ${parsed.line}: ${parsed.message}.` : `Public key on line ${parsed.line} is not a Threatline public key (copy it from Threatline's admin page in Jira).`));
+  const { publicKeys, keyRetireAt } = parsed;
+  const s = Stored.safeParse({ publicKeys, ...(Object.keys(keyRetireAt).length > 0 ? { keyRetireAt } : {}), sensitivePaths: lines(input.sensitivePaths), mode: input.mode, diffScoreThreshold: input.diffScoreThreshold });
   if (!s.success) return err(appError('validation', s.error.issues.slice(0, 2).map((i) => `${i.path.join('.') || 'settings'}: ${i.message}`).join('; ')));
   return ok(s.data);
 }
