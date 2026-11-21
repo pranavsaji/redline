@@ -1,6 +1,6 @@
 # Rovo chat: the four conversation starters (live, 2026-11-17)
 
-- **Where:** demo site `one-atlas-mefc`, Jira work item PAY-7 open, Rovo chat with the **Redline** agent (app 6.x, development environment, prompt v1.2.0).
+- **Where:** demo site `one-atlas-mefc`, Jira work item PAY-7 open, Rovo chat with the **Threatline** agent (app 6.x, development environment, prompt v1.2.0).
 - **Questions:** the manifest's conversation starters, adapted to the demo's real work item (PROJ-142 → PAY-7, T-7 on PAY-7).
 - **Transcript:** copied from the chat panel. Rovo's UI buttons are removed, and two long passages are shortened with "…".
 - **Credits:** each answer is one Rovo agent run on the site's credits.
@@ -36,7 +36,7 @@
 
 > Release 4.2 is Go with conditions.
 >
-> Condition: No work items visible to you in fix version 4.2 are currently reviewed by Redline. Please double-check the version name or ensure the relevant work items are tracked in Redline.
+> Condition: No work items visible to you in fix version 4.2 are currently reviewed by Threatline. Please double-check the version name or ensure the relevant work items are tracked in Threatline.
 >
 > Go with conditions.
 
@@ -44,13 +44,13 @@
 
 **Action called:** posture-summary. The only acceptance created during testing had already been revoked.
 
-> There are no risk acceptances expiring in the next 31 days across the Redline-enabled projects.
+> There are no risk acceptances expiring in the next 31 days across the Threatline-enabled projects.
 >
 > Currently, the security posture shows: 34 open requirements in total (3 Critical, 21 High, 10 Medium). The PAY project is the primary source of these requirements.
 
 ## 4. "Explain threat T-7 on PAY-7 like I'm new to security"
 
-**Action called:** explain-threat with the T-n ref. The answer is built from the review and the bundled OWASP and CWE data, with no model call inside Redline.
+**Action called:** explain-threat with the T-n ref. The answer is built from the review and the bundled OWASP and CWE data, with no model call inside Threatline.
 
 > Threat T-7 is about an "Over-privileged AI Agent." In plain language: The AI could be tricked into using its tools (like issuing refunds) in ways nobody intended.
 >

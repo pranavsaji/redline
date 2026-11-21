@@ -5,7 +5,7 @@ const envelope = JSON.stringify({ type: 'result', subtype: 'success', is_error: 
 const req = { system: 'SYS PROMPT', user: 'USER PROMPT', tier: 'fast' as const, maxOutputTokens: 1000, purpose: 'propose' as const };
 
 describe('claudeCodeLlm', () => {
-  it('runs claude -p with tools disabled, the Redline system prompt, JSON output and no session persistence; prompt on stdin', async () => {
+  it('runs claude -p with tools disabled, the Threatline system prompt, JSON output and no session persistence; prompt on stdin', async () => {
     let seen: { cmd: string; args: string[]; input: string } | undefined;
     const spawn: SpawnFn = async (cmd, args, input) => {
       seen = { cmd, args, input };
@@ -13,7 +13,7 @@ describe('claudeCodeLlm', () => {
     };
     const r = await claudeCodeLlm({ spawn }).complete(req);
     expect(seen!.cmd).toBe('claude');
-    // --tools '' only removes built-in tools: MCP servers from the user's config (Redline's own dev MCP server among them)
+    // --tools '' only removes built-in tools: MCP servers from the user's config (Threatline's own dev MCP server among them)
     // still load unless --strict-mcp-config is given with no --mcp-config. Skills and commands are off too.
     expect(seen!.args).toEqual(['-p', '--model', 'claude-sonnet-4-5', '--tools', '', '--strict-mcp-config', '--disable-slash-commands', '--system-prompt', 'SYS PROMPT', '--output-format', 'json', '--no-session-persistence']);
     expect(seen!.args).not.toContain('--mcp-config');

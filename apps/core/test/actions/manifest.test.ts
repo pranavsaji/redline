@@ -86,7 +86,7 @@ describe('manifest: Rovo actions, skill and MCP (Task 28)', () => {
 describe('manifest: posture surfaces (Task 29)', () => {
   it('a global page and a dashboard gadget serve the posture view through the shared resolver', () => {
     const page = (m.modules['jira:globalPage'] ?? []).find((x) => x.key === 'redline-posture');
-    expect(page).toMatchObject({ resource: 'panel', resolver: { function: 'panelResolverFn' }, title: 'Redline security posture' });
+    expect(page).toMatchObject({ resource: 'panel', resolver: { function: 'panelResolverFn' }, title: 'Threatline security posture' });
     const gadget = (m.modules['jira:dashboardGadget'] ?? []).find((x) => x.key === 'redline-posture-gadget');
     expect(gadget).toMatchObject({ resource: 'panel', resolver: { function: 'panelResolverFn' } });
     expect(gadget!.description).toBeTruthy();
@@ -102,7 +102,7 @@ describe('Marketplace readiness (Task 33)', () => {
    * fails this test until its status is checked and added.
    */
   const NOT_EAP = new Set(['sql', 'trigger', 'consumer', 'scheduledTrigger', 'jira:issuePanel', 'jira:adminPage', 'jira:globalPage', 'jira:dashboardGadget', 'jira:workflowValidator', 'jira:entityProperty', 'action', 'rovo:skill', 'rovo:mcp', 'rovo:agent', 'function', 'llm']);
-  // `llm` (Forge LLMs, Redline Engine): generally available; checked 2026-11-20 (Atlassian community: "Forge LLMs GA").
+  // `llm` (Forge LLMs, Threatline Engine): generally available; checked 2026-11-20 (Atlassian community: "Forge LLMs GA").
   it('uses no EAP module, so no separate production manifest is needed', () => {
     const unknown = Object.keys(m.modules).filter((k) => !NOT_EAP.has(k));
     expect(unknown).toEqual([]);

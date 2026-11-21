@@ -22,7 +22,7 @@ export interface VerifyItem {
 }
 
 /**
- * Adversarial verifier (Redline Engine, stage 4). It sees each consensus threat with the quotes it rests on and says
+ * Adversarial verifier (Threatline Engine, stage 4). It sees each consensus threat with the quotes it rests on and says
  * whether the quotes support it. Deliberately not the offline eval judge's rubric: it checks support and specificity
  * against the evidence, so the eval's judged precision does not grade the product with its own rule.
  */

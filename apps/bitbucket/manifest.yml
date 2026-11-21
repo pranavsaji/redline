@@ -9,12 +9,12 @@ modules:
   bitbucket:mergeCheck:
     - key: redline-merge-check
       function: mergeCheck
-      name: Redline security attestation
-      description: Requires a valid Redline attestation for security-sensitive changes
+      name: Threatline security attestation
+      description: Requires a valid Threatline attestation for security-sensitive changes
       triggers: [ on-code-pushed, on-merge ]
   bitbucket:repoSettingsMenuPage:
     - key: redline-repo-settings
-      title: Redline
+      title: Threatline
       resource: settings
       resolver:
         function: settingsResolverFn

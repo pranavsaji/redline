@@ -35,7 +35,7 @@ async function fill(form: HTMLElement, repo: string, sha: string) {
 
 describe('Copy merge attestation (AT-1)', () => {
   it('returns the text to paste into the pull request, with a copy button', async () => {
-    const attestation = vi.fn(async () => ({ token: 'redline-att.v1.x.y', expiresAt: '2026-11-17T12:00:00.000Z', prDescriptionSnippet: 'Redline attestation for PAY-6 (expires 2026-11-17 12:00 UTC):\nredline-att.v1.x.y' }));
+    const attestation = vi.fn(async () => ({ token: 'redline-att.v1.x.y', expiresAt: '2026-11-17T12:00:00.000Z', prDescriptionSnippet: 'Threatline attestation for PAY-6 (expires 2026-11-17 12:00 UTC):\nredline-att.v1.x.y' }));
     await openRequirements(api(['viewer', 'developer'], { attestation }));
     const form = screen.getByRole('form', { name: 'Merge attestation' });
     await fill(form, 'acme/payments', SHA);
@@ -51,7 +51,7 @@ describe('Copy merge attestation (AT-1)', () => {
     await openRequirements(api(['viewer', 'developer'], { attestation }));
     const form = screen.getByRole('form', { name: 'Merge attestation' });
     await fill(form, 'acme/payments', SHA);
-    expect(await within(form).findByText(/Redline blocks this merge/)).toBeTruthy();
+    expect(await within(form).findByText(/Threatline blocks this merge/)).toBeTruthy();
     expect(within(form).getByText('2 open security requirements at High or above.')).toBeTruthy();
   });
 

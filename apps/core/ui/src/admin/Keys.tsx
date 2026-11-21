@@ -6,7 +6,7 @@ import type { ApiError } from '../types.js';
 
 const code = { fontFamily: token('font.family.code'), font: token('font.body.small'), wordBreak: 'break-all' as const, padding: 8, borderRadius: 4, background: token('elevation.surface.sunken'), margin: 0 };
 
-/** AT-3: the public key to paste into Redline for Bitbucket, and key rotation (the old key stays trusted for 7 days). */
+/** AT-3: the public key to paste into Threatline for Bitbucket, and key rotation (the old key stays trusted for 7 days). */
 export function Keys({ api }: { api: AdminApi }) {
   const id = useId();
   const [keys, setKeys] = useState<PublicKeyInfo | null>(null);
@@ -27,7 +27,7 @@ export function Keys({ api }: { api: AdminApi }) {
     if (!keys) return;
     try {
       await navigator.clipboard.writeText(keys.active.publicKey);
-      setMessage('Public key copied. Paste it into Redline for Bitbucket’s settings.');
+      setMessage('Public key copied. Paste it into Threatline for Bitbucket’s settings.');
     } catch {
       setMessage('Copy failed. Select the key above and copy it.');
     }
@@ -40,7 +40,7 @@ export function Keys({ api }: { api: AdminApi }) {
     setBusy(false);
     setConfirming(false);
     if (isError(r)) return setMessage(errorText(r));
-    setMessage(`New key ${r.kid} is active. Paste the new public key into Redline for Bitbucket and your GitHub workflows within 7 days.`);
+    setMessage(`New key ${r.kid} is active. Paste the new public key into Threatline for Bitbucket and your GitHub workflows within 7 days.`);
     await load();
   };
 
@@ -49,7 +49,7 @@ export function Keys({ api }: { api: AdminApi }) {
       <h2 id={`${id}-h`} style={{ font: token('font.heading.small'), margin: 0 }}>
         Signing keys
       </h2>
-      <p style={{ margin: 0, color: token('color.text.subtle') }}>Redline signs merge attestations with this Ed25519 key. Redline for Bitbucket needs the public key to check them.</p>
+      <p style={{ margin: 0, color: token('color.text.subtle') }}>Threatline signs merge attestations with this Ed25519 key. Threatline for Bitbucket needs the public key to check them.</p>
       {keys && (
         <>
           <span style={{ font: token('font.body.small') }}>Active key {keys.active.kid}</span>
@@ -76,7 +76,7 @@ export function Keys({ api }: { api: AdminApi }) {
               </>
             )}
           </div>
-          {confirming && <span style={{ font: token('font.body.small') }}>Attestations signed with the current key keep working for 7 days. Update Redline for Bitbucket with the new public key before then.</span>}
+          {confirming && <span style={{ font: token('font.body.small') }}>Attestations signed with the current key keep working for 7 days. Update Threatline for Bitbucket with the new public key before then.</span>}
         </>
       )}
       <p role="status" style={{ margin: 0 }}>

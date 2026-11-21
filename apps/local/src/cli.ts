@@ -48,7 +48,7 @@ async function main() {
   const cmd = argv[0];
   const samples = Number(flag('samples', '3'));
   const path = (flag('path', 'agent') as EvalPath) ?? 'agent';
-  // Redline Engine (pipeline path) keeps its own recordings, so the agent path's offline CI gate is never overwritten.
+  // Threatline Engine (pipeline path) keeps its own recordings, so the agent path's offline CI gate is never overwritten.
   // Path `engine` replays the agent runs (same recordings) and adds the verifier; the earlier extract→propose design
   // (`pipeline`) keeps its own. Judge verdicts are matched by threat title, so `engine` reuses the agent path's.
   const RECORDED = path === 'pipeline' ? 'evals/results/recorded-pipeline' : AGENT_RECORDED;

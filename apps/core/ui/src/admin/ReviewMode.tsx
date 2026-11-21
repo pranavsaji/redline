@@ -14,13 +14,13 @@ import {
 } from './policy-editor.js';
 
 type Mode = 'engine' | 'agent' | 'rules_only';
-/** Per-review token caps Redline Engine needs (one extract, three deep proposals with repairs, one verification). */
+/** Per-review token caps Threatline Engine needs (one extract, three deep proposals with repairs, one verification). */
 const ENGINE_BUDGET = { tokensInPerReview: 400_000, tokensOutPerReview: 60_000 };
 
 /**
- * Review mode. Redline Engine (Redline runs the review itself on Forge LLMs) is recommended; AI review via the Rovo
+ * Review mode. Threatline Engine (Threatline runs the review itself on Forge LLMs) is recommended; AI review via the Rovo
  * agent needs Automation rules. Rule-based checks only is an
- * explicit choice for sites without Rovo: every review completes at once from Redline's deterministic checks, the
+ * explicit choice for sites without Rovo: every review completes at once from Threatline's deterministic checks, the
  * panel labels it, and the change is recorded in the risk ledger like any policy change.
  */
 export function ReviewMode(props: PolicySectionProps & { recentAuthors?: AdminPolicyDto['recentReviewAuthors'] }) {
@@ -37,7 +37,7 @@ export function ReviewMode(props: PolicySectionProps & { recentAuthors?: AdminPo
         submitLabel="Save review mode"
         onSubmit={() => {
           const b = props.policy.budget;
-          // Redline Engine's deep-model calls need room: lift per-review token caps below its defaults (the admin can lower them under Budgets).
+          // Threatline Engine's deep-model calls need room: lift per-review token caps below its defaults (the admin can lower them under Budgets).
           const budget =
             mode === 'engine'
               ? { ...b, tokensInPerReview: Math.max(b.tokensInPerReview, ENGINE_BUDGET.tokensInPerReview), tokensOutPerReview: Math.max(b.tokensOutPerReview, ENGINE_BUDGET.tokensOutPerReview) }
@@ -47,13 +47,13 @@ export function ReviewMode(props: PolicySectionProps & { recentAuthors?: AdminPo
         {...s}
       >
         <fieldset
-          aria-label="How Redline reviews work items"
+          aria-label="How Threatline reviews work items"
           style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: 6 }}
         >
           <label style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
             <input type="radio" name={`${id}-mode`} checked={mode === 'engine'} onChange={() => setMode('engine')} />
             <span>
-              <strong>Redline Engine (recommended).</strong> Redline runs every review itself on Atlassian-hosted Claude
+              <strong>Threatline Engine (recommended).</strong> Threatline runs every review itself on Atlassian-hosted Claude
               models: three independent analyses on the strongest model, which must agree and quote their evidence, and an
               adversarial verifier that checks each threat against its quotes. No Rovo agent or Automation rule needed, and no
               developer can write their own review.
@@ -62,8 +62,8 @@ export function ReviewMode(props: PolicySectionProps & { recentAuthors?: AdminPo
           <label style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
             <input type="radio" name={`${id}-mode`} checked={mode === 'agent'} onChange={() => setMode('agent')} />
             <span>
-              <strong>Rovo agent review.</strong> The Redline Rovo agent proposes threats from the work item and its
-              pages; Redline keeps what a majority of runs raised and can be quoted. Needs Rovo and the Automation rules
+              <strong>Rovo agent review.</strong> The Threatline Rovo agent proposes threats from the work item and its
+              pages; Threatline keeps what a majority of runs raised and can be quoted. Needs Rovo and the Automation rules
               in the judge guide.
             </span>
           </label>
@@ -76,7 +76,7 @@ export function ReviewMode(props: PolicySectionProps & { recentAuthors?: AdminPo
             />
             <span>
               <strong>Rule-based checks only.</strong> For sites without Rovo. Every review completes at once from
-              Redline's built-in checks (authentication, personal data, payments, public endpoints, AI agents, file
+              Threatline's built-in checks (authentication, personal data, payments, public endpoints, AI agents, file
               upload, secrets). No Rovo credits are used; the gates work the same.
             </span>
           </label>
@@ -120,7 +120,7 @@ function ReviewAuthors(props: PolicySectionProps & { recent: AdminPolicyDto['rec
         <label style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
           <input type="radio" name={`${id}-who`} checked={locked} onChange={() => setLocked(true)} />
           <span>
-            <strong>Only these accounts (recommended).</strong> Use the account that owns the Redline Automation rules
+            <strong>Only these accounts (recommended).</strong> Use the account that owns the Threatline Automation rules
             (its Use agent steps run as that account).
           </span>
         </label>

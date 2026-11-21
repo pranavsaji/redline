@@ -36,8 +36,8 @@ describe('Posture dashboard (PR-1)', () => {
   it('empty org: shows the onboarding checklist instead of zeros', async () => {
     const api: PostureApi = { ...mockPostureApi(), get: async () => ({ ...structuredClone(POSTURE_FIXTURE), projects: [], issuesCounted: 0, byTeamComponent: [], openBySeverity: { Low: 0, Medium: 0, High: 0, Critical: 0 } }) };
     render(<PostureDashboard api={api} />);
-    const list = await screen.findByRole('list', { name: 'Get started with Redline' });
-    expect(within(list).getByText(/Turn Redline on for a project/)).toBeTruthy();
+    const list = await screen.findByRole('list', { name: 'Get started with Threatline' });
+    expect(within(list).getByText(/Turn Threatline on for a project/)).toBeTruthy();
     expect(screen.queryByRole('list', { name: 'Key numbers' })).toBeNull();
   });
 

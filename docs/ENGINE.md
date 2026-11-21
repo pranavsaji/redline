@@ -1,8 +1,8 @@
-# Redline Engine
+# Threatline Engine
 
-Redline Engine is how Redline reviews a work item by itself, on Atlassian-hosted Claude models (Forge LLMs). It is the
+Threatline Engine is how Threatline reviews a work item by itself, on Atlassian-hosted Claude models (Forge LLMs). It is the
 default for new sites. It needs no Rovo agent, no Automation rule and no setup, and a developer cannot write their own
-work item's review: nothing outside Redline submits to it.
+work item's review: nothing outside Threatline submits to it.
 
 ## The pipeline
 
@@ -12,7 +12,7 @@ Each stage is its own queue job, so every model call fits a function timeout and
 | --- | --- | --- | --- |
 | 1. Gather | none | the work item, linked pages, incidents, parent and children (scoped to who triggered it) | facts, each with a source, trust level and injection flag |
 | 2. Injection check (quarantined) | balanced (`claude-sonnet-5`, falling back to `claude-sonnet-4-6`) | the raw untrusted text, fenced with a random nonce | a typed sketch whose `injectionSuspected` flag joins the scanner's: if set, every AI threat waits for a champion and the verifier is skipped. If the check cannot complete, the verifier is skipped too |
-| 3. Three independent runs, in parallel | deep (`claude-opus-5`, falling back through `claude-opus-4-8`, `-4-7`, `-4-6`) | the Redline agent prompt over the review context, with untrusted text fenced by a random nonce: exactly what a Rovo agent run sees | three threat models, each threat quoting its evidence |
+| 3. Three independent runs, in parallel | deep (`claude-opus-5`, falling back through `claude-opus-4-8`, `-4-7`, `-4-6`) | the Threatline agent prompt over the review context, with untrusted text fenced by a random nonce: exactly what a Rovo agent run sees | three threat models, each threat quoting its evidence |
 | 4. Assemble (deterministic) | none | the three runs | consensus (a threat needs a majority of runs), quotes checked word for word against the sources, the rule-based floor, coverage, severity and STRIDE/ASVS/CWE mappings, the risk score |
 | 5. Verify (adversarial) | deep | each accepted AI threat with the quotes it rests on, fenced as data | keep or drop, with a reason |
 
@@ -34,7 +34,7 @@ errors count as missing). A failed verification leaves the review as assembled, 
 
 Forge LLM calls are billed to the app's developer, not to the site. Each review records its tokens and models; the
 admin page shows the month's tokens under **Budgets**, where the per-review token caps and the monthly review cap
-(500 by default) live. Choosing Redline Engine lifts per-review caps below 400,000 input and 60,000 output tokens to
+(500 by default) live. Choosing Threatline Engine lifts per-review caps below 400,000 input and 60,000 output tokens to
 those values. The adapter logs model, tokens and timing for every call, never prompt or reply text.
 
 ## Measuring it, and why the runs use the agent prompt
@@ -48,7 +48,7 @@ context, whose injection defences the eval already measures (6 of 6 poisoned cas
 `pnpm redline eval --llm recorded --path engine --verify claude-code` replays the recorded agent runs and adds the
 verifier (its replies are saved in `evals/results/verified-engine/`; CI replays them). On the 30 cases:
 
-| Metric | Agent runs | Agent runs + verifier (Redline Engine) |
+| Metric | Agent runs | Agent runs + verifier (Threatline Engine) |
 | --- | --- | --- |
 | High-severity recall | 91.9% | 91.9% |
 | Recall | 85.2% | 85.2% |

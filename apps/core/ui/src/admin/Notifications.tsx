@@ -4,7 +4,7 @@ import type { ApiError, DigestConfig, OpsConfig } from '../types.js';
 import { field } from '../panel/form-styles.js';
 import { grid2, hint, h2, Labeled, PolicyForm, sectionStyle, splitList } from './policy-editor.js';
 
-/** Where Redline comments its ops alerts (failure rate, paused budget, warn-only) and where the Monday digest goes. */
+/** Where Threatline comments its ops alerts (failure rate, paused budget, warn-only) and where the Monday digest goes. */
 export function Notifications({ api, ops, digest }: { api: AdminApi; ops: OpsConfig | null; digest: DigestConfig | null }) {
   const id = useId();
   const [issueKey, setIssueKey] = useState(ops?.issueKey ?? '');

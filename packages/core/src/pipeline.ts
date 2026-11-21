@@ -27,7 +27,7 @@ export interface PipelineDeps {
 }
 
 /**
- * Optional atomic budget (Redline Engine): reserve before each call, settle to the actual use after. Without it, the
+ * Optional atomic budget (Threatline Engine): reserve before each call, settle to the actual use after. Without it, the
  * per-review caps are checked against the running totals in `usage` (the eval path).
  */
 export interface StageBudget {
@@ -68,7 +68,7 @@ export async function callText(
 }
 
 /**
- * Redline Engine run: the Redline agent prompt over the nonce-fenced review context, exactly what a Rovo agent run
+ * Threatline Engine run: the Threatline agent prompt over the nonce-fenced review context, exactly what a Rovo agent run
  * sees (the path the eval measures best), on the deep tier. Its JSON becomes a sample like any agent run, so
  * consensus, verbatim-quote grounding, injection flags and the rule-based floor apply unchanged. An answer that is not a
  * valid threat model is a failed run; only the budget is an error.
@@ -213,7 +213,7 @@ export async function engineProposal(deps: StageDeps, review: Review, bundle: Co
 /**
  * The eval/dev review path (Claude Code or Forge LLMs): quarantined extract → N proposals over typed evidence ids →
  * deterministic assembly. Checkpoints after every stage so a retry resumes rather than restarts. In the product the
- * same stages run as separate queue jobs (Redline Engine) so each fits a function timeout.
+ * same stages run as separate queue jobs (Threatline Engine) so each fits a function timeout.
  */
 export async function runPipeline(
   deps: PipelineDeps,

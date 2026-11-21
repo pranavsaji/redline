@@ -18,7 +18,7 @@ async function afterChange(deps: CoreDeps, issueId: string, republish: boolean):
 }
 
 export const SCHEMA_VERSION_KEY = 'schema:version';
-/** The model id a rules-only review records: no model, only Redline's deterministic rule-based checks. */
+/** The model id a rules-only review records: no model, only Threatline's deterministic rule-based checks. */
 export const RULES_ONLY_MODEL = 'redline-rules';
 
 const voidOk = (): Result<void> => ok(undefined);
@@ -46,7 +46,7 @@ async function applyAssembly(deps: CoreDeps, review: Review, bundle: ContextBund
   }
   const prior = await priorRevision(deps, review);
   if (!prior.ok) return prior;
-  // Redline Engine: the quarantined extractor's model-based injection signal counts like a flagged fact.
+  // Threatline Engine: the quarantined extractor's model-based injection signal counts like a flagged fact.
   const extract = await deps.reviews.stage(review.id, 'extract');
   const extractorFlag = extract.ok && extract.value?.status === 'done' && (extract.value.checkpoint as { sketch?: { injectionSuspected?: boolean } } | undefined)?.sketch?.injectionSuspected === true;
   const out = assembleReview({
@@ -117,7 +117,7 @@ async function gather(deps: CoreDeps, job: Extract<ReviewJob, { kind: 'gather' }
   const revision = (prev?.revision ?? 0) + 1;
   // Rules-only mode (no Rovo on the site): the review is settled now from the rule-based checks; no AI, no budget.
   const rulesOnly = !paused.value && policy.value.reviewMode === 'rules_only';
-  // Redline Engine: Redline runs the review itself on Forge LLMs (no Rovo, no Automation rule).
+  // Threatline Engine: Threatline runs the review itself on Forge LLMs (no Rovo, no Automation rule).
   const engine = !paused.value && policy.value.reviewMode === 'engine';
   const review: Review = {
     id: `rev_${job.issueId}_${revision}`,
@@ -159,7 +159,7 @@ async function gather(deps: CoreDeps, job: Extract<ReviewJob, { kind: 'gather' }
     if (!u.ok) return u;
   }
   if (engine) {
-    // Marks the review as Redline Engine's. The quarantined injection check runs first; it then starts the runs.
+    // Marks the review as Threatline Engine's. The quarantined injection check runs first; it then starts the runs.
     await deps.reviews.saveStage(review.id, 'engine', 'done', { runs: review.samplesExpected }, undefined, now.toISOString());
     const q = await deps.queue.push([{ kind: 'engine', reviewId: review.id, stage: 'extract' }]);
     if (!q.ok) return q;
@@ -222,7 +222,7 @@ async function assemble(deps: CoreDeps, reviewId: string): Promise<Result<void>>
   await traceSamples(deps, review.id, samples.value);
   await trace(deps, review.id, 'assemble', status === 'failed' ? 'failed' : 'done', status === 'failed' ? (review.failureReason ?? 'failed') : undefined);
   log('review.assembled', { reviewId, status, samples: samples.value.length });
-  // Redline Engine: once settled, the verifier runs (once); a later re-assembly re-applies its stored verdicts.
+  // Threatline Engine: once settled, the verifier runs (once); a later re-assembly re-applies its stored verdicts.
   if (status === 'ready' && (await isEngineReview(deps, review.id))) {
     const verified = await deps.reviews.stage(review.id, 'verify');
     if (verified.ok && verified.value?.status === 'done') {

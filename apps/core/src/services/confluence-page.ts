@@ -62,7 +62,7 @@ export async function publishThreatModel(deps: CoreDeps, issueId: string): Promi
 
   const parentId = await designPageOf(deps, issueId);
   if (!parentId.ok) return parentId;
-  if (!parentId.value) return err(appError('validation', 'Link a Confluence design page to this work item first. Redline publishes the threat model under it.'));
+  if (!parentId.value) return err(appError('validation', 'Link a Confluence design page to this work item first. Threatline publishes the threat model under it.'));
 
   const [facts, threats, requirements, ledger] = await Promise.all([
     deps.reviews.facts(ready.id),
@@ -115,7 +115,7 @@ export async function publishThreatModel(deps: CoreDeps, issueId: string): Promi
       if (!again.ok) return again;
       page = again.value;
     }
-    return err(appError('conflict', 'The page changed while Redline was updating it. Try again.'));
+    return err(appError('conflict', 'The page changed while Threatline was updating it. Try again.'));
   }
 
   const parent = await deps.confluence.page(parentId.value);

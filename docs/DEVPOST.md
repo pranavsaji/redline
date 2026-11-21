@@ -1,4 +1,4 @@
-# Redline: Devpost submission and demo script
+# Threatline: Devpost submission and demo script
 
 Copy the sections below into the Devpost form. The demo script is for a video of about three minutes.
 
@@ -16,18 +16,18 @@ finishes: the Done transition and the merge.
 
 ## What it does
 
-- **Redline Engine reviews every story by itself.** On Atlassian-hosted Claude models (Forge LLMs): three
+- **Threatline Engine reviews every story by itself.** On Atlassian-hosted Claude models (Forge LLMs): three
   independent analyses of the work item and its linked pages on the strongest model, which must agree and quote their
   evidence word for word, then an adversarial verifier that checks each threat against the quotes it rests on. No setup, no Rovo agent
   or Automation rule needed, and no developer can write their own review.
-- **Every threat is cited.** Redline keeps only threats a majority of analyses raised and whose quotes are found word
+- **Every threat is cited.** Threatline keeps only threats a majority of analyses raised and whose quotes are found word
   for word in the work item, its pages or incidents. A rule-based floor always runs underneath.
 - **Injection-resistant by construction.** Text that tries to instruct the AI is flagged and shown; threats resting on
   it wait for a security champion; the verifier never runs on flagged material; the model never decides the verdict.
 - **Requirements with evidence.** Each threat at or above policy becomes a Given/When/Then requirement and a sub-task,
   with fix-by dates and a copyable test skeleton.
 - **Gates that fail closed.** A workflow validator blocks Done; signed Ed25519 attestations let the Bitbucket merge
-  check (or the Redline GitHub Action) pass a sensitive pull request only for its exact head commit.
+  check (or the Threatline GitHub Action) pass a sensitive pull request only for its exact head commit.
 - **Risk acceptance with teeth, and an audit trail anyone can verify.** Reason, controls, expiry and the right approver;
   every decision goes into a hash-chained, Merkle-logged ledger with offline inclusion proofs.
 - **Everywhere people work.** Issue panel, admin page, posture dashboard and gadget, Confluence threat-model pages,
@@ -35,7 +35,7 @@ finishes: the Done transition and the merge.
 
 ## How we built it
 
-Two Forge apps (Jira + Confluence, and Bitbucket) and a GitHub Action, in TypeScript. Forge LLMs run Redline Engine as
+Two Forge apps (Jira + Confluence, and Bitbucket) and a GitHub Action, in TypeScript. Forge LLMs run Threatline Engine as
 a chain of queue jobs with checkpoints; Forge SQL stores reviews, requirements and the ledger; Forge KVS and secret
 storage hold policy and signing keys; Custom UI with Atlaskit for every surface. The design rule: the model proposes,
 code decides. Consensus, quote grounding, scoring, the verdict and the gates are deterministic and unit-tested
@@ -67,11 +67,11 @@ Marketplace listing, Jira Service Management incident feedback into reviews, and
 
 ## Demo script (about 3 minutes)
 
-1. **0:00 Problem (15 s).** "Security review is advisory, so it loses to the deadline. Redline makes it part of Done."
+1. **0:00 Problem (15 s).** "Security review is advisory, so it loses to the deadline. Threatline makes it part of Done."
 2. **0:15 Create a story (30 s).** In PAY, create "Let customers export their order history as CSV via a shareable
    link", describing a public S3 bucket, a link that never expires, and a `customerId` query parameter. Cut to the
    panel a few minutes later.
-3. **0:45 The review (45 s).** Show the Redline Engine banner, the risk score, the threats (the `customerId` IDOR,
+3. **0:45 The review (45 s).** Show the Threatline Engine banner, the risk score, the threats (the `customerId` IDOR,
    the never-expiring public link), each with its quote, "Verified" badges, and one threat the verifier dropped with
    its reason.
 4. **1:30 The gate (20 s).** Move the story to Done: blocked, with the open requirements listed.

@@ -26,7 +26,7 @@ describe('LLM judge for threats outside the must-find list (offline eval only, T
     expect(u).toContain('Users request a reset link by email.');
     expect(u).toContain('Reset token reuse');
     expect(u).toMatch(/x1.*CSRF on the reset form/);
-    expect(u).not.toMatch(/must-find|Redline|model/i);
+    expect(u).not.toMatch(/must-find|Threatline|model/i);
   });
 
   it('parseJudge needs exactly one verdict per extra id, and tolerates a fenced reply', () => {

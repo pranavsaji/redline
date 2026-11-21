@@ -1,15 +1,15 @@
-# Redline architecture
+# Threatline architecture
 
-Redline turns a Jira work item into a cited STRIDE threat model, turns the threats that matter into security requirements,
+Threatline turns a Jira work item into a cited STRIDE threat model, turns the threats that matter into security requirements,
 and then enforces them: the work item cannot move to Done, and its pull request cannot merge, until each requirement is
 verified with evidence or accepted as a risk by someone allowed to accept it. Every decision lands in a hash-chained,
 Merkle-logged risk ledger.
 
 Two Forge apps, because one app cannot carry both site and workspace scopes:
 
-- **Redline for Jira** (`apps/core`), with Confluence as a compatible product: the review, the issue panel, the
+- **Threatline for Jira** (`apps/core`), with Confluence as a compatible product: the review, the issue panel, the
   workflow gate, the Rovo agent and MCP tools, the admin and posture pages, and the ledger.
-- **Redline for Bitbucket** (`apps/bitbucket`): a merge check that accepts a pull request touching security-sensitive
+- **Threatline for Bitbucket** (`apps/bitbucket`): a merge check that accepts a pull request touching security-sensitive
   files only with a valid, signed attestation for its head commit.
 
 Neither manifest declares egress, so nothing leaves Atlassian's platform.
@@ -19,12 +19,12 @@ Neither manifest declares egress, so nothing leaves Atlassian's platform.
 ```mermaid
 flowchart LR
   subgraph Jira
-    WI[Work item created or re-run] --> AR[Automation rule:<br/>3 × Use agent: Redline<br/>take actions on]
+    WI[Work item created or re-run] --> AR[Automation rule:<br/>3 × Use agent: Threatline<br/>take actions on]
     P[Issue panel] -->|panel.* resolvers| R
     V[Workflow validator<br/>redline-gate] -->|reads KVS verdict| K[(KVS)]
   end
-  AR --> AG[Rovo agent<br/>Redline prompt v1.x]
-  AG -->|GET get-review-context| R[Redline functions]
+  AR --> AG[Rovo agent<br/>Threatline prompt v1.x]
+  AG -->|GET get-review-context| R[Threatline functions]
   R -->|bundle + single-use<br/>submission token| AG
   AG -->|CREATE submit-threat-model| R
   R --> G[Gather: REST as the app,<br/>permission-checked per viewer]
@@ -37,9 +37,9 @@ flowchart LR
   L -->|daily signed tree head| C[Confluence page]
 ```
 
-1. **Trigger.** An Automation rule runs "Use agent: Redline" three times with *Let this agent take actions* on. Each run
+1. **Trigger.** An Automation rule runs "Use agent: Threatline" three times with *Let this agent take actions* on. Each run
    is one independent threat-model sample. A person can also start a review from the panel or ask the agent directly.
-2. **Context (`get-review-context`).** Redline gathers the work item, its parent, children, links, comments, linked
+2. **Context (`get-review-context`).** Threatline gathers the work item, its parent, children, links, comments, linked
    Confluence pages and related incidents over REST. Only the work item's key, type, status, project, components and
    fix versions are *trusted*; every piece of free text is *untrusted* and wrapped as data. Pages and incidents the
    actor cannot read are left out (they still count towards the context hash). Secrets are redacted and text that
@@ -62,8 +62,8 @@ flowchart LR
 5. **Enforcement.** The verdict is written to KVS (read by the workflow validator, under 500 ms) and to an issue
    property (for JQL). The Bitbucket merge check verifies an attestation offline with the published public keys.
 
-**Redline Engine** (the default for new sites, `apps/core/src/services/engine.ts`) runs the review on Forge LLMs
-instead of the Rovo agent: a quarantined injection check, three runs of the Redline agent prompt over the fenced context
+**Threatline Engine** (the default for new sites, `apps/core/src/services/engine.ts`) runs the review on Forge LLMs
+instead of the Rovo agent: a quarantined injection check, three runs of the Threatline agent prompt over the fenced context
 in parallel, deterministic assembly, then a verifier. Its calls are billed to the app's developer. See
 [ENGINE.md](ENGINE.md). The earlier dual-LLM design (proposals that saw only an extracted sketch) is kept in
 `packages/core/src/pipeline.ts` for the eval; it measured worse and does not run in the product.
@@ -133,7 +133,7 @@ SQL implementation (`packages/core/test/contracts`).
 ## The ledger
 
 Every acceptance, approval, revocation, confirmation, break-glass, warn-only switch and policy change is appended to
-`ledger` with `entryHash = SHA-256(prevHash ‖ canonical entry)`; there is no update or delete path. Once a day Redline
+`ledger` with `entryHash = SHA-256(prevHash ‖ canonical entry)`; there is no update or delete path. Once a day Threatline
 builds an RFC 9162 Merkle tree over the entry hashes, signs the tree head with the attestation key, stores it and posts
 it to a Confluence page. An admin can download a proof for any entry (inclusion in the signed tree, plus consistency
 with the last published head) and anyone can check it offline with `node scripts/verify-ledger-proof.mjs proof.json`,
@@ -147,6 +147,6 @@ which uses only Node built-ins.
 - **Admin page**: first-run wizard, projects and guarded transitions, severity policy, roles, budgets, warn-only,
   notifications, recent runs with stage timings, signing keys, ledger verification and Merkle proofs, demo data.
 - **Security posture** global page and dashboard gadget: open Critical/High, where they are, trend, release report.
-- **Rovo agent** "Redline" and **MCP server** (`rovo:mcp`): get a review, requirements, change risk, attestation,
+- **Rovo agent** "Threatline" and **MCP server** (`rovo:mcp`): get a review, requirements, change risk, attestation,
   request acceptance, explain a threat, release readiness, posture.
 - **Confluence**: the threat model published as a page; the weekly digest; the ledger tree heads.

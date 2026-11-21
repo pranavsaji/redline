@@ -22,7 +22,7 @@ function safeCodePoint(cp: number): string {
   return String.fromCodePoint(cp);
 }
 
-/** Raw page size Redline parses (2 MB of text); anything beyond is dropped before parsing, so no page can stall ingest. */
+/** Raw page size Threatline parses (2 MB of text); anything beyond is dropped before parsing, so no page can stall ingest. */
 export const MAX_RAW_PAGE = 2_000_000;
 
 /**

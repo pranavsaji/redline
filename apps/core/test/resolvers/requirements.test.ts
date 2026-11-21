@@ -75,7 +75,7 @@ describe('requirements.create (RQ-2)', () => {
     await t.deps.reviews.updateThreat(agent.id, { citations: [{ factId: page.id, quote: 'Refunds skip the fraud check' }] });
     await requirementsCreate(t.deps, dev, { threatIds: [agent.id] });
     expect(created[0]!.summary).not.toContain('refund');
-    expect(created[0]!.summary).toMatch(/Redline .*requirement/i);
+    expect(created[0]!.summary).toMatch(/Threatline .*requirement/i);
     expect(JSON.stringify(created[0]!.description)).not.toMatch(/fraud|VIP/);
   });
 
@@ -171,7 +171,7 @@ describe('requirements.setStatus (RQ-3, RQ-4)', () => {
 });
 
 describe('requirement subtasks follow their own requirement, not the story', () => {
-  it('a Redline subtask passes once its requirement is verified even while the story still blocks', async () => {
+  it('a Threatline subtask passes once its requirement is verified even while the story still blocks', async () => {
     const { t, agent, threats } = await settled();
     await requirementsCreate(t.deps, dev, { threatIds: [agent.id] });
     const sub = jiraIssue({ id: '20001', key: 'PAY-100', labels: ['redline'], issueType: { id: '10003', name: 'Subtask', subtask: true }, parent: { id: ISSUE, key: 'PAY-7' } });
@@ -197,18 +197,18 @@ describe('verdict property message (EN-3)', () => {
     const ids = Array.from({ length: 7 }, (_, i) => `req_${i}`);
     const keys = new Map(ids.map((id, i) => [id, `PAY-${100 + i}`]));
     const m = gateMessage(blockWith([{ code: 'open_requirement', message: '7 open security requirements at High or above.', requirementIds: ids }]), keys, URL, ['Done']);
-    expect(m).toBe(`Redline blocks Done: 7 open security requirements at High or above: PAY-100, PAY-101, PAY-102, PAY-103, PAY-104 and 2 more. Open the Redline panel: ${URL}`);
+    expect(m).toBe(`Threatline blocks Done: 7 open security requirements at High or above: PAY-100, PAY-101, PAY-102, PAY-103, PAY-104 and 2 more. Open the Threatline panel: ${URL}`);
   });
 
   it('requirements without subtasks are counted, not named, and say how to create them', () => {
     const m = gateMessage(blockWith([{ code: 'open_requirement', message: '2 open security requirements at High or above.', requirementIds: ['req_a', 'thr_b'] }]), new Map(), URL, ['Done']);
-    expect(m).toContain('2 open security requirements at High or above (create the subtasks in the Redline panel)');
+    expect(m).toContain('2 open security requirements at High or above (create the subtasks in the Threatline panel)');
   });
 
   it('an out-of-date review message points to the one-click re-run in the panel', () => {
     const m = gateMessage(blockWith([{ code: 'review_stale', message: 'The design or linked work changed since the last review.', action: { label: 'Re-run review', href: `${URL}?rerun=1` } }]), new Map(), URL, ['Done']);
     // Final review I4: the validator dialog cannot run anything; it says where the one-click re-run is.
-    expect(m).toContain('(re-run it from the Redline panel)');
+    expect(m).toContain('(re-run it from the Threatline panel)');
     expect(m).not.toContain('?rerun=1');
   });
 
@@ -216,17 +216,17 @@ describe('verdict property message (EN-3)', () => {
     const long = blockWith(Array.from({ length: 12 }, () => ({ code: 'needs_human' as const, message: 'x'.repeat(200) })));
     const m = gateMessage(long, new Map(), URL, ['Done']);
     expect(m.length).toBeLessThanOrEqual(1000);
-    expect(m.endsWith(`Open the Redline panel: ${URL}`)).toBe(true);
+    expect(m.endsWith(`Open the Threatline panel: ${URL}`)).toBe(true);
   });
 
   it('pass and warn verdicts get their own wording', () => {
-    expect(gateMessage({ ...blockWith([]), state: 'pass', blockingCount: 0 }, new Map(), URL, ['Done'])).toMatch(/^Redline: no security requirements block this work item/);
-    expect(gateMessage({ ...blockWith([{ code: 'needs_human', message: '1 threat needs a security champion to confirm it.' }]), state: 'warn', validUntil: '2026-11-30T00:00:00.000Z' }, new Map(), URL, ['Done'])).toMatch(/^Redline warns \(warn-only until 2026-11-30\)/);
+    expect(gateMessage({ ...blockWith([]), state: 'pass', blockingCount: 0 }, new Map(), URL, ['Done'])).toMatch(/^Threatline: no security requirements block this work item/);
+    expect(gateMessage({ ...blockWith([{ code: 'needs_human', message: '1 threat needs a security champion to confirm it.' }]), state: 'warn', validUntil: '2026-11-30T00:00:00.000Z' }, new Map(), URL, ['Done'])).toMatch(/^Threatline warns \(warn-only until 2026-11-30\)/);
   });
 
   it('refreshVerdict writes message, panelUrl and riskScore with the verdict', async () => {
     const { t } = await settled();
     await refreshVerdict(t.deps, ISSUE);
-    expect(prop(t)).toMatchObject({ message: expect.stringMatching(/^Redline /), panelUrl: 'https://one-atlas-mefc.atlassian.net/browse/PAY-7', riskScore: expect.any(Number) });
+    expect(prop(t)).toMatchObject({ message: expect.stringMatching(/^Threatline /), panelUrl: 'https://one-atlas-mefc.atlassian.net/browse/PAY-7', riskScore: expect.any(Number) });
   });
 });

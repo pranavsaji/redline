@@ -1,17 +1,17 @@
-# Redline merge gate for GitHub
+# Threatline merge gate for GitHub
 
-The Redline GitHub Action does on GitHub what Redline for Bitbucket's merge check does on Bitbucket: a pull request
-that touches security-sensitive files merges only with a valid Redline attestation for its head commit. Changes that
+The Threatline GitHub Action does on GitHub what Threatline for Bitbucket's merge check does on Bitbucket: a pull request
+that touches security-sensitive files merges only with a valid Threatline attestation for its head commit. Changes that
 touch no sensitive paths pass freely. The decision code is shared with Bitbucket (`packages/core/src/merge-gate.ts`),
 so both platforms give the same answer for the same change.
 
 ## Set it up (5 minutes)
 
-1. In Jira, open **Redline admin → Signing keys** and copy the active public key. It is public: no secret is needed.
+1. In Jira, open **Threatline admin → Signing keys** and copy the active public key. It is public: no secret is needed.
 2. Add `.github/workflows/redline.yml` to the repository:
 
    ```yaml
-   name: Redline
+   name: Threatline
    on:
      # pull_request_target runs this file from the base branch, so a pull request cannot change its own gate.
      # Safe here: the action never checks out or runs pull request code; it only reads the pull request through the API.
@@ -24,14 +24,14 @@ so both platforms give the same answer for the same change.
      merge-gate:
        runs-on: ubuntu-latest
        steps:
-         # Pin to a full commit SHA from https://github.com/pranavsaji/redline/commits/main
-         - uses: pranavsaji/redline/apps/github-action@main
+         # Pin to a full commit SHA from https://github.com/pranavsaji/threatline/commits/main
+         - uses: pranavsaji/threatline/apps/github-action@main
            with:
              public-keys: |
                PASTE-THE-PUBLIC-KEY-HERE
    ```
 
-3. In **Settings → Branches** (or Rules), require the **Redline / merge-gate** status check on your main branch.
+3. In **Settings → Branches** (or Rules), require the **Threatline / merge-gate** status check on your main branch.
 
 `edited` is in the trigger list so that pasting an attestation into the description re-runs the check.
 
@@ -47,8 +47,8 @@ gate needs an attestation like any other security change.
 
 | Input | Default | Meaning |
 | --- | --- | --- |
-| `public-keys` | (required) | Redline public keys, one per line. During a key rotation, list both. |
-| `sensitive-paths` | none | Extra path globs, one per line, on top of Redline's defaults. |
+| `public-keys` | (required) | Threatline public keys, one per line. During a key rotation, list both. |
+| `sensitive-paths` | none | Extra path globs, one per line, on top of Threatline's defaults. |
 | `diff-score-threshold` | `40` | A change scoring at or above this needs an attestation even outside sensitive paths. |
 | `mode` | `block` | `warn` reports failures but passes, until `warn-until`. |
 | `warn-until` | none | Required in warn mode: an ISO date at most 14 days away. After it, the check blocks again. |
@@ -59,7 +59,7 @@ an unreadable policy file makes every changed file count as sensitive.
 ## How a developer gets through the gate
 
 1. Finish the work item's security requirements in Jira (or get a risk acceptance).
-2. In the Redline panel, use **Merge attestation** with the repository as `owner/repository` and the pull request's
+2. In the Threatline panel, use **Merge attestation** with the repository as `owner/repository` and the pull request's
    head commit. An IDE agent can call `get-merge-attestation` over MCP instead.
 3. Paste the attestation into the pull request description. Put the work item key in the title or branch name.
 

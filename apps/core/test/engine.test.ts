@@ -40,14 +40,14 @@ async function run(llm: FakeLlm, policy = enginePolicy) {
   return { t, review: review.value, threats, reqs };
 }
 
-describe('Redline Engine (Redline runs the review itself on Forge LLMs)', () => {
+describe('Threatline Engine (Threatline runs the review itself on Forge LLMs)', () => {
   it('created work item → three independent runs in parallel → assembly → verifier, with no Rovo or Automation', async () => {
     const llm = new FakeLlm({ extract: extract(), propose: RUN, verify: verifyRejecting('none') }, 'claude-opus-5');
     const { t, review, threats } = await run(llm);
     expect(llm.calls.map((c) => c.purpose)).toEqual(['extract', 'propose', 'propose', 'propose', 'verify']);
     expect(llm.calls.filter((c) => c.purpose === 'propose').map((c) => c.tier)).toEqual(['deep', 'deep', 'deep']);
-    // Each run is the Redline agent prompt over the nonce-fenced review context, exactly what a Rovo agent run sees.
-    expect(llm.calls[1]!.system).toMatch(/Redline Security Reviewer/);
+    // Each run is the Threatline agent prompt over the nonce-fenced review context, exactly what a Rovo agent run sees.
+    expect(llm.calls[1]!.system).toMatch(/Threatline Security Reviewer/);
     expect(llm.calls[1]!.user).toMatch(/Result of get-review-context:/);
     expect(review).toMatchObject({ status: 'ready', samplesReceived: 3, modelIds: ['claude-opus-5'] });
     expect(review.tokensIn).toBeGreaterThan(0);
@@ -107,7 +107,7 @@ describe('Redline Engine (Redline runs the review itself on Forge LLMs)', () => 
     expect(threats.find((x) => x.title === 'No audit of refund events')!.state).not.toBe('dismissed');
   });
 
-  it('in engine mode, Rovo agent submissions are refused (Redline writes the review itself)', async () => {
+  it('in engine mode, Rovo agent submissions are refused (Threatline writes the review itself)', async () => {
     const t = coreDeps({ policy: enginePolicy, llm: new FakeLlm({}) });
     const ctx = { context: { accountId: 'acc-1', agentId: 'a', cloudId: 'c' } };
     const c = await getReviewContext({ issueKey: 'PAY-7', ...ctx }, t.deps);

@@ -50,9 +50,9 @@ export interface SetupStatus {
 }
 
 const MCP_HINT =
-  'Rovo MCP: in Atlassian Administration → Rovo → MCP server, allow the clients your team uses. Coding agents then get Redline’s tools (get-review, get-security-requirements, check-change-risk, get-merge-attestation, request-risk-acceptance, explain-threat, posture-summary) with the user’s own permissions.';
+  'Rovo MCP: in Atlassian Administration → Rovo → MCP server, allow the clients your team uses. Coding agents then get Threatline’s tools (get-review, get-security-requirements, check-change-risk, get-merge-attestation, request-risk-acceptance, explain-threat, posture-summary) with the user’s own permissions.';
 
-/** `admin.setupStatus` (Task 24): what Redline has seen working on this site. Jira administrators only. */
+/** `admin.setupStatus` (Task 24): what Threatline has seen working on this site. Jira administrators only. */
 export async function adminSetupStatus(deps: CoreDeps, a: Admin, o: { signingKeys: () => Promise<boolean> }): Promise<SetupStatus | ApiError> {
   const denied = await requireAdmin(deps, a);
   if (denied) return denied;
@@ -111,7 +111,7 @@ const ACCOUNT_ID = /^[A-Za-z0-9:_-]{1,128}$/;
 const AdminPolicySchema = SitePolicySchema.superRefine((p, ctx) => {
   const bad = p.enabledProjects.find((k) => !PROJECT_KEY.test(k));
   if (bad !== undefined) ctx.addIssue({ code: 'custom', path: ['enabledProjects'], message: `"${bad.slice(0, 40)}" is not a Jira project key (like PAY).` });
-  if (p.enabledProjects.length > 100) ctx.addIssue({ code: 'custom', path: ['enabledProjects'], message: 'Turn Redline on for at most 100 projects.' });
+  if (p.enabledProjects.length > 100) ctx.addIssue({ code: 'custom', path: ['enabledProjects'], message: 'Turn Threatline on for at most 100 projects.' });
   if (p.guardedTransitions.length === 0 || p.guardedTransitions.some((t) => !name.safeParse(t).success))
     ctx.addIssue({ code: 'custom', path: ['guardedTransitions'], message: 'Name at least one guarded transition (like Done).' });
   if (p.reviewIssueTypes.some((t) => !name.safeParse(t).success)) ctx.addIssue({ code: 'custom', path: ['reviewIssueTypes'], message: 'Work type names cannot be empty.' });
@@ -154,7 +154,7 @@ async function bumpPolicyVersion(deps: CoreDeps): Promise<boolean> {
 
 const SAVED_UNCHECKED: ApiError = {
   error: 'unavailable',
-  message: 'The policy was saved, but Redline could not mark existing verdicts for a recheck. Save again to retry.',
+  message: 'The policy was saved, but Threatline could not mark existing verdicts for a recheck. Save again to retry.',
 };
 
 /** `admin.getPolicy`: the site policy in force, and where alerts and the weekly digest go. */
@@ -216,7 +216,7 @@ export async function adminWarnOnly(deps: CoreDeps, a: Admin, payload: unknown):
   const { projectKey, days } = p.data;
   const policy = await deps.config.site();
   if (!policy.ok) return apiError(policy.error);
-  if (!policy.value.enabledProjects.includes(projectKey)) return { error: 'validation', message: `Redline is not turned on for ${projectKey}.` };
+  if (!policy.value.enabledProjects.includes(projectKey)) return { error: 'validation', message: `Threatline is not turned on for ${projectKey}.` };
   const now = deps.clock.now();
   const since = now.toISOString();
   const until = new Date(now.getTime() + days * DAY).toISOString();
@@ -226,7 +226,7 @@ export async function adminWarnOnly(deps: CoreDeps, a: Admin, payload: unknown):
   const saved = await deps.config.setSite({ ...policy.value, warnOnly: [...kept, { projectKey, since, until }] });
   if (!saved.ok) return apiError(saved.error);
   if (!(await bumpPolicyVersion(deps))) return SAVED_UNCHECKED;
-  await opsAlert(deps, `alert:warn_only:${row.value.entryHash}`, `Redline: an administrator switched ${projectKey} to warn-only until ${until.slice(0, 16).replace('T', ' ')} UTC. Its Done gate warns instead of blocking until then. Recorded in the Redline ledger.`);
+  await opsAlert(deps, `alert:warn_only:${row.value.entryHash}`, `Threatline: an administrator switched ${projectKey} to warn-only until ${until.slice(0, 16).replace('T', ' ')} UTC. Its Done gate warns instead of blocking until then. Recorded in the Threatline ledger.`);
   return { projectKey, since, until, entryHash: row.value.entryHash };
 }
 
@@ -269,7 +269,7 @@ export async function adminResumeReviews(deps: CoreDeps, a: Admin, _payload: unk
 const PurgeSchema = z.object({ projectKey: z.string().regex(PROJECT_KEY), confirm: z.string() });
 
 /**
- * `admin.purgeProject` (privacy): deletes every review, gathered fact, threat and requirement of a project Redline no
+ * `admin.purgeProject` (privacy): deletes every review, gathered fact, threat and requirement of a project Threatline no
  * longer reviews. The ledger and attestations stay (audit trail). Ledgered before anything is deleted.
  */
 export async function adminPurgeProject(deps: CoreDeps, a: Admin, payload: unknown): Promise<{ projectKey: string; reviews: number; requirements: number; entryHash: string } | ApiError> {
@@ -282,12 +282,12 @@ export async function adminPurgeProject(deps: CoreDeps, a: Admin, payload: unkno
   const policy = await deps.config.site();
   if (!policy.ok) return apiError(policy.error);
   if (policy.value.enabledProjects.includes(projectKey))
-    return { error: 'validation', message: `Redline still reviews ${projectKey}. Turn it off under Projects and transitions first, then purge.` };
+    return { error: 'validation', message: `Threatline still reviews ${projectKey}. Turn it off under Projects and transitions first, then purge.` };
   const row = await appendLedger(deps.ledger, deps.clock, 'project.purged', { projectKey }, a.accountId);
   if (!row.ok) return apiError(row.error);
   const done = await deps.retention.purgeProject(projectKey);
   if (!done.ok) return apiError(done.error);
-  await opsAlert(deps, `alert:purge:${row.value.entryHash}`, `Redline: an administrator purged ${projectKey}'s reviews (${done.value.reviews} reviews, ${done.value.requirements} requirements). The risk ledger is kept. Recorded in the Redline ledger.`);
+  await opsAlert(deps, `alert:purge:${row.value.entryHash}`, `Threatline: an administrator purged ${projectKey}'s reviews (${done.value.reviews} reviews, ${done.value.requirements} requirements). The risk ledger is kept. Recorded in the Threatline ledger.`);
   return { projectKey, ...done.value, entryHash: row.value.entryHash };
 }
 

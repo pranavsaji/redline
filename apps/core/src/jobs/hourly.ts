@@ -56,14 +56,14 @@ async function failRateAlert(deps: CoreDeps): Promise<void> {
   const sent = await opsAlert(
     deps,
     alertKey,
-    `Redline: ${bad} of ${total} security reviews in the last hour failed or timed out. Work items stay blocked until they are re-run. Check the site's Rovo credits and the Redline admin page.` +
+    `Threatline: ${bad} of ${total} security reviews in the last hour failed or timed out. Work items stay blocked until they are re-run. Check the site's Rovo credits and the Threatline admin page.` +
       (silent > 0 && engine
-        ? ` ${silent} of them got no Redline Engine run at all: Forge LLMs did not answer. Check the app's Forge logs (llm.failed) and the developer console usage; until it recovers, choose Redline admin → Review mode → Rule-based checks only.`
+        ? ` ${silent} of them got no Threatline Engine run at all: Forge LLMs did not answer. Check the app's Forge logs (llm.failed) and the developer console usage; until it recovers, choose Threatline admin → Review mode → Rule-based checks only.`
         : silent > 0
-        ? ` ${silent} of them got no agent run at all, so Jira Automation did not run the Redline agent: open Project settings → Automation → the Redline rules → Audit log. If it says the agent is deactivated (this can happen after a Redline update), re-select Redline in each Use agent step and save. If this site has no Rovo, choose Redline admin → Review mode → Rule-based checks only.`
+        ? ` ${silent} of them got no agent run at all, so Jira Automation did not run the Threatline agent: open Project settings → Automation → the Threatline rules → Audit log. If it says the agent is deactivated (this can happen after a Threatline update), re-select Threatline in each Use agent step and save. If this site has no Rovo, choose Threatline admin → Review mode → Rule-based checks only.`
         : '') +
       (refused > 0
-        ? ` ${refused} agent ${refused === 1 ? 'run was' : 'runs were'} refused because the account is not a review author: check Redline admin → Review mode → Who can submit AI review runs (it should be the Automation rule owner).`
+        ? ` ${refused} agent ${refused === 1 ? 'run was' : 'runs were'} refused because the account is not a review author: check Threatline admin → Review mode → Who can submit AI review runs (it should be the Automation rule owner).`
         : ''),
   );
   if (!sent) return;

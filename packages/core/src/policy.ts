@@ -27,7 +27,7 @@ export const DEFAULT_SITE_POLICY: SitePolicy = {
   warnOnly: [],
   attestationTtlHours: 24,
   sensitivePaths: ['src/auth/**', '**/auth/**', '**/payments/**', '**/crypto/**', 'infra/**', '.github/workflows/**', '**/*.pem'],
-  // Redline Engine: one extract, three proposals and one verification per review, on deep models.
+  // Threatline Engine: one extract, three proposals and one verification per review, on deep models.
   budget: { tokensInPerReview: 400_000, tokensOutPerReview: 60_000, reviewsPerMonth: 500 },
   reviewMode: 'engine',
 };

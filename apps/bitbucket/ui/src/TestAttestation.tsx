@@ -15,7 +15,7 @@ export function keysFrom(text: string): Record<string, string> {
 }
 
 const REASON: Record<string, string> = {
-  malformed: 'Signature invalid: this is not a complete Redline attestation.',
+  malformed: 'Signature invalid: this is not a complete Threatline attestation.',
   bad_signature: 'Signature invalid: it was changed, or it was signed by a key this repository does not trust.',
   schema: 'Signature invalid: the attestation content is not in the expected format.',
   unknown_key: 'No public key is set above, so nothing can be verified.',
@@ -31,7 +31,7 @@ export function TestAttestation({ publicKeys }: { publicKeys: string }) {
   const test = (e: FormEvent) => {
     e.preventDefault();
     const found = findAttestations(text);
-    if (found.length === 0) return setResult('No Redline attestation found in the pasted text.');
+    if (found.length === 0) return setResult('No Threatline attestation found in the pasted text.');
     const r = decodeAttestation(found[found.length - 1]!, keysFrom(publicKeys), Math.floor(Date.now() / 1000));
     if (!r.ok) return setResult(REASON[r.error.code] ?? 'Signature invalid.');
     const p = r.value;

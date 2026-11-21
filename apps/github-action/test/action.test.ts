@@ -38,7 +38,7 @@ const inputs = (o: Record<string, string> = {}) => {
 };
 
 describe('parseInputs (GitHub Action inputs)', () => {
-  it('derives each key id from the pasted public keys, one per line, like Redline for Bitbucket', () => {
+  it('derives each key id from the pasted public keys, one per line, like Threatline for Bitbucket', () => {
     const other = generateKeyPair();
     expect(inputs({ 'public-keys': `${key.publicKey}\n\n  ${other.publicKey}  ` }).publicKeys).toEqual({ [key.kid]: key.publicKey, [other.kid]: other.publicKey });
   });
@@ -100,7 +100,7 @@ describe('runGitHubCheck (the merge gate on GitHub)', () => {
   });
   it('with no public key configured, says where to put it on GitHub', async () => {
     const r = await runGitHubCheck({ settings: { ...inputs(), publicKeys: {} }, client: client({ pr: PR(token()) }), nowSec: NOW });
-    expect(r.message).toMatch(/public-keys input of the Redline step/);
+    expect(r.message).toMatch(/public-keys input of the Threatline step/);
   });
 });
 
@@ -152,12 +152,12 @@ describe('the bundled action', () => {
     expect(pass.summary).toMatch(/attested by PAY-7/);
     const fail = await runDist('No attestation here.');
     expect(fail.status).toBe(1);
-    expect(fail.stdout).toMatch(/::error title=Redline::Redline: this change touches security-sensitive files/);
+    expect(fail.stdout).toMatch(/::error title=Threatline::Threatline: this change touches security-sensitive files/);
     expect(fail.outputs).toMatch(/outcome=fail_missing/);
     expect(fail.stdout).not.toMatch(/::warning/);
   });
 
   it.skipIf(!existsSync(dist))('warns when run on pull_request, where the pull request controls its own workflow', async () => {
-    expect((await runDist(token(), 'pull_request')).stdout).toMatch(/::warning title=Redline::.*pull_request_target/);
+    expect((await runDist(token(), 'pull_request')).stdout).toMatch(/::warning title=Threatline::.*pull_request_target/);
   });
 });

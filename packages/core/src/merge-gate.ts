@@ -4,16 +4,16 @@ import { DEFAULT_SITE_POLICY, parseRepoPolicy } from './policy.js';
 import { scoreDiff, type DiffFile } from './diffscore.js';
 
 /**
- * The merge gate's decision, shared by Redline for Bitbucket (merge check) and the Redline GitHub Action: given a pull
+ * The merge gate's decision, shared by Threatline for Bitbucket (merge check) and the Threatline GitHub Action: given a pull
  * request's description, head commit, changed files and the repository's settings, does the change need an
  * attestation, and does the one in the description verify? Pure: the callers fetch, this decides. Fails closed.
  */
 
-/** Diff text Redline scans (2 MB); a bigger diff is scanned up to here. */
+/** Diff text Threatline scans (2 MB); a bigger diff is scanned up to here. */
 export const MAX_DIFF_TEXT = 2_000_000;
 
-/** Marker file for diff text Redline could not read whole (unreadable, or over MAX_DIFF_TEXT): treated as sensitive. */
-export const DIFF_UNREAD_PATH = '(diff text Redline could not read)';
+/** Marker file for diff text Threatline could not read whole (unreadable, or over MAX_DIFF_TEXT): treated as sensitive. */
+export const DIFF_UNREAD_PATH = '(diff text Threatline could not read)';
 
 /**
  * Every added line in a unified diff, whichever file it belongs to. The secret scan does not need per-file mapping, so
@@ -26,13 +26,13 @@ export function allAddedText(diff: string): string {
   return out;
 }
 
-/** Appended when the PR changes more files than Redline pages through; the merge check treats it as sensitive. */
-export const TRUNCATED_PATH = '(more files than Redline reads)';
+/** Appended when the PR changes more files than Threatline pages through; the merge check treats it as sensitive. */
+export const TRUNCATED_PATH = '(more files than Threatline reads)';
 
 export interface RepoSettings {
-  /** Where an admin pastes Redline's public key on this platform; used in the missing-key message. */
+  /** Where an admin pastes Threatline's public key on this platform; used in the missing-key message. */
   keyHint?: string;
-  /** kid → base64url Ed25519 public key, copied from Redline's admin page. */
+  /** kid → base64url Ed25519 public key, copied from Threatline's admin page. */
   publicKeys: Record<string, string>;
   sensitivePaths: string[];
   mode: 'warn' | 'block';
@@ -68,7 +68,7 @@ export interface PrFacts {
 
 const ISSUE_KEY = /\b([A-Z][A-Z0-9_]+-\d+)\b/;
 const ISSUE_KEYS = /\b([A-Z][A-Z0-9_]+-\d+)\b/g;
-const MSG_SIGNATURE = 'Redline: attestation signature invalid. Copy a fresh attestation from the Jira issue panel.';
+const MSG_SIGNATURE = 'Threatline: attestation signature invalid. Copy a fresh attestation from the Jira issue panel.';
 /** Bitbucket stores descriptions as Markdown and escapes punctuation (`\_`, `\-`); undo that before looking for tokens. */
 export const unescapeMarkdown = (text: string) => text.replace(/\\([\\`*_{}[\]()#+\-.!|~<>])/g, '$1');
 const utcMinute = (sec: number) => `${new Date(sec * 1000).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
@@ -108,7 +108,7 @@ export async function evaluateMergeCheck(i: { pr: PrFacts; files: DiffFile[]; re
   if (r.success || i.settings.mode !== 'warn') return r;
   const until = i.settings.warnUntil ? Date.parse(i.settings.warnUntil) / 1000 : NaN;
   if (!(until > i.nowSec)) {
-    const ended = Number.isFinite(until) ? `Redline: warn-only mode ended ${utcMinute(until)}, so this check blocks again. ` : 'Redline: warn-only mode has no end date, so this check blocks. ';
+    const ended = Number.isFinite(until) ? `Threatline: warn-only mode ended ${utcMinute(until)}, so this check blocks again. ` : 'Threatline: warn-only mode has no end date, so this check blocks. ';
     return { ...r, message: `${ended}${r.message}` };
   }
   return { success: true, outcome: 'warn', message: `Warning: ${r.message}` };
@@ -121,14 +121,14 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
   const truncated = markers.length > 0;
   // An unreadable policy file on the target branch fails closed: every changed file counts as sensitive.
   const sensitive = policy.invalid ? i.files.map((f) => f.path) : truncated ? [...markers, ...score.sensitiveFiles] : score.sensitiveFiles;
-  if (sensitive.length === 0 && score.score < policy.threshold) return { success: true, outcome: 'pass_not_sensitive', message: 'Redline: no security-sensitive changes.' };
+  if (sensitive.length === 0 && score.score < policy.threshold) return { success: true, outcome: 'pass_not_sensitive', message: 'Threatline: no security-sensitive changes.' };
 
   const key = ISSUE_KEY.exec(i.pr.title ?? '')?.[1] ?? ISSUE_KEY.exec(i.pr.branch ?? '')?.[1] ?? 'the linked issue';
   const shown = [...new Set(sensitive.length > 0 ? sensitive : i.files.map((f) => f.path))].slice(0, 3).join(', ');
   const missing: CheckResult = {
     success: false,
     outcome: 'fail_missing',
-    message: `Redline: this change touches security-sensitive files (${shown}) and has no attestation. Ask your IDE agent for get-merge-attestation on ${key}, or click Copy attestation in Jira.`,
+    message: `Threatline: this change touches security-sensitive files (${shown}) and has no attestation. Ask your IDE agent for get-merge-attestation on ${key}, or click Copy attestation in Jira.`,
   };
 
   const tokens = findAttestations(unescapeMarkdown(i.pr.description));
@@ -140,12 +140,12 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
     // Every token is readable but none is for this repository → say which repository they are for.
     const others = [...new Set(peeked.flatMap((x) => (x.p ? [x.p.repo] : [])))];
     if (peeked.every((x) => x.p))
-      return { success: false, outcome: 'fail_other_repo', message: `Redline: the attestation in this pull request is for ${others.slice(0, 2).join(', ')}, not ${i.pr.repoFullName}. Request one for this repository.` };
+      return { success: false, outcome: 'fail_other_repo', message: `Threatline: the attestation in this pull request is for ${others.slice(0, 2).join(', ')}, not ${i.pr.repoFullName}. Request one for this repository.` };
     return { success: false, outcome: 'fail_signature', message: MSG_SIGNATURE };
   }
 
   if (Object.keys(i.settings.publicKeys).length === 0)
-    return { success: false, outcome: 'fail_signature', message: `Redline: no Redline public key is configured for this repository. ${i.settings.keyHint ?? 'A repository admin must paste it in Repository settings → Redline.'}` };
+    return { success: false, outcome: 'fail_signature', message: `Threatline: no Threatline public key is configured for this repository. ${i.settings.keyHint ?? 'A repository admin must paste it in Repository settings → Threatline.'}` };
   const v = decodeAttestation(mine[0]!.t, i.settings.publicKeys, i.nowSec);
   if (!v.ok) {
     if (v.error.code === 'expired') {
@@ -156,7 +156,7 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
           return i.nowSec;
         }
       })();
-      return { success: false, outcome: 'fail_expired', message: `Redline: attestation expired at ${utcMinute(exp)}. Request a new one.` };
+      return { success: false, outcome: 'fail_expired', message: `Threatline: attestation expired at ${utcMinute(exp)}. Request a new one.` };
     }
     return { success: false, outcome: 'fail_signature', message: MSG_SIGNATURE };
   }
@@ -164,13 +164,13 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
   const head = i.pr.headSha.toLowerCase();
   // Bitbucket's pull request API reports 12-character hashes (GitHub's, all 40); the attestation carries all 40.
   if (head.length < 7 || !p.commitSha.startsWith(head))
-    return { success: false, outcome: 'fail_stale_commit', message: `Redline: attestation is for commit ${p.commitSha.slice(0, 7)} but the PR head is ${head.slice(0, 7)}. Request a new attestation for the latest commit.` };
+    return { success: false, outcome: 'fail_stale_commit', message: `Threatline: attestation is for commit ${p.commitSha.slice(0, 7)} but the PR head is ${head.slice(0, 7)}. Request a new attestation for the latest commit.` };
   // The attestation must be for a work item this PR names: otherwise any passing item's token could carry a blocked change.
   const named = [...new Set([...(i.pr.title ?? '').matchAll(ISSUE_KEYS), ...(i.pr.branch ?? '').matchAll(ISSUE_KEYS)].map((m) => m[1]!))];
   if (named.length === 0)
-    return { success: false, outcome: 'fail_other_issue', message: `Redline: this pull request names no Jira work item. Put the work item key (${p.issueKey}) in the pull request title or branch name, then re-run the check.` };
+    return { success: false, outcome: 'fail_other_issue', message: `Threatline: this pull request names no Jira work item. Put the work item key (${p.issueKey}) in the pull request title or branch name, then re-run the check.` };
   if (!named.includes(p.issueKey))
-    return { success: false, outcome: 'fail_other_issue', message: `Redline: the attestation is for ${p.issueKey}, but this pull request is for ${named.join(', ')}. Request an attestation from ${named[0]}.` };
+    return { success: false, outcome: 'fail_other_issue', message: `Threatline: the attestation is for ${p.issueKey}, but this pull request is for ${named.join(', ')}. Request an attestation from ${named[0]}.` };
   // Final review I1: every work item the PR names needs its own valid attestation for this commit; otherwise a passing
   // item named next to a blocked one ("PAY-6 …, see PAY-7") would carry the blocked change.
   const attested = (key: string) =>
@@ -183,10 +183,10 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
     return {
       success: false,
       outcome: 'fail_other_issue',
-      message: `Redline: this pull request also names ${unattested}, which has no valid attestation for this commit. Add one from ${unattested}, or remove ${unattested} from the title and branch name.`,
+      message: `Threatline: this pull request also names ${unattested}, which has no valid attestation for this commit. Add one from ${unattested}, or remove ${unattested} from the title and branch name.`,
     };
   const verified = p.requirements.filter((r) => r.status === 'Verified').length;
-  const pass = `Redline: attested by ${p.issueKey}, ${verified} requirements verified${p.partial ? ' (reviewed with partial context)' : ''}.`;
+  const pass = `Threatline: attested by ${p.issueKey}, ${verified} requirements verified${p.partial ? ' (reviewed with partial context)' : ''}.`;
   const lenient = p.override === 'break_glass' ? 'Warning: attested under a break-glass override. ' : p.override === 'warn_only' ? 'Warning: attested under warn-only mode. ' : '';
   return { success: true, outcome: 'pass_attested', message: `${lenient}${pass}` };
 }

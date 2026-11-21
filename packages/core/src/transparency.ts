@@ -36,7 +36,7 @@ export interface LedgerProof {
   leafHash: string;
   auditPath: string[];
   treeHead: Omit<TreeHead, 'publishedPageId'>;
-  /** Ed25519 public key (raw, base64url) the tree head is signed with; compare it with the one Redline publishes. */
+  /** Ed25519 public key (raw, base64url) the tree head is signed with; compare it with the one Threatline publishes. */
   publicKey: string;
   /** Proof that `treeHead` extends an earlier published head. */
   consistency?: { fromTreeHead: Omit<TreeHead, 'publishedPageId'>; proof: string[] };

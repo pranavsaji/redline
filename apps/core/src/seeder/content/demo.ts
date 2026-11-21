@@ -43,7 +43,7 @@ export const DESIGN_PAGE_TITLE = 'Design: AI support agent';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-/** Confluence storage for the design page, including one poisoned paragraph (Redline must treat it as data). */
+/** Confluence storage for the design page, including one poisoned paragraph (Threatline must treat it as data). */
 export function designPageStorage(): string {
   const rows: Array<[string, string]> = [
     ['Chat widget', 'Public web widget on the help centre. Anyone can open a chat; customers identify themselves by typing an email address.'],

@@ -47,7 +47,7 @@ export function TransparencyLog({ api }: { api: AdminApi }) {
     <div style={{ display: 'grid', gap: 8 }}>
       <strong>Transparency log</strong>
       <span style={{ font: token('font.body.small'), color: token('color.text.subtle') }}>
-        The ledger’s entry hashes are the leaves of a Merkle tree (RFC 9162). Redline signs the tree head daily and posts it to the “Redline ledger tree heads” page in the digest space, so an auditor can prove an entry was in the log without trusting Redline.
+        The ledger’s entry hashes are the leaves of a Merkle tree (RFC 9162). Threatline signs the tree head daily and posts it to the “Threatline ledger tree heads” page in the digest space, so an auditor can prove an entry was in the log without trusting Threatline.
       </span>
       {headError && <p style={{ margin: 0 }}>{headError}</p>}
       {head && (

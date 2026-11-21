@@ -1,11 +1,11 @@
-# Redline's own semgrep rules (Task 34). CI runs them together with the registry rulesets:
+# Threatline's own semgrep rules (Task 34). CI runs them together with the registry rulesets:
 #   semgrep scan --config .semgrep.yml --config p/default --config p/typescript --config p/react --config p/secrets \
 #     --metrics off --severity ERROR --error
 # Each rule pins a control from docs/SECURITY_REVIEW.md so a regression fails CI, not just a test.
 rules:
   - id: redline-no-egress
     message: >-
-      Forge app code must not call fetch(): Redline declares no egress and reaches Atlassian only through
+      Forge app code must not call fetch(): Threatline declares no egress and reaches Atlassian only through
       @forge/api (requestJira, requestConfluence, requestBitbucket) or Rovo. Nothing leaves Atlassian.
     severity: ERROR
     languages: [typescript]
@@ -48,7 +48,7 @@ rules:
       - pattern: document.write(...)
 
   - id: redline-no-dynamic-code
-    message: No eval or Function constructor anywhere in Redline.
+    message: No eval or Function constructor anywhere in Threatline.
     severity: ERROR
     languages: [typescript]
     paths:

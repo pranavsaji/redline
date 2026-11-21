@@ -9,7 +9,7 @@ import { hint, h2, Labeled, sectionStyle } from './policy-editor.js';
 const PROJECT_KEY = /^[A-Z][A-Z0-9_]{0,254}$/;
 
 /**
- * Shown until an administrator saves a policy: turn Redline on for a project, pick the transition its gate guards,
+ * Shown until an administrator saves a policy: turn Threatline on for a project, pick the transition its gate guards,
  * name the groups. The later steps (demo data, public key, checklist) are the sections below.
  */
 export function FirstRun({ api, policy, onSaved }: { api: AdminApi; policy: SitePolicy; onSaved: (p: SitePolicy) => void }) {
@@ -49,11 +49,11 @@ export function FirstRun({ api, policy, onSaved }: { api: AdminApi; policy: Site
   return (
     <section aria-labelledby={`${id}-h`} style={sectionStyle}>
       <h2 id={`${id}-h`} style={h2}>
-        Set up Redline
+        Set up Threatline
       </h2>
       {done ? (
-        <SectionMessage appearance="success" title="Redline is set up">
-          <p style={{ margin: 0 }}>{`Redline is on for ${done.project}. Next, in ${done.project}'s workflow, add "Redline security gate" to the ${done.transition} transition. Then load demo data, copy the public key for Bitbucket, and check the setup checklist below.`}</p>
+        <SectionMessage appearance="success" title="Threatline is set up">
+          <p style={{ margin: 0 }}>{`Threatline is on for ${done.project}. Next, in ${done.project}'s workflow, add "Threatline security gate" to the ${done.transition} transition. Then load demo data, copy the public key for Bitbucket, and check the setup checklist below.`}</p>
         </SectionMessage>
       ) : (
         <form
@@ -67,11 +67,11 @@ export function FirstRun({ api, policy, onSaved }: { api: AdminApi; policy: Site
         >
           <ol style={{ margin: 0, paddingLeft: 20, display: 'grid', gap: 12 }}>
             <li style={{ margin: 0, display: 'grid', gap: 6 }}>
-              <strong>Turn Redline on for a project</strong>
+              <strong>Turn Threatline on for a project</strong>
               <Labeled text="Jira project key">{(fid) => <input id={fid} value={project} onChange={(e) => setProject(e.target.value)} placeholder="PAY" style={field} />}</Labeled>
             </li>
             <li style={{ margin: 0, display: 'grid', gap: 6 }}>
-              <strong>Pick the transition Redline guards</strong>
+              <strong>Pick the transition Threatline guards</strong>
               <div style={{ display: 'flex', gap: 8, alignItems: 'end', flexWrap: 'wrap' }}>
                 <Labeled text="Guarded transition">
                   {(fid) => (

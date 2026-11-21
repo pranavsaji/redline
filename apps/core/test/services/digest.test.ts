@@ -32,7 +32,7 @@ describe('weekly digest (PR-4)', () => {
     const r = await publishWeeklyDigest(t.deps);
     expect(r).toEqual({ ok: true, value: { posted: true, url: 'https://one-atlas-mefc.atlassian.net/wiki/pages/pg1' } });
     expect(created).toHaveLength(1);
-    expect(created[0]).toMatchObject({ spaceId: 'sp1', parentId: 'parent9', title: 'Redline security posture: week of 2026-11-16' });
+    expect(created[0]).toMatchObject({ spaceId: 'sp1', parentId: 'parent9', title: 'Threatline security posture: week of 2026-11-16' });
     expect(created[0]!.storage).toContain('<td>High</td><td>1</td>');
   });
 
@@ -72,6 +72,6 @@ describe('weekly digest (PR-4)', () => {
   it('the daily job publishes it on Monday', async () => {
     const { t, created } = await setup();
     await daily(t.deps);
-    expect(created.filter((c) => c.title.startsWith('Redline security posture'))).toHaveLength(1);
+    expect(created.filter((c) => c.title.startsWith('Threatline security posture'))).toHaveLength(1);
   });
 });

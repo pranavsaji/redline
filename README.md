@@ -1,4 +1,4 @@
-# Redline
+# Threatline
 
 ![tests](https://img.shields.io/badge/tests-1050%2B%20passing-brightgreen)
 ![coverage](https://img.shields.io/badge/line%20coverage-92.9%25-brightgreen)
@@ -6,24 +6,24 @@
 ![injection resistance](https://img.shields.io/badge/injection%20resistance-6%2F6-blue)
 ![runs on Atlassian](https://img.shields.io/badge/egress-none-informational)
 
-**Security review that actually gates Done and merge.** Redline threat-models every Jira work item with a cited STRIDE
+**Security review that actually gates Done and merge.** Threatline threat-models every Jira work item with a cited STRIDE
 model, turns the threats that matter into security requirements, and blocks the Done transition and the Bitbucket merge
 until each one is verified with evidence or its risk is accepted by someone allowed to accept it. Every decision goes
 into a hash-chained, Merkle-logged risk ledger anyone can verify offline.
 
-Built for Atlassian Codegeist 2026 on Forge: Forge LLMs (Redline Engine), Jira, Confluence, Bitbucket, Rovo (agent,
+Built for Atlassian Codegeist 2026 on Forge: Forge LLMs (Threatline Engine), Jira, Confluence, Bitbucket, Rovo (agent,
 actions, skill, MCP), Automation and Forge SQL. No egress: nothing leaves Atlassian.
 
-![Redline issue panel](docs/screenshots/jira-1-issue-panel.png)
+![Threatline issue panel](docs/screenshots/jira-1-issue-panel.png)
 
 ## What it does
 
-- **Redline Engine: it reviews by itself.** Install, create a story, and within a few minutes the panel shows a cited
-  threat model. Redline runs it on Atlassian-hosted Claude models (Opus 5): three independent analyses that must
+- **Threatline Engine: it reviews by itself.** Install, create a story, and within a few minutes the panel shows a cited
+  threat model. Threatline runs it on Atlassian-hosted Claude models (Opus 5): three independent analyses that must
   agree, each quoting its evidence, then an adversarial verifier that checks every threat against its quotes (doubted
   High and Critical threats go to a champion instead of disappearing). No Rovo agent, Automation rule or setup, and no
   developer can write their own review. [How it works, and what we measured](docs/ENGINE.md).
-- **Cited threat models.** Three independent AI runs (Redline Engine, or your site's Rovo agent) propose STRIDE threats; Redline keeps only those a
+- **Cited threat models.** Three independent AI runs (Threatline Engine, or your site's Rovo agent) propose STRIDE threats; Threatline keeps only those a
   majority raised and whose quotes are found word for word in the work item, its pages or incidents. Plain language
   first ("A stolen link lets an attacker lock the real owner out for good."), then the STRIDE category, ASVS 5 and CWE.
 - **Injection-resistant by construction.** The model never decides anything: code sets the verdict. Text that tries to
@@ -34,10 +34,10 @@ actions, skill, MCP), Automation and Forge SQL. No egress: nothing leaves Atlass
   Python or Java) with one failing test per acceptance criterion, in the panel or for coding agents via
   `get-security-requirements` with `testLanguage`. Requirement text is escaped, so a hostile work item cannot inject
   code into the skeleton.
-- **Fix-by dates.** Open requirements are due 7 days (Critical), 30 (High) or 90 (Medium) after Redline raised them;
+- **Fix-by dates.** Open requirements are due 7 days (Critical), 30 (High) or 90 (Medium) after Threatline raised them;
   the panel shows "Overdue by N days" and the posture page counts what is overdue.
 - **Works without Rovo.** An admin can switch Review mode to rule-based checks only: every review completes at once from
-  Redline's built-in checks, clearly labelled, so the gates work on any Jira site.
+  Threatline's built-in checks, clearly labelled, so the gates work on any Jira site.
 - **Developers cannot write their own review.** An admin locks AI review runs to the account that owns the Automation
   rule (Review mode → Who can submit AI review runs). Anyone else's submission is refused and recorded in the ledger.
 - **Enforcement that fails closed.** A workflow validator blocks Done while anything is open, missing, failed or out of
@@ -51,12 +51,12 @@ actions, skill, MCP), Automation and Forge SQL. No egress: nothing leaves Atlass
 - **A ledger you can audit.** Append-only hash chain, daily signed Merkle tree heads published to Confluence, and
   downloadable inclusion proofs checked with `node scripts/verify-ledger-proof.mjs` (Node built-ins only).
 - **For everyone involved.** Issue panel, admin page with a first-run wizard, security posture page and dashboard
-  gadget, Confluence threat-model pages and a weekly digest, the Redline Rovo agent, and an MCP server so coding agents
+  gadget, Confluence threat-model pages and a weekly digest, the Threatline Rovo agent, and an MCP server so coding agents
   (Claude Code, Cursor) see the same requirements ([skill](mcp-skill/skill.md)).
 
 ## Eval
 
-_Scored offline with Claude Code on claude-sonnet-4-5 (tools and MCP off, Redline's prompt as the system prompt), 30 cases (24 clean, 6 poisoned), 3 samples each, 2026-11-19, prompt v1.3.0._
+_Scored offline with Claude Code on claude-sonnet-4-5 (tools and MCP off, Threatline's prompt as the system prompt), 30 cases (24 clean, 6 poisoned), 3 samples each, 2026-11-19, prompt v1.3.0._
 
 | Metric | Value | Target |
 | --- | --- | --- |
@@ -69,7 +69,7 @@ _Scored offline with Claude Code on claude-sonnet-4-5 (tools and MCP off, Redlin
 | Precision, strict (vs the must-find list only) | 35.9% (was 29.5%) | lower bound |
 | F1 (strict) | 50.5% (was 43.8%) | |
 
-Each case lists only 2 to 3 must-find threats, while Redline shows about 6 per case, so strict precision counts every
+Each case lists only 2 to 3 must-find threats, while Threatline shows about 6 per case, so strict precision counts every
 other threat as wrong. A separate `claude -p` call (same model, tools off, a strict rubric: follows from the design,
 specific, not a duplicate) graded each threat outside the list: 45 of the 73 the model proposed are valid.
 
@@ -104,7 +104,7 @@ pnpm redline eval --llm fake                             # deterministic baselin
 
 ## Try it
 
-- **On a Jira site**: [install Redline for Jira](https://developer.atlassian.com/console/install/13898a7c-6897-48d3-a512-079d9f9f5f00?signature=AYABeCcfIQJqGrR0SUgfCmoTNmEAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4CxqLTo9l4lqXuFjNim1xJM%2Bp%2F3TVP9xHS2BrU5DRRucB1BD8mEv4t3Ljf3OukSd5eQAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDEh%2BKItDcqUwro%2BHrQIBEIA7MA0KHRf%2BF3YuTEAMovFxVALBMAXOWvXwcePSrlXd8eWbO0Gu4PlzXePH9QGutTzgsBB7obWKVcKw55kAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHi9bVMAkme4qVQX1fQHo6ePw3H40A7cGfz7yrmSfBWMXgHlW5ynSsuhZ7zbqiK2sh%2B2AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMkPcTbpchY2MsayhfAgEQgDuWokoIpYBa88xi5ggk1L1JkcZBleXY2Fhu75VlWDzfTq%2FPjQu2HTJqqUvWAGr3gQmwdhbGrdneGDgHcgAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeDYASx0XCjkny4iLV6vz%2BKtEGSGT6kdt0QRpkn6D%2FlVEAbLrick3%2FS2k9TO8wl7jjBMAAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAwPyU3UXZLk3LyqQEcCARCAO56x65zN0k8TKW9hcCjB8AjClKyO30ptqnOAj2gX5CQsUchhHNyCLeBw5CSlVzbE5lnPkVzoFWWWPI9DAgAAAAAMAAAQAAAAAAAAAAAAAAAAAE5uz5LjAh1FnegGXQysekL%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADJlU7brRNHeEAgdUVuQgPgaQWe2H582mtCI1iAJ%2FP3ZS3ti2WQm0S86s3LQVssf56LpbJ8u0XxBB32s7u970Pyt6So%3D&product=jira&product=confluence) (and [Redline for Bitbucket](https://developer.atlassian.com/console/install/53a2efe5-9150-4e9a-b869-8bd2605d64e0?signature=AYABeKFrOdIp4KpSdnKGbGUBSkUAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4CxqLTo9l4lqXuFjNim1xJM%2Bp%2F3TVP9xHS2BrU5DRRucB43xQ8z0a40vUy92qFrbZsgAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDLmyoQqegXqdj1hpawIBEIA7KqL2Jq8dMqSVB%2BqLp%2BqmRoaoxpOLEOxAiir3VTO5e6sSe7s5CXVhfARMsp0c1HUiWcXegZaQ2afBrboAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHi9bVMAkme4qVQX1fQHo6ePw3H40A7cGfz7yrmSfBWMXgEputGsmrOJAk%2FkRTqjeiMVAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMkH7QJyZwcmbpFIVEAgEQgDsHAfyZkW2%2BSGje9GoN3d5v8W%2FjjNH6AZqGtivmtT6mifu72SeLpu3P6CtQdUhCniy4BntFoD0iOIC1nQAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeDYASx0XCjkny4iLV6vz%2BKtEGSGT6kdt0QRpkn6D%2FlVEAZJijhliY2wtihwZxY0ZFg4AAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAw8KYxq%2BOBFrXk5KjwCARCAOxK9or6FQxcLuzPGYQeMECqtNv1j0ZC8u9P0W0GNJVp0yeYt4cHziLHW7O%2BxamFnPnnS13F8bky3lfspAgAAAAAMAAAQAAAAAAAAAAAAAAAAAD5FLYx1pYO%2B%2BHscT5ahDZP%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADLmtENlA5glak6mKZ8RlGFud8haL7JU3yXg40aDBe7s9XGrm0hcfv%2BUa75S%2FBNizLRIC3uIp8m7LVm2W4Gys7NdNrE%3D&product=bitbucket)), then follow the
+- **On a Jira site**: [install Threatline for Jira](https://developer.atlassian.com/console/install/13898a7c-6897-48d3-a512-079d9f9f5f00?signature=AYABeCcfIQJqGrR0SUgfCmoTNmEAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4CxqLTo9l4lqXuFjNim1xJM%2Bp%2F3TVP9xHS2BrU5DRRucB1BD8mEv4t3Ljf3OukSd5eQAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDEh%2BKItDcqUwro%2BHrQIBEIA7MA0KHRf%2BF3YuTEAMovFxVALBMAXOWvXwcePSrlXd8eWbO0Gu4PlzXePH9QGutTzgsBB7obWKVcKw55kAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHi9bVMAkme4qVQX1fQHo6ePw3H40A7cGfz7yrmSfBWMXgHlW5ynSsuhZ7zbqiK2sh%2B2AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMkPcTbpchY2MsayhfAgEQgDuWokoIpYBa88xi5ggk1L1JkcZBleXY2Fhu75VlWDzfTq%2FPjQu2HTJqqUvWAGr3gQmwdhbGrdneGDgHcgAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeDYASx0XCjkny4iLV6vz%2BKtEGSGT6kdt0QRpkn6D%2FlVEAbLrick3%2FS2k9TO8wl7jjBMAAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAwPyU3UXZLk3LyqQEcCARCAO56x65zN0k8TKW9hcCjB8AjClKyO30ptqnOAj2gX5CQsUchhHNyCLeBw5CSlVzbE5lnPkVzoFWWWPI9DAgAAAAAMAAAQAAAAAAAAAAAAAAAAAE5uz5LjAh1FnegGXQysekL%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADJlU7brRNHeEAgdUVuQgPgaQWe2H582mtCI1iAJ%2FP3ZS3ti2WQm0S86s3LQVssf56LpbJ8u0XxBB32s7u970Pyt6So%3D&product=jira&product=confluence) (and [Threatline for Bitbucket](https://developer.atlassian.com/console/install/53a2efe5-9150-4e9a-b869-8bd2605d64e0?signature=AYABeKFrOdIp4KpSdnKGbGUBSkUAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4CxqLTo9l4lqXuFjNim1xJM%2Bp%2F3TVP9xHS2BrU5DRRucB43xQ8z0a40vUy92qFrbZsgAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDLmyoQqegXqdj1hpawIBEIA7KqL2Jq8dMqSVB%2BqLp%2BqmRoaoxpOLEOxAiir3VTO5e6sSe7s5CXVhfARMsp0c1HUiWcXegZaQ2afBrboAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHi9bVMAkme4qVQX1fQHo6ePw3H40A7cGfz7yrmSfBWMXgEputGsmrOJAk%2FkRTqjeiMVAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMkH7QJyZwcmbpFIVEAgEQgDsHAfyZkW2%2BSGje9GoN3d5v8W%2FjjNH6AZqGtivmtT6mifu72SeLpu3P6CtQdUhCniy4BntFoD0iOIC1nQAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeDYASx0XCjkny4iLV6vz%2BKtEGSGT6kdt0QRpkn6D%2FlVEAZJijhliY2wtihwZxY0ZFg4AAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAw8KYxq%2BOBFrXk5KjwCARCAOxK9or6FQxcLuzPGYQeMECqtNv1j0ZC8u9P0W0GNJVp0yeYt4cHziLHW7O%2BxamFnPnnS13F8bky3lfspAgAAAAAMAAAQAAAAAAAAAAAAAAAAAD5FLYx1pYO%2B%2BHscT5ahDZP%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADLmtENlA5glak6mKZ8RlGFud8haL7JU3yXg40aDBe7s9XGrm0hcfv%2BUa75S%2FBNizLRIC3uIp8m7LVm2W4Gys7NdNrE%3D&product=bitbucket)), then follow the
   [judge guide](docs/JUDGE_GUIDE.md): run the admin wizard, load the demo data,
   open the epic, try to move it to Done.
 - **Locally, no site needed**:
@@ -117,23 +117,23 @@ pnpm redline eval --llm fake                             # deterministic baselin
   pnpm e2e                                    # Journeys A and B and the merge check in a real browser
   ```
 
-  `pnpm e2e` drives the real UI against Redline's real resolvers, agent actions, Done validator and signing, with
-  only Jira, Confluence, Rovo and the clock simulated (`e2e/local/server.ts`). CI also runs semgrep (Redline's own
+  `pnpm e2e` drives the real UI against Threatline's real resolvers, agent actions, Done validator and signing, with
+  only Jira, Confluence, Rovo and the clock simulated (`e2e/local/server.ts`). CI also runs semgrep (Threatline's own
   rules in `.semgrep.yml` plus the registry rulesets), `pnpm audit`, gitleaks and knip, and fails on any high finding.
 
 ## Docs
 
 - [Architecture](docs/ARCHITECTURE.md): the review flow, the risk formula, the verdict rules, packages and ports.
-- [Security review](docs/SECURITY_REVIEW.md): Redline threat-modelled, each control with the test that proves it.
+- [Security review](docs/SECURITY_REVIEW.md): Threatline threat-modelled, each control with the test that proves it.
 - [Judge guide](docs/JUDGE_GUIDE.md), [screenshots](docs/screenshots/README.md), [privacy](docs/PRIVACY.md),
   [terms](docs/TERMS.md).
 
 ## Repository
 
 ```
-apps/core        Redline for Jira: Forge functions, Rovo actions and agent, Custom UI (apps/core/ui)
-apps/bitbucket   Redline for Bitbucket: merge check and repository settings
-apps/github-action  Redline merge gate for GitHub (same decision code; see docs/GITHUB.md)
+apps/core        Threatline for Jira: Forge functions, Rovo actions and agent, Custom UI (apps/core/ui)
+apps/bitbucket   Threatline for Bitbucket: merge check and repository settings
+apps/github-action  Threatline merge gate for GitHub (same decision code; see docs/GITHUB.md)
 apps/local       pnpm redline: offline reviews, evals, demo signing
 packages/        core (domain), crypto, db, frameworks (ASVS 5, CWE, OWASP LLM/Agentic), prompts, shared, llm-dev
 evals/           cases, runner, metrics, recorded model outputs, results

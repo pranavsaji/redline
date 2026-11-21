@@ -14,7 +14,7 @@ export const post = async <T = Record<string, unknown>>(request: APIRequestConte
 /** Moving the work item to Done: what Jira's workflow validator answers. */
 export const tryDone = (request: APIRequestContext) => post<{ result: boolean; errorMessage?: string }>(request, 'transition', { issueKey: 'PAY-7' });
 
-/** The Redline issue panel on PAY-7, signed in as `as`. */
+/** The Threatline issue panel on PAY-7, signed in as `as`. */
 export async function openPanel(page: Page, as: string, tab?: RegExp): Promise<void> {
   await page.goto(`${PANEL}/?bridge=local&as=${as}&issue=10042`);
   if (tab) await page.getByRole('tab', { name: tab }).click();

@@ -33,7 +33,7 @@ export function mockApi(state = new URLSearchParams(window.location.search).get(
     breakGlass: async (_r, hours) => ({ entryHash: 'c'.repeat(64), until: new Date(Date.now() + hours * 3_600_000).toISOString() }),
     attestation: async (repo, commitSha) => {
       const token = `redline-att.v1.mock-${repo.replace('/', '-')}-${commitSha.slice(0, 7)}.sig`;
-      return { token, expiresAt: new Date(Date.now() + 86_400_000).toISOString(), prDescriptionSnippet: `Redline attestation for ${dto.issueKey} (expires tomorrow):\n${token}` };
+      return { token, expiresAt: new Date(Date.now() + 86_400_000).toISOString(), prDescriptionSnippet: `Threatline attestation for ${dto.issueKey} (expires tomorrow):\n${token}` };
     },
     publish: async () => ({ pageId: '900', url: 'https://example.atlassian.net/wiki/spaces/PAY/pages/900', created: true }),
     explain: async (_r, threatId) => {
@@ -61,7 +61,7 @@ export function mockAdminApi(state = typeof window === 'undefined' ? 'ready' : (
       confirm !== projectKey
         ? { error: 'validation' as const, message: `Type ${projectKey} to confirm. This cannot be undone.` }
         : dto.policy.enabledProjects.includes(projectKey)
-          ? { error: 'validation' as const, message: `Redline still reviews ${projectKey}. Turn it off under Projects and transitions first, then purge.` }
+          ? { error: 'validation' as const, message: `Threatline still reviews ${projectKey}. Turn it off under Projects and transitions first, then purge.` }
           : { projectKey, reviews: 3, requirements: 2, entryHash: 'c'.repeat(64) },
     endWarnOnly: async (projectKey) => ((dto.policy.warnOnly = dto.policy.warnOnly.filter((w) => w.projectKey !== projectKey)), { projectKey, entryHash: 'b'.repeat(64) }),
     runs: async () => ({ runs: structuredClone(RUNS_FIXTURE) }),

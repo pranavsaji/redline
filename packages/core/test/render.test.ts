@@ -27,7 +27,7 @@ const dto = (over: Partial<ThreatModelDto> = {}): ThreatModelDto => ({
   summary: 'Add AI support agent that can issue refunds',
   review,
   latestRevision: 2,
-  verdict: { state: 'block', message: 'Redline blocks Done: 1 open security requirement at High or above: PAY-101.' },
+  verdict: { state: 'block', message: 'Threatline blocks Done: 1 open security requirement at High or above: PAY-101.' },
   threats: [threat(1), threat(2, { severity: 'Medium', state: 'dismissed', dismissReason: 'false_positive' })],
   requirements: [requirement(1), requirement(2, { status: 'AcceptedRisk', severity: 'Medium' })],
   acceptances: [acceptance],
@@ -69,7 +69,7 @@ describe('renderThreatModel (RQ-5)', () => {
     expect(out).not.toContain('Someone could fake a refund 1.');
     expect(out).toContain('Someone could fake a refund 2.');
     expect(out).toContain('PAY-101');
-    expect(out).toMatch(/details in the Redline panel/i);
+    expect(out).toMatch(/details in the Threatline panel/i);
   });
 
   it('a page older than the latest revision gets a "stale" info macro', () => {

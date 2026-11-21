@@ -12,8 +12,8 @@ const ready = !!process.env.E2E_SITE_URL && !!process.env.E2E_ISSUE_KEY && exist
 
 test.skip(!ready, 'site e2e needs E2E_SITE_URL, E2E_ISSUE_KEY and a saved session (pnpm --filter @redline/e2e login)');
 
-test('the Redline panel on a reviewed work item shows its verdict', async ({ page }) => {
+test('the Threatline panel on a reviewed work item shows its verdict', async ({ page }) => {
   await page.goto(`/browse/${process.env.E2E_ISSUE_KEY}`);
-  const panel = page.frameLocator('iframe[src*="redline"], iframe[title*="Redline"]').first();
+  const panel = page.frameLocator('iframe[src*="redline"], iframe[title*="Threatline"]').first();
   await expect(panel.getByText(/Blocks Done and merge|Ready for Done|Warn only|Not reviewed yet|Review in progress/).first()).toBeVisible({ timeout: 45_000 });
 });

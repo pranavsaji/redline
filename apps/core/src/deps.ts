@@ -36,7 +36,7 @@ export interface CoreDeps {
   treeHeads: TreeHeadRepo;
   /** Ed25519 merge-attestation keys (private halves in Forge secret storage). */
   keys: SigningKeyStore;
-  /** Redline Engine's model (Forge LLMs in production, a fake in tests). Billed to the app's developer. */
+  /** Threatline Engine's model (Forge LLMs in production, a fake in tests). Billed to the app's developer. */
   llm: LlmPort;
   /** Jira as the app (triggers, consumers and jobs have no user). */
   jira: JiraClient;

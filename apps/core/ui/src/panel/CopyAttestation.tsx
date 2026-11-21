@@ -47,7 +47,7 @@ export function CopyAttestation({ api }: { api: PanelApi }) {
     <form aria-label="Merge attestation" onSubmit={submit} style={box}>
       <strong>Merge attestation</strong>
       <span style={{ font: token('font.body.small'), color: token('color.text.subtle') }}>
-        Redline's merge gate (Redline for Bitbucket, or the Redline GitHub Action) lets a pull request that touches security-sensitive files merge only with a signed attestation for its head commit.
+        Threatline's merge gate (Threatline for Bitbucket, or the Threatline GitHub Action) lets a pull request that touches security-sensitive files merge only with a signed attestation for its head commit.
       </span>
       <label style={label} htmlFor={`${id}-repo`}>
         Repository
@@ -70,7 +70,7 @@ export function CopyAttestation({ api }: { api: PanelApi }) {
       <div role="status" style={{ display: 'grid', gap: 6 }}>
         {result && 'blocking' in result && (
           <>
-            <span>Redline blocks this merge until these are resolved:</span>
+            <span>Threatline blocks this merge until these are resolved:</span>
             <ul style={{ margin: 0, paddingLeft: 20 }}>
               {result.blocking.map((b, i) => (
                 <li key={i}>{b.message}</li>

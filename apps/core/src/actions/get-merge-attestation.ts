@@ -28,7 +28,7 @@ export async function getMergeAttestation(payload: ActionPayload & { issueKey?: 
   }
   if ('blocking' in r.value) {
     const blocking = r.value.blocking.map((b) => ({ code: b.code, message: b.message }));
-    return { issued: false, blocking, message: `Redline blocks merging ${issueKey}: ${blocking.map((b) => b.message.replace(/\.+$/, '')).join('; ')}.` };
+    return { issued: false, blocking, message: `Threatline blocks merging ${issueKey}: ${blocking.map((b) => b.message.replace(/\.+$/, '')).join('; ')}.` };
   }
   return { issued: true, ...r.value, message: `Paste this into the pull request description. It is valid for this commit until ${r.value.expiresAt}.` };
 }

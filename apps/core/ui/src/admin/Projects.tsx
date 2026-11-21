@@ -2,7 +2,7 @@ import { useId, useState } from 'react';
 import { field, label } from '../panel/form-styles.js';
 import { hint, h2, PolicyForm, sectionStyle, splitList, usePolicySave, type PolicySectionProps } from './policy-editor.js';
 
-/** Which projects Redline reviews, which work types it reviews, and which transitions its gate guards. */
+/** Which projects Threatline reviews, which work types it reviews, and which transitions its gate guards. */
 export function Projects(props: PolicySectionProps) {
   const id = useId();
   const { policy } = props;
@@ -25,7 +25,7 @@ export function Projects(props: PolicySectionProps) {
         Projects and transitions
       </h2>
       <p style={hint}>
-        Redline reviews these work types in these projects. The Done gate runs wherever you add the “Redline security gate” validator to a workflow transition; the names here are used in its messages.
+        Threatline reviews these work types in these projects. The Done gate runs wherever you add the “Threatline security gate” validator to a workflow transition; the names here are used in its messages.
       </p>
       <PolicyForm label="Projects and transitions" submitLabel="Save projects" onSubmit={submit} {...s}>
         <label style={label} htmlFor={`${id}-p`}>
@@ -36,7 +36,7 @@ export function Projects(props: PolicySectionProps) {
           Project keys, separated by commas.
         </span>
         <label style={label} htmlFor={`${id}-t`}>
-          Work types Redline reviews
+          Work types Threatline reviews
         </label>
         <input id={`${id}-t`} value={types} onChange={(e) => setTypes(e.target.value)} placeholder="Epic, Story" style={field} />
         <label style={label} htmlFor={`${id}-g`}>

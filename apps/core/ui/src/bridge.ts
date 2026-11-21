@@ -5,7 +5,7 @@ export type Invoke = <T>(key: string, payload?: Record<string, unknown>) => Prom
 
 /**
  * @forge/bridge 7 types every resolver result as `T | { body: T; metadata }`; it only wraps when the caller passes
- * invoke metadata, which Redline never does, so the result is the resolver's return value itself.
+ * invoke metadata, which Threatline never does, so the result is the resolver's return value itself.
  */
 async function bridgeInvoke(): Promise<Invoke> {
   const { invoke } = await import('@forge/bridge');
@@ -196,5 +196,5 @@ export function errorText(e: ApiError): string {
   if (e.error === 'forbidden') return 'You do not have permission to do that.';
   if (e.error === 'not_found') return 'That item is no longer available, or you cannot open it.';
   if (e.error === 'rate_limited') return 'Too many requests. Try again later.';
-  return 'Redline could not save that. Try again.';
+  return 'Threatline could not save that. Try again.';
 }

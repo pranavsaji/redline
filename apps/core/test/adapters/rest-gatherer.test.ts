@@ -129,7 +129,7 @@ describe('restGatherer', () => {
     expect(rev[0]!.excerpt).toContain('64');
   });
 
-  it('M4: Redline\'s own earlier review does not change the context hash (identical sources, identical hash)', async () => {
+  it('M4: Threatline\'s own earlier review does not change the context hash (identical sources, identical hash)', async () => {
     const before = await setup().g.gather('10042', ACTOR);
     const { g, reviews } = setup();
     await reviews.create({

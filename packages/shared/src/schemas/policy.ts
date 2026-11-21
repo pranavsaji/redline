@@ -14,14 +14,14 @@ export const SitePolicySchema = z
     agentSamples: z.union([z.literal(1), z.literal(3), z.literal(5)]),
     agentTimeoutMinutes: z.number().int().min(1).max(120),
     /**
-     * `engine` (default for new sites): Redline Engine runs the review itself on Forge LLMs (quarantined extract, independent
-     * proposals, adversarial verifier), with no Rovo or Automation setup. `agent`: reviews wait for the Redline Rovo agent's runs. `rules_only`: an admin's explicit choice for
-     * sites without Rovo; every review settles at once from Redline's rule-based checks and says so.
+     * `engine` (default for new sites): Threatline Engine runs the review itself on Forge LLMs (quarantined extract, independent
+     * proposals, adversarial verifier), with no Rovo or Automation setup. `agent`: reviews wait for the Threatline Rovo agent's runs. `rules_only`: an admin's explicit choice for
+     * sites without Rovo; every review settles at once from Threatline's rule-based checks and says so.
      */
     reviewMode: z.enum(['engine', 'agent', 'rules_only']).optional(),
     /**
      * Who may submit AI review runs (Atlassian account IDs, normally the owner of the Automation rule that runs the
-     * Redline agent). Empty or absent: anyone who can edit the work item, which lets a developer fill their own review.
+     * Threatline agent). Empty or absent: anyone who can edit the work item, which lets a developer fill their own review.
      */
     reviewAuthors: z.array(z.string().trim().min(1).max(128)).max(10).optional(),
     warnOnly: z.array(z.object({ projectKey: z.string(), since: z.string(), until: z.string() }).strict()),

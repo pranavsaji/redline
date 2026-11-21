@@ -10,7 +10,7 @@ export interface GraphEnrichment {
   reasons: string[];
 }
 
-/** CE-2: persisted queries only. `value` is a union; Redline reads node ids only (no untrusted titles). */
+/** CE-2: persisted queries only. `value` is a union; Threatline reads node ids only (no untrusted titles). */
 export const CUSTOM_QUERY = `query RedlineCustomQuery($queryKey: String!, $queryParams: CypherRequestParams, $first: Int, $after: String) {
   customQuery(queryKey: $queryKey, queryParams: $queryParams, first: $first, after: $after) {
     edges { node { columns { key value { __typename ... on CypherQueryResultNode { id } } } } }

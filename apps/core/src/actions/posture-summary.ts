@@ -30,7 +30,7 @@ export type PostureSummaryResult = ReturnType<typeof postureSummary> & {
 
 /**
  * GET (Agent, MCP): open requirements by severity, expiring acceptances and the riskiest components across the
- * Redline-enabled projects (or one of them), counting only work items the caller can browse. `team` narrows to a
+ * Threatline-enabled projects (or one of them), counting only work items the caller can browse. `team` narrows to a
  * Jira component of that name.
  */
 export async function getPostureSummary(payload: ActionPayload & Record<string, unknown>, deps: CoreDeps): Promise<PostureSummaryResult | ActionError> {
@@ -43,7 +43,7 @@ export async function getPostureSummary(payload: ActionPayload & Record<string, 
   const p = policy.value;
   const { project, team } = input.value;
   if (project && !p.enabledProjects.includes(project))
-    return { error: 'invalid_input', message: `project ${project} is not enabled for Redline (enabled: ${p.enabledProjects.join(', ') || 'none'})` };
+    return { error: 'invalid_input', message: `project ${project} is not enabled for Threatline (enabled: ${p.enabledProjects.join(', ') || 'none'})` };
   const projects = project ? [project] : p.enabledProjects;
   const empty = { ...postureSummary([], deps.clock.now()), projects, ...(team ? { team } : {}), issuesCounted: 0, expiring: [], hiddenExpiring: 0, truncated: false };
   if (projects.length === 0) return empty;

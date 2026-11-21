@@ -29,7 +29,7 @@ test('merge check: attestation issued only when Done would pass; one changed cha
   await openPanel(page, USERS.dev, /^Requirements/);
 
   const form = await requestAttestation(page);
-  await expect(form.getByText('Redline blocks this merge until these are resolved:')).toBeVisible();
+  await expect(form.getByText('Threatline blocks this merge until these are resolved:')).toBeVisible();
   expect(await post(request, 'merge-check', { description: 'Refund webhook hardening', headSha: HEAD })).toMatchObject({ success: false });
 
   for (const [i, title] of ['Forged refund webhooks', 'Payment amount or recipient manipulated', 'Personal data exposed to unauthorised users'].entries())
@@ -43,10 +43,10 @@ test('merge check: attestation issued only when Done would pass; one changed cha
   expect(await post(request, 'merge-check', { description: tamper(snippet), headSha: HEAD })).toMatchObject({ success: false });
   expect(await post(request, 'merge-check', { description: snippet, headSha: 'f'.repeat(40) })).toMatchObject({ success: false });
 
-  // The repository admin's view: paste Redline's public key, then test the attestation in Bitbucket's settings page.
+  // The repository admin's view: paste Threatline's public key, then test the attestation in Bitbucket's settings page.
   const keys = await post<{ active: { publicKey: string } }>(request, 'invoke', { key: 'keys.public', accountId: USERS.admin, payload: {} });
   await page.goto(`${BITBUCKET}/`);
-  await page.getByLabel(/Redline public keys/).fill(keys.active.publicKey);
+  await page.getByLabel(/Threatline public keys/).fill(keys.active.publicKey);
   const tester = page.getByRole('form', { name: 'Test an attestation' });
   await tester.getByLabel('Attestation').fill(snippet);
   await tester.getByRole('button', { name: 'Test' }).click();

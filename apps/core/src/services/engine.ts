@@ -35,7 +35,7 @@ const trace = (deps: CoreDeps, reviewId: string, stage: string, status: 'done' |
   deps.reviews.saveStage(reviewId, `engine_${stage}`, status, undefined, error, deps.clock.now().toISOString()).catch(() => null);
 
 /**
- * Redline Engine, one stage per queue job: a quarantined injection check, then N independent runs in parallel on the deep tier, each the Redline agent
+ * Threatline Engine, one stage per queue job: a quarantined injection check, then N independent runs in parallel on the deep tier, each the Threatline agent
  * prompt over the nonce-fenced review context (each becomes a run exactly like a Rovo agent run, so consensus, quote
  * checks, injection flags and the rule-based floor apply unchanged) → assembly → the adversarial verifier. Model errors become failed runs: the review
  * then fails closed, as AI errors count as missing.
@@ -93,7 +93,7 @@ export async function engineJob(deps: CoreDeps, job: EngineJob): Promise<Result<
   return deps.queue.push([{ kind: 'assemble', reviewId: review.id }]);
 }
 
-/** Is this review one Redline Engine ran (its marker stage, or an extract checkpoint from before runs replaced it)? */
+/** Is this review one Threatline Engine ran (its marker stage, or an extract checkpoint from before runs replaced it)? */
 export async function isEngineReview(deps: Pick<CoreDeps, 'reviews'>, reviewId: string): Promise<boolean> {
   const [m, x] = await Promise.all([deps.reviews.stage(reviewId, 'engine'), deps.reviews.stage(reviewId, 'extract')]);
   return (m.ok && !!m.value) || (x.ok && !!x.value);

@@ -33,7 +33,7 @@ export function DemoData({ api }: { api: AdminApi }) {
         Demo data
       </h2>
       <p style={{ margin: 0, color: token('color.text.subtle') }}>
-        Creates an epic with two stories, a linked design page (with one hidden instruction aimed at the AI, which Redline must ignore), and two recent incidents. Running it again reuses what exists. Each new story starts a review, which uses Rovo credits.
+        Creates an epic with two stories, a linked design page (with one hidden instruction aimed at the AI, which Threatline must ignore), and two recent incidents. Running it again reuses what exists. Each new story starts a review, which uses Rovo credits.
       </p>
       <form aria-label="Load demo data" onSubmit={submit} style={box}>
         <label style={label} htmlFor={`${id}-p`}>

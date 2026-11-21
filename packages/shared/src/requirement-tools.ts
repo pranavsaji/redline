@@ -32,8 +32,8 @@ function uniqueNames(base: string[], fallback: string): string[] {
 function header(r: Requirement, comment: string): string[] {
   const where = r.subtaskKey ? `${r.subtaskKey} (${r.issueKey})` : r.issueKey;
   return [
-    `${comment} Redline requirement ${r.id} for ${oneLine(where, 60)}${r.asvsIds.length ? ` · ASVS ${r.asvsIds.map((a) => oneLine(a, 20)).join(', ')}` : ''}`,
-    `${comment} Mark it Verified in the Redline panel with this test file as evidence once it passes.`,
+    `${comment} Threatline requirement ${r.id} for ${oneLine(where, 60)}${r.asvsIds.length ? ` · ASVS ${r.asvsIds.map((a) => oneLine(a, 20)).join(', ')}` : ''}`,
+    `${comment} Mark it Verified in the Threatline panel with this test file as evidence once it passes.`,
   ];
 }
 
@@ -45,7 +45,7 @@ export function testScaffold(r: Requirement, lang: TestLanguage): string {
       `    // Given ${oneLine(c.given)}`,
       `    // When ${oneLine(c.when)}`,
       `    // Then ${oneLine(c.then)}`,
-      `    throw new Error('Write this test (Redline ${r.id})');`,
+      `    throw new Error('Write this test (Threatline ${r.id})');`,
       '  });',
     ]);
     return [...header(r, '//'), `describe(${singleQuoted(`${key} ${r.title}`)}, () => {`, ...tests, '});', ''].join('\n');
@@ -58,11 +58,11 @@ export function testScaffold(r: Requirement, lang: TestLanguage): string {
       `    # Given ${oneLine(c.given)}`,
       `    # When ${oneLine(c.when)}`,
       `    # Then ${oneLine(c.then)}`,
-      `    raise NotImplementedError(${doubleQuoted(`Write this test (Redline ${r.id})`)})`,
+      `    raise NotImplementedError(${doubleQuoted(`Write this test (Threatline ${r.id})`)})`,
     ]);
     return [...header(r, '#'), `# ${oneLine(`${key} ${r.title}`)}`, ...tests, ''].join('\n');
   }
-  const cls = `${words(key).map((w) => w[0]!.toUpperCase() + w.slice(1)).join('') || 'Redline'}SecurityTest`;
+  const cls = `${words(key).map((w) => w[0]!.toUpperCase() + w.slice(1)).join('') || 'Threatline'}SecurityTest`;
   const names = uniqueNames(
     r.criteria.map((c) => words(c.then).slice(0, 10).map((w, j) => (j === 0 ? w : w[0]!.toUpperCase() + w.slice(1))).join('').replace(/^[^a-z]+/, '').slice(0, 70)),
     'requirement',
@@ -74,7 +74,7 @@ export function testScaffold(r: Requirement, lang: TestLanguage): string {
     `        // Given ${javaComment(c.given)}`,
     `        // When ${javaComment(c.when)}`,
     `        // Then ${javaComment(c.then)}`,
-    `        fail(${doubleQuoted(`Write this test (Redline ${r.id})`)});`,
+    `        fail(${doubleQuoted(`Write this test (Threatline ${r.id})`)});`,
     '    }',
   ]);
   return [
@@ -90,7 +90,7 @@ export function testScaffold(r: Requirement, lang: TestLanguage): string {
   ].join('\n');
 }
 
-/** Days to fix an open requirement, by severity, counted from when Redline created it. Low has no deadline. */
+/** Days to fix an open requirement, by severity, counted from when Threatline created it. Low has no deadline. */
 export const SLA_DAYS: Readonly<Record<Severity, number | null>> = { Critical: 7, High: 30, Medium: 90, Low: null };
 const DAY = 86_400_000;
 

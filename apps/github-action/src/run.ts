@@ -27,11 +27,11 @@ export interface GitHubClient {
 
 export const WARN_MAX_DAYS = 14;
 /**
- * Changing the gate's own configuration (the workflow that runs it, local actions, Redline's policy file) is always
+ * Changing the gate's own configuration (the workflow that runs it, local actions, Threatline's policy file) is always
  * sensitive: loosening the gate needs an attestation like any other security change.
  */
 export const GATE_CONFIG_PATHS = ['.github/workflows/**', '.github/actions/**', '.redline/**'];
-const KEY_HINT = 'Add it to the public-keys input of the Redline step in your workflow (Redline admin → Signing keys → Copy public key).';
+const KEY_HINT = 'Add it to the public-keys input of the Threatline step in your workflow (Threatline admin → Signing keys → Copy public key).';
 const lines = (v: string | undefined) => (v ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
 
 /** The step's `with:` inputs → repository settings. Rejects anything it cannot honour rather than guessing. */
@@ -39,20 +39,20 @@ export function parseInputs(input: Record<string, string | undefined>, nowSec: n
   const publicKeys: Record<string, string> = {};
   for (const k of lines(input['public-keys'])) {
     const bytes = isValidPublicKey(k) ? fromB64url(k) : null;
-    if (!bytes) return { ok: false, message: `Redline: "${k.slice(0, 12)}…" is not a Redline public key. Copy it from Redline admin → Signing keys.` };
+    if (!bytes) return { ok: false, message: `Threatline: "${k.slice(0, 12)}…" is not a Threatline public key. Copy it from Threatline admin → Signing keys.` };
     publicKeys[kidOf(bytes)] = k;
   }
   const mode = (input.mode ?? '').trim() || 'block';
-  if (mode !== 'block' && mode !== 'warn') return { ok: false, message: `Redline: mode must be block or warn, not "${mode.slice(0, 20)}".` };
+  if (mode !== 'block' && mode !== 'warn') return { ok: false, message: `Threatline: mode must be block or warn, not "${mode.slice(0, 20)}".` };
   const rawThreshold = (input['diff-score-threshold'] ?? '').trim();
   const threshold = rawThreshold === '' ? 40 : Number(rawThreshold);
-  if (!Number.isFinite(threshold) || threshold < 0 || threshold > 100) return { ok: false, message: 'Redline: diff-score-threshold must be a number from 0 to 100.' };
+  if (!Number.isFinite(threshold) || threshold < 0 || threshold > 100) return { ok: false, message: 'Threatline: diff-score-threshold must be a number from 0 to 100.' };
   const settings: RepoSettings = { publicKeys, sensitivePaths: [...GATE_CONFIG_PATHS, ...lines(input['sensitive-paths'])], mode, diffScoreThreshold: threshold, keyHint: KEY_HINT };
   if (mode === 'warn') {
     const until = (input['warn-until'] ?? '').trim();
     const at = Date.parse(until);
-    if (!until || Number.isNaN(at)) return { ok: false, message: 'Redline: warn mode needs warn-until, a date at most 14 days away (warn-only mode expires).' };
-    if (at / 1000 > nowSec + WARN_MAX_DAYS * 86_400) return { ok: false, message: `Redline: warn-until is more than ${WARN_MAX_DAYS} days away; warn-only mode lasts at most ${WARN_MAX_DAYS} days.` };
+    if (!until || Number.isNaN(at)) return { ok: false, message: 'Threatline: warn mode needs warn-until, a date at most 14 days away (warn-only mode expires).' };
+    if (at / 1000 > nowSec + WARN_MAX_DAYS * 86_400) return { ok: false, message: `Threatline: warn-until is more than ${WARN_MAX_DAYS} days away; warn-only mode lasts at most ${WARN_MAX_DAYS} days.` };
     settings.warnUntil = until;
   }
   return { ok: true, value: settings };
@@ -77,11 +77,11 @@ export function toDiffFiles(files: GitHubFile[], truncated: boolean): DiffFile[]
   return out;
 }
 
-/** Reads the pull request from GitHub and decides, exactly as Redline for Bitbucket does. Fails closed. */
+/** Reads the pull request from GitHub and decides, exactly as Threatline for Bitbucket does. Fails closed. */
 export async function runGitHubCheck(i: { settings: RepoSettings; client: GitHubClient; nowSec: number }): Promise<CheckResult> {
   const warnActive = i.settings.mode === 'warn' && !!i.settings.warnUntil && Date.parse(i.settings.warnUntil) / 1000 > i.nowSec;
   const unreadable = (what: string, status: number): CheckResult => {
-    const message = `Redline: could not read this pull request from GitHub (${what}, HTTP ${status}), so it cannot be checked. Re-run the job in a minute.`;
+    const message = `Threatline: could not read this pull request from GitHub (${what}, HTTP ${status}), so it cannot be checked. Re-run the job in a minute.`;
     return warnActive ? { success: true, outcome: 'warn', message: `Warning: ${message}` } : { success: false, outcome: 'fail_missing', message };
   };
   const [pr, files] = await Promise.all([i.client.pullRequest(), i.client.files()]);

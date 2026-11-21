@@ -18,14 +18,14 @@ const renderState = async (state: string, api: PanelApi = mockApi(state)) => {
 
 describe('IssuePanel states render their key text', () => {
   it.each([
-    ['not_reviewed', /Redline has not reviewed this work item yet/],
+    ['not_reviewed', /Threatline has not reviewed this work item yet/],
     ['in_progress', /Review in progress/],
     ['ready', /Blocks Done and merge/],
     ['partial', /Partial context/],
     ['failed', /The review failed/],
     ['timeout', /The AI review did not arrive in time/],
     ['budget', /Reviews are paused at the AI budget/],
-    ['injection', /Redline ignored instructions found in this page/],
+    ['injection', /Threatline ignored instructions found in this page/],
     ['stale', /Context changed since the last review/],
     ['pass', /Ready for Done/],
   ])('%s', async (state, text) => {
@@ -74,7 +74,7 @@ describe('feature: rules-only reviews are labelled', () => {
   });
 });
 
-describe('feature: Redline Engine reviews', () => {
+describe('feature: Threatline Engine reviews', () => {
   it('say how the review was made, and show the verifier\'s call on each threat', async () => {
     const api = mockApi('ready');
     const dto = await api.get();
@@ -86,7 +86,7 @@ describe('feature: Redline Engine reviews', () => {
       ...rest,
     ];
     await renderState('ready', { ...api, get: async () => ({ ...dto, threats, review: { ...dto.review!, modelIds: ['claude-sonnet-5', 'claude-opus-5'], samplesReceived: 3 } }) });
-    expect(screen.getByText('Redline Engine review')).toBeTruthy();
+    expect(screen.getByText('Threatline Engine review')).toBeTruthy();
     expect(screen.getByText(/claude-sonnet-5, claude-opus-5/)).toBeTruthy();
     expect(screen.getAllByText('Verified').length).toBe(1);
     expect(screen.getByText(/The verifier doubted this: the quote does not mention an admin console/)).toBeTruthy();
@@ -100,7 +100,7 @@ describe('feature: rule-based checks covered by a more specific AI threat', () =
     if ('error' in dto) throw new Error('fixture');
     const cover = dto.threats[0]!;
     await renderState('ready', { ...api, get: async () => ({ ...dto, covered: [{ title: 'Tool misuse by an over-privileged agent', coveredBy: cover.id }] }) });
-    expect(screen.getByText("Also covers Redline's rule-based check: Tool misuse by an over-privileged agent.")).toBeTruthy();
+    expect(screen.getByText("Also covers Threatline's rule-based check: Tool misuse by an over-privileged agent.")).toBeTruthy();
   });
 });
 
@@ -130,7 +130,7 @@ describe('feature: fix-by dates and test skeletons on requirements', () => {
     await userEvent.selectOptions(within(item).getByLabelText('Test language'), 'python');
     await userEvent.click(within(item).getByRole('button', { name: 'Copy test skeleton' }));
     await waitFor(() => expect(copied).toHaveLength(1));
-    expect(copied[0]).toMatch(/^# Redline requirement req_1/);
+    expect(copied[0]).toMatch(/^# Threatline requirement req_1/);
     expect(copied[0]).toMatch(/^def test_/m);
     expect(within(item).getByText('Copied a Python test skeleton.')).toBeTruthy();
   });

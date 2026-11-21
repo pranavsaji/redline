@@ -50,13 +50,13 @@ describe('confluence client', () => {
 
   it('createPage posts a current storage page under the parent', async () => {
     const { c, calls } = client([[/POST \/wiki\/api\/v2\/pages$/, { status: 200, body: fixture('confluence', 'created') }]]);
-    const r = await c.createPage({ spaceId: '4456', parentId: '98305', title: 'Redline threat model', storage: '<p>x</p>' });
+    const r = await c.createPage({ spaceId: '4456', parentId: '98305', title: 'Threatline threat model', storage: '<p>x</p>' });
     expect(r).toEqual({ ok: true, value: { id: '98400', url: 'https://one-atlas-mefc.atlassian.net/wiki/spaces/PAY/pages/98400' } });
     expect(JSON.parse(calls[0]!.init!.body!)).toEqual({
       spaceId: '4456',
       parentId: '98305',
       status: 'current',
-      title: 'Redline threat model',
+      title: 'Threatline threat model',
       body: { representation: 'storage', value: '<p>x</p>' },
     });
   });

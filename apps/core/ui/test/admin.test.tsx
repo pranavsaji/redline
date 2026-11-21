@@ -96,8 +96,8 @@ describe('Admin: first-run wizard (Task 30)', () => {
     await userEvent.type(within(form).getByRole('textbox', { name: 'Security champions group' }), 'appsec');
     await userEvent.click(within(form).getByRole('button', { name: 'Save and continue' }));
     expect(setPolicy).toHaveBeenCalledWith(expect.objectContaining({ enabledProjects: ['PAY'], guardedTransitions: ['In Review'], championGroup: 'appsec' }));
-    expect(await screen.findByText(/Redline is on for PAY/)).toBeTruthy();
-    expect(screen.getByText(/add "Redline security gate" to the In Review transition/)).toBeTruthy();
+    expect(await screen.findByText(/Threatline is on for PAY/)).toBeTruthy();
+    expect(screen.getByText(/add "Threatline security gate" to the In Review transition/)).toBeTruthy();
   });
 
   it('is not shown once a policy has been saved', async () => {
@@ -119,7 +119,7 @@ describe('Admin: policy sections (Task 30)', () => {
     await userEvent.type(paths, 'src/auth/**{enter}{enter}infra/**');
     await userEvent.click(within(form).getByRole('button', { name: 'Save severity policy' }));
     expect(setPolicy).toHaveBeenCalledWith(expect.objectContaining({ blockAtOrAbove: 'Critical', sensitivePaths: ['src/auth/**', 'infra/**'], attestationTtlHours: 24 }));
-    expect(await within(form).findByText('Saved. Redline rechecks verdicts against the new policy.')).toBeTruthy();
+    expect(await within(form).findByText('Saved. Threatline rechecks verdicts against the new policy.')).toBeTruthy();
   });
 
   it('projects: saves the enabled projects, work types and guarded transitions, and shows the server’s error', async () => {
@@ -177,17 +177,17 @@ describe('Admin: budgets (Task 30)', () => {
     expect(setPolicy).toHaveBeenCalledWith(expect.objectContaining({ reviewMode: 'rules_only' }));
   });
 
-  it('feature: an admin chooses Redline Engine; the checklist then needs no Rovo, Automation rule or review authors', async () => {
+  it('feature: an admin chooses Threatline Engine; the checklist then needs no Rovo, Automation rule or review authors', async () => {
     const api = mockAdminApi();
     const setPolicy = vi.fn(api.setPolicy);
     const dto = await api.getPolicy();
     if ('error' in dto) throw new Error('fixture');
     render(<AdminPage api={{ ...api, setPolicy, getPolicy: async () => ({ ...dto, policy: { ...dto.policy, reviewMode: 'engine' } }) }} />);
     const list = await screen.findByRole('list', { name: 'Setup checklist' });
-    expect((await within(list).findByText(/Redline Engine runs every review itself/)).closest('li')!.textContent).toMatch(/Done/);
-    expect(within(list).getByText(/Redline Engine writes reviews itself/).closest('li')!.textContent).toMatch(/Done/);
+    expect((await within(list).findByText(/Threatline Engine runs every review itself/)).closest('li')!.textContent).toMatch(/Done/);
+    expect(within(list).getByText(/Threatline Engine writes reviews itself/).closest('li')!.textContent).toMatch(/Done/);
     const form = screen.getByRole('form', { name: 'Review mode' });
-    expect((within(form).getByRole('radio', { name: /Redline Engine \(recommended\)/ }) as HTMLInputElement).checked).toBe(true);
+    expect((within(form).getByRole('radio', { name: /Threatline Engine \(recommended\)/ }) as HTMLInputElement).checked).toBe(true);
     await userEvent.click(within(form).getByRole('button', { name: 'Save review mode' }));
     expect(setPolicy).toHaveBeenCalledWith(expect.objectContaining({ reviewMode: 'engine', budget: expect.objectContaining({ tokensInPerReview: 400000, tokensOutPerReview: 60000 }) }));
   });
@@ -361,6 +361,6 @@ describe('Admin: data retention (privacy purge)', () => {
     await userEvent.type(within(form).getByRole('textbox', { name: 'Project key' }), 'PAY');
     await userEvent.type(within(form).getByRole('textbox', { name: 'Type the key again to confirm' }), 'PAY');
     await userEvent.click(within(form).getByRole('button', { name: 'Purge reviews' }));
-    expect((await within(form).findByRole('alert')).textContent).toBe('Redline still reviews PAY. Turn it off under Projects and transitions first, then purge.');
+    expect((await within(form).findByRole('alert')).textContent).toBe('Threatline still reviews PAY. Turn it off under Projects and transitions first, then purge.');
   });
 });

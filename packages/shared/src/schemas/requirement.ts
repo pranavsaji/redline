@@ -25,7 +25,7 @@ export const RequirementSchema = z
     verifiedBy: z.string().optional(),
     evidence: EvidenceSchema.optional(),
     fileHints: z.array(z.string()).optional(),
-    /** When Redline first created the requirement, and when it was last marked Verified (mean time to verify, PR-1). */
+    /** When Threatline first created the requirement, and when it was last marked Verified (mean time to verify, PR-1). */
     createdAt: z.string().datetime({ offset: true }).optional(),
     verifiedAt: z.string().datetime({ offset: true }).optional(),
   })

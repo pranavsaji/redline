@@ -17,16 +17,16 @@ async function markSeen(deps: CoreDeps, issueKey: string | undefined): Promise<v
   }
 }
 
-/** Shown when a work item still has no Redline verdict after computing one (EN-2: missing reviews block). */
-export const NOT_REVIEWED_MESSAGE = 'Redline has not reviewed this work item yet. Open the Redline panel and click Run review.';
-const UNREADABLE = 'Redline could not read the security verdict for this work item, so the transition is blocked. Try again in a minute.';
-const BLOCKED = 'Redline blocks this transition. Open the Redline panel on this work item to see why.';
+/** Shown when a work item still has no Threatline verdict after computing one (EN-2: missing reviews block). */
+export const NOT_REVIEWED_MESSAGE = 'Threatline has not reviewed this work item yet. Open the Threatline panel and click Run review.';
+const UNREADABLE = 'Threatline could not read the security verdict for this work item, so the transition is blocked. Try again in a minute.';
+const BLOCKED = 'Threatline blocks this transition. Open the Threatline panel on this work item to see why.';
 
 type Outcome = { result: boolean; errorMessage?: string };
 const blocked = (errorMessage: string): Outcome => ({ result: false, errorMessage });
 
 /**
- * The Done gate. Reads the verdict from app storage, which only Redline can write — never the `redline.verdict` issue
+ * The Done gate. Reads the verdict from app storage, which only Threatline can write — never the `redline.verdict` issue
  * property, which anyone who can edit the work item can overwrite. No stored verdict yet: compute it once. Fails closed:
  * only `pass` and `warn` let the transition through; every error or unknown value blocks with a message.
  */

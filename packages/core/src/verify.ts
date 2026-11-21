@@ -13,7 +13,7 @@ export interface Verdict4 {
 const verifiable = (t: Threat) => t.origin === 'agent' && t.state === 'accepted';
 
 /**
- * Redline Engine stage 4: one call on a stronger model checks each accepted AI threat against the quotes it rests on.
+ * Threatline Engine stage 4: one call on a stronger model checks each accepted AI threat against the quotes it rests on.
  * Its answer is only a request; applyVerification decides what it does. Every id must get a verdict, or nothing changes.
  */
 export async function engineVerify(deps: Pick<PipelineDeps, 'llm' | 'policy'>, threats: readonly Threat[], usage: Usage, nonce: string): Promise<Result<Verdict4[]>> {

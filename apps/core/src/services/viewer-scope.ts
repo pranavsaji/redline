@@ -54,7 +54,7 @@ export async function scopeForViewer(
         if (id === issueId) return true;
         return can(issueChecks, id, () => c.jira.canBrowse(viewerAccountId, id));
       }
-      // Redline's own earlier-review summary and unrestricted comments on this work item are visible to anyone who can
+      // Threatline's own earlier-review summary and unrestricted comments on this work item are visible to anyone who can
       // browse it. Every other source type (graph commits, teams, components…) cannot be checked here: deny by default.
       return f.sourceType === 'review' || f.sourceType === 'jira_comment';
     }),
@@ -71,7 +71,7 @@ export async function scopeForViewer(
 
 /**
  * True when every source a threat cites is readable by anyone who can see the work item itself: the item's own fields,
- * its unrestricted comments, or Redline's earlier-review summary. Anything else (pages, linked issues, incidents, graph
+ * its unrestricted comments, or Threatline's earlier-review summary. Anything else (pages, linked issues, incidents, graph
  * facts, or an unknown fact) may be restricted, so text derived from it must not be copied where the whole audience of
  * the work item can read it (sub-tasks, comments).
  */
@@ -83,7 +83,7 @@ export function citesOnlyTheWorkItem(threat: Pick<Threat, 'citations'>, facts: r
     // Comment facts are only ever gathered from this work item's own comments, and restricted ones are dropped before
     // they become facts (rest-gatherer). The facts passed here are this work item's own review's.
     if (f.sourceType === 'review' || f.sourceType === 'jira_comment') return true;
-    // A page Redline publishes under inherits that parent's view restrictions, so citing the parent itself is fine there.
+    // A page Threatline publishes under inherits that parent's view restrictions, so citing the parent itself is fine there.
     if (f.sourceType === 'confluence_page') return alsoPages.includes(PAGE.exec(f.sourceAri)?.[1] ?? '');
     return f.sourceType === 'jira_issue' && ISSUE.exec(f.sourceAri)?.[1] === issueId;
   });

@@ -11,7 +11,7 @@ app:
     confluence:
       required: false
 modules:
-  # Redline Engine: Redline runs reviews itself on Atlassian-hosted Claude models (billed to the app's developer).
+  # Threatline Engine: Threatline runs reviews itself on Atlassian-hosted Claude models (billed to the app's developer).
   llm:
     - key: redline-engine-llm
       model:
@@ -50,23 +50,23 @@ modules:
       resource: panel
       resolver:
         function: panelResolverFn
-      title: Redline security review
+      title: Threatline security review
       icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
   jira:adminPage:
     - key: redline-admin
       resource: panel
       resolver:
         function: panelResolverFn
-      title: Redline
+      title: Threatline
   jira:globalPage:
     - key: redline-posture
       resource: panel
       resolver:
         function: panelResolverFn
-      title: Redline security posture
+      title: Threatline security posture
   jira:dashboardGadget:
     - key: redline-posture-gadget
-      title: Redline security posture
+      title: Threatline security posture
       description: Open security requirements by severity, expiring risk acceptances, mean time to verify and reviews in flight, for the work items you can see.
       thumbnail: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
       resource: panel
@@ -74,8 +74,8 @@ modules:
         function: panelResolverFn
   jira:workflowValidator:
     - key: redline-gate
-      name: Redline security gate
-      description: Blocks the transition while Redline's verdict for the work item is block (open security requirements, or a missing, failed or out-of-date review).
+      name: Threatline security gate
+      description: Blocks the transition while Threatline's verdict for the work item is block (open security requirements, or a missing, failed or out-of-date review).
       function: validateTransitionFn
   jira:entityProperty:
     - key: redline-verdict-index
@@ -88,7 +88,7 @@ modules:
         - { path: riskScore, type: number, searchAlias: redlineRisk }
   action:
     - key: get-review-context
-      name: Get Redline review context
+      name: Get Threatline review context
       function: getReviewContextFn
       actionVerb: GET
       description: Returns the work item's security review context (design, linked work, pages, incidents) and the JSON output contract. Call this first when reviewing a work item.
@@ -99,7 +99,7 @@ modules:
           required: true
           description: The Jira work item key, for example PAY-7
     - key: submit-threat-model
-      name: Submit Redline threat model
+      name: Submit Threatline threat model
       function: submitThreatModelFn
       actionVerb: CREATE
       description: Saves the threat model JSON for a Jira work item as one agent run. Call this once with the complete JSON.
@@ -120,10 +120,10 @@ modules:
           required: true
           description: The complete threat model as a JSON string with "schema" set to "redline.threatmodel.v1"
     - key: get-merge-attestation
-      name: Get Redline merge attestation
+      name: Get Threatline merge attestation
       function: getMergeAttestationFn
       actionVerb: CREATE
-      description: Signs a merge attestation for a Jira work item, Bitbucket or GitHub repository and commit when Redline's verdict allows it, and returns the text to paste into the pull request description. If the work item is blocked, returns what blocks it instead.
+      description: Signs a merge attestation for a Jira work item, Bitbucket or GitHub repository and commit when Threatline's verdict allows it, and returns the text to paste into the pull request description. If the work item is blocked, returns what blocks it instead.
       inputs:
         issueKey:
           title: Issue key
@@ -141,10 +141,10 @@ modules:
           required: true
           description: The full 40-character hash of the pull request's head commit
     - key: get-review
-      name: Get Redline review
+      name: Get Threatline review
       function: getReviewFn
       actionVerb: GET
-      description: Returns Redline's latest security review of a Jira work item - the verdict and why, risk score, whether the context was partial, and the threats with short refs (T-1, T-2...) and quoted citations.
+      description: Returns Threatline's latest security review of a Jira work item - the verdict and why, risk score, whether the context was partial, and the threats with short refs (T-1, T-2...) and quoted citations.
       inputs:
         issueKey:
           title: Issue key
@@ -176,7 +176,7 @@ modules:
       name: Check change risk
       function: checkChangeRiskFn
       actionVerb: GET
-      description: Previews Redline's Bitbucket merge check for a change - whether the changed files are security-sensitive, which requirements they touch, and whether the merge would pass. Call this before opening a pull request.
+      description: Previews Threatline's Bitbucket merge check for a change - whether the changed files are security-sensitive, which requirements they touch, and whether the merge would pass. Call this before opening a pull request.
       inputs:
         issueKey:
           title: Issue key
@@ -197,13 +197,13 @@ modules:
       name: Request risk acceptance
       function: requestAcceptanceFn
       actionVerb: CREATE
-      description: Requests a time-boxed risk acceptance for one Redline security requirement. It is recorded in Redline's ledger and stays pending until a tech lead or security champion approves it in the Redline panel. It never takes effect on its own.
+      description: Requests a time-boxed risk acceptance for one Threatline security requirement. It is recorded in Threatline's ledger and stays pending until a tech lead or security champion approves it in the Threatline panel. It never takes effect on its own.
       inputs:
         requirementId:
           title: Requirement id
           type: string
           required: true
-          description: The Redline requirement id (req_...) from get-security-requirements
+          description: The Threatline requirement id (req_...) from get-security-requirements
         reason:
           title: Reason
           type: string
@@ -223,7 +223,7 @@ modules:
       name: Explain threat
       function: explainThreatFn
       actionVerb: GET
-      description: Explains one threat from a Redline review in plain language - how the attack works, how to fix it, and OWASP and CWE references.
+      description: Explains one threat from a Threatline review in plain language - how the attack works, how to fix it, and OWASP and CWE references.
       inputs:
         issueKey:
           title: Issue key
@@ -247,10 +247,10 @@ modules:
           required: true
           description: The Jira fix version name, for example 4.2
     - key: start-review
-      name: Start Redline review
+      name: Start Threatline review
       function: startReviewFn
       actionVerb: TRIGGER
-      description: Queues a fresh Redline security review of a Jira work item. The result appears in the Redline panel in a minute or two.
+      description: Queues a fresh Threatline security review of a Jira work item. The result appears in the Threatline panel in a minute or two.
       inputs:
         issueKey:
           title: Issue key
@@ -261,13 +261,13 @@ modules:
       name: Get security posture
       function: postureSummaryFn
       actionVerb: GET
-      description: Summarises security posture across Redline-enabled projects - open requirements by severity, the riskiest components, and the risk acceptances that expire in the next 31 days (soonest first).
+      description: Summarises security posture across Threatline-enabled projects - open requirements by severity, the riskiest components, and the risk acceptances that expire in the next 31 days (soonest first).
       inputs:
         project:
           title: Project key
           type: string
           required: false
-          description: Only this Jira project, for example PAY. Leave empty for all Redline-enabled projects.
+          description: Only this Jira project, for example PAY. Leave empty for all Threatline-enabled projects.
         team:
           title: Team or component
           type: string
@@ -284,7 +284,7 @@ modules:
           - get-merge-attestation
   rovo:mcp:
     - key: redline-mcp
-      name: Redline
+      name: Threatline
       tools:
         - get-review
         - get-security-requirements
@@ -295,7 +295,7 @@ modules:
         - posture-summary
   rovo:agent:
     - key: redline-reviewer
-      name: Redline
+      name: Threatline
       description: Security reviewer for Jira work items. Builds cited STRIDE threat models and explains what must be fixed before Done or merge.
       prompt: resource:agent-prompt;prompt.md
       conversationStarters:

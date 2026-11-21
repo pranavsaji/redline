@@ -210,7 +210,7 @@ export function restGatherer(d: RestGathererDeps): ContextGatherer {
             raw({
               sourceAri: `ari:redline:review/${last.id}`,
               sourceType: 'review',
-              title: `Earlier Redline review, revision ${last.revision}`,
+              title: `Earlier Threatline review, revision ${last.revision}`,
               url: browse(issue.key),
               text: `Revision ${last.revision} (${last.status}${last.partial ? ', partial context' : ''}): risk score ${last.riskScore} of 100, reviewed ${last.createdAt}.`,
               version: `${last.revision}-${last.status}-${last.riskScore}`,
@@ -233,7 +233,7 @@ export function restGatherer(d: RestGathererDeps): ContextGatherer {
         facts: normalized,
         partial: reasons.length > 0,
         partialReasons: reasons,
-        // M4: Redline's own review summary is context for the agent, not a source; it must not change the hash, or a
+        // M4: Threatline's own review summary is context for the agent, not a source; it must not change the hash, or a
         // redelivered "created" event would open a new revision that no Automation run fills.
         contextHash: contextHash([...normalized.filter((f) => f.sourceType !== 'review'), ...withheld]),
         gatheredAt: d.clock.now().toISOString(),

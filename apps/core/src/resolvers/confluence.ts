@@ -5,7 +5,7 @@ import { authorise, type Viewer } from './panel.js';
 
 /**
  * `confluence.publish` (RQ-5): needs edit permission on the work item and read access to the design page the threat
- * model goes under, so nobody uses Redline to write into a page tree they cannot see.
+ * model goes under, so nobody uses Threatline to write into a page tree they cannot see.
  */
 export async function confluencePublish(deps: CoreDeps, v: Viewer, _payload: unknown): Promise<{ pageId: string; url: string; created: boolean } | ApiError> {
   const auth = await authorise(deps, v, 'edit');

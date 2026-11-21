@@ -2,7 +2,7 @@ import { sql } from '@forge/sql';
 import type { SqlExecutor } from '@redline/db';
 import { appError, err, ok, type AppError, type Result } from '@redline/shared';
 
-/** The subset of `@forge/sql`'s client Redline uses. */
+/** The subset of `@forge/sql`'s client Threatline uses. */
 export interface ForgeSqlClient {
   prepare(query: string): { bindParams(...args: unknown[]): { execute(): Promise<{ rows: unknown }> } };
 }

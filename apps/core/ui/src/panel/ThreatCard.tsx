@@ -34,7 +34,7 @@ export function ThreatCard({
   explain: (t: Threat) => Promise<ThreatExplanation | null>;
   /** Extra controls inside the card (champion triage). */
   children?: ReactNode;
-  /** Titles of Redline's rule-based checks this threat covers (they are not listed separately). */
+  /** Titles of Threatline's rule-based checks this threat covers (they are not listed separately). */
   covers?: string[];
 }) {
   const [open, setOpen] = useState(false);
@@ -72,7 +72,7 @@ export function ThreatCard({
           )}
           {covers.length > 0 && (
             <span style={{ color: token('color.text.subtle'), font: token('font.body.small') }}>
-              Also covers Redline's rule-based {covers.length === 1 ? 'check' : 'checks'}: {covers.join('; ')}.
+              Also covers Threatline's rule-based {covers.length === 1 ? 'check' : 'checks'}: {covers.join('; ')}.
             </span>
           )}
           {threat.mappings.length > 0 && (

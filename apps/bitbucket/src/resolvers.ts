@@ -3,7 +3,7 @@ import { parseSettingsInput, REPO_UUID, type SettingsStore } from './settings-st
 
 export type ApiError = { error: 'forbidden' | 'validation' | 'unavailable'; message?: string };
 
-/** `settings.get`: the repository's Redline settings (defaults before the first save). */
+/** `settings.get`: the repository's Threatline settings (defaults before the first save). */
 export async function settingsGet(deps: { store: SettingsStore }, ctx: { repoUuid: string }): Promise<RepoSettings | ApiError> {
   if (!REPO_UUID.test(ctx.repoUuid)) return { error: 'validation', message: 'Unknown repository.' };
   try {
@@ -21,7 +21,7 @@ export async function settingsSave(
 ): Promise<RepoSettings | ApiError> {
   if (!REPO_UUID.test(ctx.repoUuid)) return { error: 'validation', message: 'Unknown repository.' };
   const admin = ctx.accountId ? await deps.isRepoAdmin(ctx.workspaceUuid, ctx.repoUuid).catch(() => false) : false;
-  if (!admin) return { error: 'forbidden', message: 'Only a repository admin can change Redline settings.' };
+  if (!admin) return { error: 'forbidden', message: 'Only a repository admin can change Threatline settings.' };
   const parsed = parseSettingsInput((payload ?? {}) as Record<string, unknown>);
   if (!parsed.ok) return { error: 'validation', message: parsed.error.message };
   let next: RepoSettings = parsed.value;

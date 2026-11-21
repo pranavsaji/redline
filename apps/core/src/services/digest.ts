@@ -16,7 +16,7 @@ const head = (cells: string[]) => `<tr>${cells.map((c) => `<th>${esc(c)}</th>`).
 
 /**
  * PR-4: on Mondays (UTC), post one Confluence page of the week's security posture under the configured parent.
- * Counts only, across every Redline-enabled project: the page can reach people who cannot see the work items, so it
+ * Counts only, across every Threatline-enabled project: the page can reach people who cannot see the work items, so it
  * never names a work item or a requirement.
  */
 export async function publishWeeklyDigest(deps: CoreDeps): Promise<Result<DigestOutcome>> {
@@ -46,7 +46,7 @@ export async function publishWeeklyDigest(deps: CoreDeps): Promise<Result<Digest
   const mttv = s.meanTimeToVerifyHours === null ? 'not enough data yet' : `${Math.round(s.meanTimeToVerifyHours)} hours`;
   const change = (now: number, then: number | undefined) => (then === undefined ? '' : ` (${now - then >= 0 ? '+' : ''}${now - then} since ${lastWeek!.day})`);
   const storage = [
-    `<p>Redline's weekly security posture for ${esc(policy.value.enabledProjects.join(', ') || 'no projects yet')}, as of ${esc(now.toISOString().slice(0, 16).replace('T', ' '))} UTC. Counts only; open the Redline posture page in Jira for the work items.</p>`,
+    `<p>Threatline's weekly security posture for ${esc(policy.value.enabledProjects.join(', ') || 'no projects yet')}, as of ${esc(now.toISOString().slice(0, 16).replace('T', ' '))} UTC. Counts only; open the Threatline posture page in Jira for the work items.</p>`,
     '<h2>Open security requirements</h2>',
     `<table><tbody>${head(['Severity', 'Open'])}${[...SEVERITIES].reverse().map((sev) => row([sev, s.openBySeverity[sev]])).join('')}</tbody></table>`,
     `<p>Critical${esc(change(s.openBySeverity.Critical, lastWeek?.openCritical))}; High${esc(change(s.openBySeverity.High, lastWeek?.openHigh))}.</p>`,
@@ -61,7 +61,7 @@ export async function publishWeeklyDigest(deps: CoreDeps): Promise<Result<Digest
   const space = await deps.confluence.spaceByKey(config.spaceKey);
   if (!space.ok) return space;
   const parentId = typeof config.parentPageId === 'string' && config.parentPageId ? config.parentPageId : (space.value.homepageId ?? undefined);
-  const title = `Redline security posture: week of ${monday}`;
+  const title = `Threatline security posture: week of ${monday}`;
   const existing = await deps.confluence.findPage(space.value.id, title);
   if (!existing.ok) return existing;
   if (existing.value) {

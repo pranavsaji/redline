@@ -5,12 +5,12 @@ import type { CoreDeps } from '../deps.js';
 import { authorise, type Viewer } from '../resolvers/panel.js';
 import { callerOf, ISSUE_KEY, type ActionPayload } from './common.js';
 
-/** Rovo's practical response ceiling is about 1 MB and Forge's 5 MB; Redline keeps every action answer under 256 KB. */
+/** Rovo's practical response ceiling is about 1 MB and Forge's 5 MB; Threatline keeps every action answer under 256 KB. */
 export const MAX_ACTION_BYTES = 256_000;
 
 export type ActionError = { error: 'invalid_input' | 'refused'; message: string } | { error: 'not_found' | 'unavailable' | 'rate_limited' };
 
-/** A service error as an action answer: Redline's own refusal messages are shown; anything internal is not. */
+/** A service error as an action answer: Threatline's own refusal messages are shown; anything internal is not. */
 export function actionError(e: AppError): ActionError {
   if (e.code === 'not_found') return { error: 'not_found' };
   if (e.code === 'budget') return { error: 'rate_limited' };
@@ -52,7 +52,7 @@ export const SCHEMAS = {
   }),
   checkChangeRisk: z.object({ issueKey, changedPaths: pathList, summary: trimmed(2000).optional() }),
   requestRiskAcceptance: z.object({
-    requirementId: z.string({ message: 'requirementId is required' }).trim().regex(/^req_[A-Za-z0-9_]{1,64}$/, 'requirementId must be a Redline requirement id such as req_1a2b3c'),
+    requirementId: z.string({ message: 'requirementId is required' }).trim().regex(/^req_[A-Za-z0-9_]{1,64}$/, 'requirementId must be a Threatline requirement id such as req_1a2b3c'),
     reason: z.string({ message: 'reason is required' }).trim().min(1, 'reason is required').max(2000),
     controls: trimmed(2000).default(''),
     expiryDays: z.coerce.number({ message: 'expiryDays must be a whole number of days' }).int('expiryDays must be a whole number of days').min(1, 'expiryDays must be at least 1').max(365, 'expiryDays is at most 365'),
@@ -114,7 +114,7 @@ export async function callerOnIssue(
   return { ok: true, viewer, issue: auth.issue };
 }
 
-/** A link to the work item; the Redline panel is on it. */
+/** A link to the work item; the Threatline panel is on it. */
 export const issueUrl = async (deps: CoreDeps, key: string) => `${(await deps.siteUrl()).replace(/\/+$/, '')}/browse/${key}`;
 
 /**

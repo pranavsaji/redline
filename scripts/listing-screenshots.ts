@@ -36,19 +36,19 @@ const token = encodeAttestation(
   key,
 );
 const tampered = token.slice(0, 40) + (token[40] === 'A' ? 'B' : 'A') + token.slice(41);
-const KEYS = 'form[aria-label="Redline settings"] textarea';
+const KEYS = 'form[aria-label="Threatline settings"] textarea';
 const PASTE = 'form[aria-label="Test an attestation"] textarea';
 
 const SHOTS = [
-  // Redline for Jira (Core, with Confluence)
+  // Threatline for Jira (Core, with Confluence)
   { file: 'jira-1-issue-panel.png', url: `${CORE}?state=ready`, theme: 'light', width: 760, maxHeight: 1100 },
   { file: 'jira-2-threat-evidence.png', url: `${CORE}?state=ready`, theme: 'dark', width: 760, maxHeight: 1100, steps: [{ click: 'Details' }, { click: 'Explain like I’m new to security' }] },
   { file: 'jira-3-accept-risk.png', url: `${CORE}?state=ready`, theme: 'light', width: 760, maxHeight: 1200, steps: [{ click: 'Requirements (2)' }, { click: 'Accept risk' }] },
   { file: 'jira-4-posture-dashboard.png', url: `${CORE}?view=posture`, theme: 'light', width: 1280, maxHeight: 900 },
   { file: 'jira-5-admin-policy.png', url: `${CORE}?view=admin`, theme: 'dark', width: 1280, maxHeight: 1300 },
-  // Redline for Bitbucket
+  // Threatline for Bitbucket
   { file: 'bitbucket-1-repo-settings.png', url: BB, theme: 'light', width: 1280, maxHeight: 900 },
-  { file: 'bitbucket-2-attestation-valid.png', url: BB, theme: 'light', width: 1280, maxHeight: 1100, steps: [{ fill: [KEYS, key.publicKey] }, { fill: [PASTE, `Redline attestation for PAY-6:\n${token}`] }, { click: 'Test' }] },
+  { file: 'bitbucket-2-attestation-valid.png', url: BB, theme: 'light', width: 1280, maxHeight: 1100, steps: [{ fill: [KEYS, key.publicKey] }, { fill: [PASTE, `Threatline attestation for PAY-6:\n${token}`] }, { click: 'Test' }] },
   { file: 'bitbucket-3-attestation-tampered.png', url: BB, theme: 'dark', width: 1280, maxHeight: 1100, steps: [{ fill: [KEYS, key.publicKey] }, { fill: [PASTE, tampered] }, { click: 'Test' }] },
   {
     file: 'bitbucket-4-jira-attestation.png',

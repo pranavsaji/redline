@@ -53,7 +53,7 @@ const withReview = (o: Partial<NonNullable<PanelDto['review']>>, rest: Partial<P
 
 export const FIXTURES: Record<string, PanelDto> = {
   ready: base,
-  not_reviewed: { ...base, review: null, verdict: { ...base.verdict!, reasons: [{ code: 'no_review', message: 'Redline has not reviewed this work item yet.' }] }, threats: [], threatsTotal: 0, discarded: [], facts: [], requirements: [], history: [], samples: { received: 0, expected: 0 } },
+  not_reviewed: { ...base, review: null, verdict: { ...base.verdict!, reasons: [{ code: 'no_review', message: 'Threatline has not reviewed this work item yet.' }] }, threats: [], threatsTotal: 0, discarded: [], facts: [], requirements: [], history: [], samples: { received: 0, expected: 0 } },
   in_progress: withReview({ status: 'awaiting_agent', samplesReceived: 1, riskScore: 40 }, { samples: { received: 1, expected: 3 }, verdict: { ...base.verdict!, reasons: [{ code: 'agent_missing', message: 'Review in progress (1 of 3 agent runs received).' }] } }),
   partial: withReview({ partial: true }),
   failed: withReview({ status: 'failed', failureReason: 'context_unavailable' }, { verdict: { ...base.verdict!, reasons: [{ code: 'review_failed', message: 'The security review failed.', action: { label: 'Re-run review', href: '?rerun=1' } }] } }),
