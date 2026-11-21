@@ -147,6 +147,26 @@ describe('Admin: ledger (RL-4, RL-7)', () => {
     expect(await within(section).findByText(/broken at entry 3: an entry was changed after it was written/)).toBeTruthy();
   });
 
+  it('bug 6: reports a ledger that no longer matches its signed tree heads (truncated or rewritten)', async () => {
+    const verifyLedger = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, length: 12, treeHeads: 3 })
+      .mockResolvedValueOnce({ ok: false, reason: 'truncated', firstBrokenSeq: 11, treeSize: 14 })
+      .mockResolvedValueOnce({ ok: false, reason: 'tree_head_mismatch', firstBrokenSeq: 7, treeSize: 10 })
+      .mockResolvedValueOnce({ ok: false, reason: 'tree_head_signature', firstBrokenSeq: 1, treeSize: 10 });
+    render(<AdminPage api={{ ...mockAdminApi(), verifyLedger }} />);
+    const section = await screen.findByRole('region', { name: 'Risk ledger' });
+    const verify = () => userEvent.click(within(section).getByRole('button', { name: 'Verify the ledger' }));
+    await verify();
+    expect(await within(section).findByText('The ledger is intact: 12 entries, matching 3 signed tree heads.')).toBeTruthy();
+    await verify();
+    expect(await within(section).findByText('The ledger is shorter than its signed tree head of 14 entries: entries from 11 on were removed.')).toBeTruthy();
+    await verify();
+    expect(await within(section).findByText(/does not match its signed tree head of 10 entries: an entry from 7 to 10 was changed/)).toBeTruthy();
+    await verify();
+    expect(await within(section).findByText(/signed tree head of 10 entries has an invalid signature/)).toBeTruthy();
+  });
+
   it('exports an evidence pack for a project and date range', async () => {
     const exportLedger = vi.fn(async () => ({ csv: 'seq\n1\n', json: '{"entries":[{}]}' }));
     render(<AdminPage api={{ ...mockAdminApi(), exportLedger }} />);

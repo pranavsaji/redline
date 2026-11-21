@@ -104,3 +104,27 @@ export function verifyLedgerProof(p: LedgerProof): ProofVerdict {
   }
   return { ok: true, treeSize: p.treeHead.treeSize, seq: e.seq };
 }
+
+export type TreeHeadCheck =
+  | { ok: true; checked: number }
+  | { ok: false; reason: 'truncated' | 'tree_head_mismatch' | 'tree_head_signature'; firstBrokenSeq: number; treeSize: number };
+
+/**
+ * The ledger against its stored signed tree heads. The hash chain alone cannot see the newest entries dropped, nor an
+ * entry changed with every later hash recomputed; a signed head can: its size must not exceed the ledger and its root
+ * must equal the root of the ledger's first `treeSize` entries. Heads are checked smallest first, so a mismatch names the
+ * first entry after the last head that still matches. A head whose key is still published must also verify, or a
+ * rewritten stored root could hide a rewritten ledger (heads from retired keys are checked on size and root only).
+ */
+export function checkTreeHeads(rows: readonly Pick<LedgerRow, 'seq' | 'entryHash'>[], heads: readonly TreeHead[], publicKeys: Record<string, string>): TreeHeadCheck {
+  const leaves = ledgerLeafHashes(rows);
+  let good = 0;
+  for (const h of [...heads].sort((a, b) => a.treeSize - b.treeSize)) {
+    const key = publicKeys[h.kid];
+    if (key && !verifyTreeHead(h, key)) return { ok: false, reason: 'tree_head_signature', firstBrokenSeq: good + 1, treeSize: h.treeSize };
+    if (h.treeSize > leaves.length) return { ok: false, reason: 'truncated', firstBrokenSeq: leaves.length + 1, treeSize: h.treeSize };
+    if (merkleRoot(leaves.slice(0, h.treeSize)) !== h.rootHash) return { ok: false, reason: 'tree_head_mismatch', firstBrokenSeq: good + 1, treeSize: h.treeSize };
+    good = h.treeSize;
+  }
+  return { ok: true, checked: heads.length };
+}

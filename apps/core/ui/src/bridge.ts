@@ -24,7 +24,10 @@ export interface PublicKeyInfo {
   active: { kid: string; publicKey: string };
   previous?: { kid: string; publicKey: string; retireAt: string };
 }
-export type ChainVerdict = { ok: true; length: number } | { ok: false; firstBrokenSeq: number; reason: 'prev_mismatch' | 'hash_mismatch' | 'seq_gap' };
+export type ChainVerdict =
+  | { ok: true; length: number; treeHeads?: number }
+  | { ok: false; firstBrokenSeq: number; reason: 'prev_mismatch' | 'hash_mismatch' | 'seq_gap' }
+  | { ok: false; firstBrokenSeq: number; treeSize: number; reason: 'truncated' | 'tree_head_mismatch' | 'tree_head_signature' };
 
 export type TriageInput =
   | { threatId: string; op: 'accept' }
