@@ -21,8 +21,11 @@ export interface BitbucketClient {
   diffstat(workspace: string, repo: string, id: number): Promise<Result<DiffstatEntry[]>>;
   /** File text at a commit; null when the file does not exist there. */
   fileAt(workspace: string, repo: string, commit: string, path: string): Promise<Result<string | null>>;
-  /** The full 40-character hash of a commit Bitbucket reports abbreviated (its pull request API gives 12 characters). */
-  commitHash(workspace: string, repo: string, hash: string): Promise<Result<string>>;
+  /**
+   * The full 40-character hash of the pull request's head, which its API reports as 12 characters: the newest entry of
+   * the pull request's commit list, checked against that short hash. Works for pull requests from forks.
+   */
+  headCommit(workspace: string, repo: string, id: number, shortHash: string): Promise<Result<string>>;
   /** The pull request's unified diff (text, capped), so added lines can be scanned for secrets. Optional. */
   diff?(workspace: string, repo: string, id: number): Promise<Result<string>>;
 }
@@ -85,6 +88,7 @@ export function bitbucketClient(request: BitbucketRequest): BitbucketClient {
         if (body.next === undefined || body.next === null || body.next === '') return ok(out);
         const next = typeof body.next === 'string' ? sameApi(body.next) : null;
         if (!next) return err(appError('upstream', 'diffstat: unexpected next link'));
+        if (page === MAX_PAGES - 1) break;
         res = await request(next);
       }
       // More files than we page through: report what we have plus a marker so the check treats it as sensitive.
@@ -108,13 +112,16 @@ export function bitbucketClient(request: BitbucketRequest): BitbucketClient {
       if (r.status === 404) return ok(null);
       return r.ok ? ok(await r.text()) : fail('file', r.status);
     },
-    async commitHash(ws, repo, hash) {
-      if (!COMMIT.test(hash)) return err(appError('validation', 'commit: not a commit hash'));
-      const r = await request(`${repoPath(ws, repo)}/commit/${hash}`);
-      if (!r.ok) return fail('commit', r.status);
-      const full = ((await r.json()) as { hash?: unknown })?.hash;
-      // The commit Bitbucket returns must be the one asked for, in full.
-      return typeof full === 'string' && FULL_SHA.test(full) && full.startsWith(hash.toLowerCase()) ? ok(full) : err(appError('upstream', 'commit: no full hash'));
+    async headCommit(ws, repo, id, shortHash) {
+      if (!COMMIT.test(shortHash)) return err(appError('validation', 'head commit: not a commit hash'));
+      // The pull request's own commit list (newest first), not a lookup by prefix in this repository: a fork's source
+      // commit lives in the fork, and a prefix lookup here could fail or find a different commit with the same prefix.
+      const r = await request(`${prPath(ws, repo, id)}/commits?pagelen=1`);
+      if (!r.ok) return fail('head commit', r.status);
+      const values = ((await r.json()) as { values?: unknown })?.values;
+      const full = Array.isArray(values) ? (values[0] as { hash?: unknown } | undefined)?.hash : undefined;
+      // The newest commit must be the head the pull request reports, in full.
+      return typeof full === 'string' && FULL_SHA.test(full) && full.startsWith(shortHash.toLowerCase()) ? ok(full) : err(appError('upstream', 'head commit: does not match the pull request head'));
     },
   };
 }

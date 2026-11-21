@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { encodeAttestation, generateKeyPair, type KeyPair } from '@threatline/crypto';
 import type { AttestationPayload } from '@threatline/shared';
+import type { DiffFile } from '@threatline/core';
 import { evaluateMergeCheck, runMergeCheck, type RepoSettings } from '../src/merge-check.js';
 import type { BitbucketClient } from '../src/bitbucket-client.js';
 import { kvsSettingsStore } from '../src/settings-store.js';
@@ -38,7 +39,7 @@ const AUTH = [{ path: 'src/auth/webhook.ts', status: 'modified' as const, linesA
 const DOCS = [{ path: 'README.md', status: 'modified' as const, linesAdded: 2 }];
 // The gate compares full 40-character hashes; runMergeCheck resolves Bitbucket's 12-character ones first (bug 7).
 const pr = (description: string, headSha = HEAD) => ({ description, headSha, repoFullName: REPO, destSha: 'd'.repeat(12), title: 'PAY-7 Verify refund webhook signatures', branch: 'feature/PAY-7-webhook-hmac' });
-const run = (description: string, o: { files?: typeof AUTH; yaml?: string | null; s?: RepoSettings; head?: string } = {}) =>
+const run = (description: string, o: { files?: DiffFile[]; yaml?: string | null; s?: RepoSettings; head?: string } = {}) =>
   evaluateMergeCheck({ pr: pr(description, o.head), files: o.files ?? AUTH, repoPolicyYaml: o.yaml ?? null, settings: o.s ?? settings(), nowSec: NOW });
 
 describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
@@ -231,7 +232,7 @@ describe('runMergeCheck: reads the PR, its diffstat, the destination policy and 
       diffstat: async (_ws, _repo, id) => (calls.push(`diff:${id}`), o.fail === 'diff' ? { ok: false, error: { code: 'upstream', message: '500' } } : { ok: true, value: JSON.parse(o.diff ?? fixture('diffstat/auth-change.json')).values }),
       fileAt: async (_ws, _repo, commit, path) => (calls.push(`file:${commit}:${path}`), { ok: true, value: o.policy ?? null }),
       diff: async (_ws, _repo, id) => (calls.push(`patch:${id}`), o.patch === null ? { ok: false, error: { code: 'upstream', message: '500' } } : { ok: true, value: o.patch ?? '' }),
-      commitHash: async (_ws, _repo, hash) => (calls.push(`commit:${hash}`), o.fail === 'commit' ? { ok: false, error: { code: 'upstream', message: '500' } } : { ok: true, value: o.fullHead ?? 'b'.repeat(40) }),
+      headCommit: async (_ws, _repo, id, hash) => (calls.push(`head:${id}:${hash}`), o.fail === 'commit' ? { ok: false, error: { code: 'upstream', message: '500' } } : { ok: true, value: o.fullHead ?? 'b'.repeat(40) }),
     };
     return { c, calls };
   }
@@ -250,7 +251,7 @@ describe('runMergeCheck: reads the PR, its diffstat, the destination policy and 
     const t = token({ commitSha: 'b'.repeat(40) });
     const { c, calls } = client({ description: t });
     expect(await runMergeCheck(event, { client: c, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: true });
-    expect(calls).toContain('commit:bbbbbbbbbbbb');
+    expect(calls).toContain('head:7:bbbbbbbbbbbb');
     // The short hash resolves to a different commit than the attestation names (same 12-character prefix).
     const { c: other } = client({ description: t, fullHead: `${'b'.repeat(12)}${'e'.repeat(28)}` });
     expect(await runMergeCheck(event, { client: other, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: false, message: expect.stringMatching(/attestation is for commit/) });
