@@ -4,7 +4,8 @@ Copy the sections below into the Devpost form. The demo script is for a video of
 
 ## Tagline
 
-Security review that actually gates Done and merge: cited threat models, verified by AI, enforced by code.
+Security review that gates Done and merge: AI threat models with cited evidence, enforced by code the AI cannot talk
+past.
 
 ## Inspiration
 
@@ -16,22 +17,27 @@ finishes: the Done transition and the merge.
 
 ## What it does
 
-- **Threatline Engine reviews every story by itself.** On Atlassian-hosted Claude models (Forge LLMs): three
-  independent analyses of the work item and its linked pages on the strongest model, which must agree and quote their
-  evidence word for word, then an adversarial verifier that checks each threat against the quotes it rests on. No setup, no Rovo agent
-  or Automation rule needed, and no developer can write their own review.
-- **Every threat is cited.** Threatline keeps only threats a majority of analyses raised and whose quotes are found word
-  for word in the work item, its pages or incidents. A rule-based floor always runs underneath.
-- **Injection-resistant by construction.** Text that tries to instruct the AI is flagged and shown; threats resting on
-  it wait for a security champion; the verifier never runs on flagged material; the model never decides the verdict.
-- **Requirements with evidence.** Each threat at or above policy becomes a Given/When/Then requirement and a sub-task,
-  with fix-by dates and a copyable test skeleton.
-- **Gates that fail closed.** A workflow validator blocks Done; signed Ed25519 attestations let the Bitbucket merge
-  check (or the Threatline GitHub Action) pass a sensitive pull request only for its exact head commit.
-- **Risk acceptance with teeth, and an audit trail anyone can verify.** Reason, controls, expiry and the right approver;
-  every decision goes into a hash-chained, Merkle-logged ledger with offline inclusion proofs.
-- **Everywhere people work.** Issue panel, admin page, posture dashboard and gadget, Confluence threat-model pages,
-  the Rovo agent, and MCP tools so coding agents (Claude Code, Cursor) see the same requirements.
+Threatline makes security review part of "Done". One story shows all of it:
+
+1. **Create a story.** Threatline Engine reviews it by itself on Atlassian-hosted Claude models (Forge LLMs): three
+   independent analyses that must agree and quote their evidence word for word, then an adversarial verifier. No
+   setup, no Rovo agent, no Automation rule, and no developer can write their own review.
+2. **Read the threats in plain language**, each with the sentence it rests on, its STRIDE category, ASVS 5 and CWE, and
+   a Given/When/Then requirement with a fix-by date and a copyable test skeleton.
+3. **Try to move it to Done: blocked.** The workflow validator lists the open requirements. Missing, failed or
+   out-of-date reviews block too, with a one-click re-run. The gate fails closed.
+4. **Fix or accept.** Verify a requirement with a PR link, or accept the risk with a reason, controls, an expiry and an
+   approver who is not you. Done passes.
+5. **Merge.** A signed Ed25519 attestation lets the Bitbucket merge check (or the Threatline GitHub Action) pass the
+   sensitive pull request for its exact head commit. Change one character and it fails.
+
+**The AI cannot be talked into approving.** Text that tries to instruct the model is flagged, the threats resting on it
+wait for a security champion, the verifier never runs on flagged material, and code, not the model, computes the
+verdict. Measured on our eval: 6 of 6 poisoned cases held, high-severity recall 91.9%.
+
+**Also:** a hash-chained, Merkle-logged risk ledger with offline inclusion proofs; MCP tools and a Rovo agent so coding
+agents (Claude Code, Cursor) see the same requirements; a posture dashboard and gadget; Confluence threat-model pages;
+break-glass overrides with written reasons; warn-only mode that expires after 14 days.
 
 ## How we built it
 
