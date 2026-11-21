@@ -1,5 +1,5 @@
 import { DEFAULT_REPO_SETTINGS, WARN_ONLY_MAX_DAYS, type RepoSettings } from './merge-check.js';
-import { parseSettingsInput, REPO_UUID, type SettingsStore } from './settings-store.js';
+import { CorruptSettingsError, parseSettingsInput, REPO_UUID, type SettingsStore } from './settings-store.js';
 
 export type ApiError = { error: 'forbidden' | 'validation' | 'unavailable'; message?: string };
 
@@ -16,8 +16,10 @@ export async function settingsGet(deps: { store: SettingsStore; now?: () => Date
   let s: RepoSettings;
   try {
     s = (await deps.store.get(ctx.repoUuid)) ?? { ...DEFAULT_REPO_SETTINGS };
-  } catch {
-    return { error: 'unavailable' };
+  } catch (e) {
+    // Corrupt: show the defaults so an admin can save fresh settings (the merge check fails closed until then).
+    if (!(e instanceof CorruptSettingsError)) return { error: 'unavailable' };
+    s = { ...DEFAULT_REPO_SETTINGS };
   }
   const now = (deps.now ?? (() => new Date()))().getTime();
   if (s.mode !== 'warn' || (s.warnUntil && Date.parse(s.warnUntil) > now)) return s;
@@ -41,7 +43,10 @@ export async function settingsSave(
     // Warn mode lasts at most 14 days from when it was switched on; saving other settings keeps the same end.
     if (next.mode === 'warn') {
       const now = (deps.now ?? (() => new Date()))();
-      const prev = await deps.store.get(ctx.repoUuid);
+      const prev = await deps.store.get(ctx.repoUuid).catch((e: unknown) => {
+        if (e instanceof CorruptSettingsError) return null; // overwritten by this save
+        throw e;
+      });
       const running = prev?.mode === 'warn' && prev.warnUntil && Date.parse(prev.warnUntil) > now.getTime() ? prev.warnUntil : null;
       next = { ...next, warnUntil: running ?? new Date(now.getTime() + WARN_ONLY_MAX_DAYS * 86_400_000).toISOString() };
     }

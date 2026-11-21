@@ -4,6 +4,7 @@ import { encodeAttestation, generateKeyPair, type KeyPair } from '@threatline/cr
 import type { AttestationPayload } from '@threatline/shared';
 import { evaluateMergeCheck, runMergeCheck, type RepoSettings } from '../src/merge-check.js';
 import type { BitbucketClient } from '../src/bitbucket-client.js';
+import { kvsSettingsStore } from '../src/settings-store.js';
 
 const fixture = (p: string) => readFileSync(new URL(`./fixtures/${p}`, import.meta.url), 'utf8');
 const HEAD = 'b'.repeat(40);
@@ -275,6 +276,20 @@ describe('runMergeCheck: reads the PR, its diffstat, the destination policy and 
     const { c } = client({ description: '', fail: 'diff' });
     const ended = settings({ mode: 'warn', warnUntil: new Date((NOW - 60) * 1000).toISOString() });
     expect((await runMergeCheck(event, { client: c, settings: async () => ended, nowSec: () => NOW })).success).toBe(false);
+  });
+
+  it('bug 3: settings that cannot be read (storage down, or a stored value that no longer parses) fail closed', async () => {
+    const billing = JSON.stringify({ values: [{ status: 'modified', lines_added: 3, old: { path: 'billing/invoice.ts' }, new: { path: 'billing/invoice.ts' } }] });
+    const { c } = client({ description: '', diff: billing });
+    // With the admin's settings, billing/** is sensitive; with no settings ever saved, it is not.
+    expect(await runMergeCheck(event, { client: c, settings: async () => settings({ sensitivePaths: ['billing/**'] }), nowSec: () => NOW })).toMatchObject({ success: false });
+    expect(await runMergeCheck(event, { client: c, settings: async () => null, nowSec: () => NOW })).toMatchObject({ success: true });
+    const kv = new Map<string, unknown>([['settings:0b1c2d3e-0000-4000-8000-000000000001', { mode: 'sideways' }]]);
+    const corrupt = kvsSettingsStore({ get: async (k) => kv.get(k) as never, set: async () => undefined });
+    for (const read of [async () => Promise.reject(new Error('kvs down')), (uuid: string) => corrupt.get(uuid)]) {
+      const r = await runMergeCheck({ ...event, repository: { uuid: '{0b1c2d3e-0000-4000-8000-000000000001}' } }, { client: c, settings: read, nowSec: () => NOW });
+      expect(r).toEqual({ success: false, message: "Threatline: could not read this repository's Threatline settings, so this pull request cannot be checked. Re-run the check in a minute." });
+    }
   });
 
   it('a repository with no settings yet uses the defaults: block mode and the built-in sensitive paths', async () => {

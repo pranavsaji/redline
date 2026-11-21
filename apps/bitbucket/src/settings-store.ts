@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { fromB64url, kidOf } from '@threatline/crypto';
 import { appError, err, ok, type Result } from '@threatline/shared';
-import { DEFAULT_REPO_SETTINGS, type RepoSettings } from './merge-check.js';
+import type { RepoSettings } from './merge-check.js';
 
 export interface SettingsKvs {
   get<T>(key: string): Promise<T | undefined>;
@@ -44,7 +44,18 @@ export function parseSettingsInput(input: { publicKeys?: unknown; sensitivePaths
   return ok(s.data);
 }
 
-/** Per-repository settings in Forge KVS (`settings:<repoUuid>`). A stored value that no longer parses reads as defaults. */
+/** A stored settings value that no longer parses: the merge check fails closed; the settings page offers defaults to re-save. */
+export class CorruptSettingsError extends Error {
+  constructor() {
+    super('the stored Threatline settings for this repository do not parse');
+  }
+}
+
+/**
+ * Per-repository settings in Forge KVS (`settings:<repoUuid>`). null means none were ever saved (the defaults apply). A
+ * read that fails throws, and a stored value that no longer parses throws CorruptSettingsError: neither may quietly become
+ * the defaults, which would drop the admin's sensitive paths and keys.
+ */
 export function kvsSettingsStore(kv: SettingsKvs): SettingsStore {
   // Forge KVS keys allow only [a-zA-Z0-9:._ #-], so the UUID's braces are dropped.
   const key = (uuid: string) => `settings:${uuid.toLowerCase().replace(/[{}]/g, '')}`;
@@ -54,7 +65,8 @@ export function kvsSettingsStore(kv: SettingsKvs): SettingsStore {
       const raw = await kv.get<unknown>(key(uuid));
       if (raw === undefined) return null;
       const s = Stored.safeParse(raw);
-      return s.success ? s.data : { ...DEFAULT_REPO_SETTINGS };
+      if (!s.success) throw new CorruptSettingsError();
+      return s.data;
     },
     async set(uuid, s) {
       if (!REPO_UUID.test(uuid)) throw new Error('invalid repository id');

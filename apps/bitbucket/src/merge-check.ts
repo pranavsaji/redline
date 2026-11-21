@@ -27,7 +27,14 @@ export async function runMergeCheck(
   event: PRCheckEvent,
   deps: { client: BitbucketClient; settings: (repoUuid: string) => Promise<RepoSettings | null>; nowSec: () => number },
 ): Promise<{ success: boolean; message: string }> {
-  const settings = (await deps.settings(event.repository.uuid).catch(() => null)) ?? DEFAULT_REPO_SETTINGS;
+  // null: no settings were ever saved, so the defaults apply. A failed or corrupt read fails closed instead: the defaults
+  // would drop the admin's sensitive paths and pass a change that touches them.
+  const read = await deps.settings(event.repository.uuid).then(
+    (s) => ({ ok: true as const, s }),
+    () => ({ ok: false as const }),
+  );
+  if (!read.ok) return { success: false, message: "Threatline: could not read this repository's Threatline settings, so this pull request cannot be checked. Re-run the check in a minute." };
+  const settings = read.s ?? DEFAULT_REPO_SETTINGS;
   const warnActive = settings.mode === 'warn' && !!settings.warnUntil && Date.parse(settings.warnUntil) / 1000 > deps.nowSec();
   const unreadable = (why: string) => {
     const message = `Threatline: could not read this pull request from Bitbucket (${why}), so it cannot be checked. Re-run the check in a minute.`;

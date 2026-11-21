@@ -53,6 +53,22 @@ describe('settings resolvers', () => {
     expect(await kvsSettingsStore(kv).get(REPO.toUpperCase())).toMatchObject({ mode: 'block' });
   });
 
+  it('bug 3: a stored value that no longer parses is an error for the merge check, but the page still loads defaults to re-save', async () => {
+    const kv = memory();
+    const store = kvsSettingsStore(kv);
+    await store.set(REPO, { publicKeys: {}, sensitivePaths: ['billing/**'], mode: 'block', diffScoreThreshold: 40 });
+    const [k] = [...kv.data.keys()];
+    kv.data.set(k!, { ...(kv.data.get(k!) as object), mode: 'sideways' });
+    await expect(store.get(REPO)).rejects.toThrow(/stored Threatline settings/);
+    expect(await settingsGet({ store }, { repoUuid: REPO })).toEqual({ publicKeys: {}, sensitivePaths: [], mode: 'block', diffScoreThreshold: 40 });
+    // Saving fresh settings over the corrupt value works (warn mode reads the previous value first).
+    expect(await settingsSave({ store, isRepoAdmin: async () => true }, { accountId: 'acc', workspaceUuid: REPO, repoUuid: REPO }, { ...input, mode: 'warn' })).toMatchObject({ mode: 'warn' });
+    expect(await store.get(REPO)).toMatchObject({ mode: 'warn', sensitivePaths: ['billing/**'] });
+    // Storage that is down is "unavailable" on the page, not defaults.
+    const down = kvsSettingsStore({ get: async () => Promise.reject(new Error('down')), set: async () => undefined });
+    expect(await settingsGet({ store: down }, { repoUuid: REPO })).toEqual({ error: 'unavailable' });
+  });
+
   it('a malformed repository id is refused', async () => {
     const store = kvsSettingsStore(memory());
     expect(await settingsSave({ store, isRepoAdmin: async () => true }, { accountId: 'acc', workspaceUuid: REPO, repoUuid: 'x/../y' }, input)).toMatchObject({ error: 'validation' });
