@@ -3,8 +3,9 @@ import Lozenge from '@atlaskit/lozenge';
 import { token } from '@atlaskit/tokens';
 import { errorText, isError, type AdminApi, type SetupStatus } from '../bridge.js';
 import type { ApiError } from '../types.js';
+import { AddGate } from './AddGate.js';
 
-type Item = { done: boolean | null; text: string };
+type Item = { done: boolean | null; text: string; gate?: boolean };
 
 const itemsOf = (s: SetupStatus, mode: 'engine' | 'agent' | 'rules_only', authors: number): Item[] => {
   const rulesOnly = mode === 'rules_only';
@@ -26,6 +27,7 @@ const itemsOf = (s: SetupStatus, mode: 'engine' | 'agent' | 'rules_only', author
         s.validatorSeenOn.length > 0
           ? `Done gate seen on ${s.validatorSeenOn.join(', ')}`
           : 'Done gate not seen yet: add "Threatline security gate" to the Done transition',
+      gate: s.validatorSeenOn.length === 0,
     },
     engine
       ? { done: true, text: 'Threatline Engine runs every review itself: no Rovo agent or Automation rule needed' }
@@ -88,7 +90,7 @@ export function SetupChecklist({
       {status && (
         <ul aria-label="Setup checklist" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
           {itemsOf(status, reviewMode, reviewAuthors).map((item) => (
-            <li key={item.text} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <li key={item.text} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ flexShrink: 0 }}>
                 {item.done === null ? (
                   <Lozenge>Info</Lozenge>
@@ -97,6 +99,7 @@ export function SetupChecklist({
                 )}
               </span>
               <span>{item.text}</span>
+              {item.gate && <AddGate api={api} />}
             </li>
           ))}
         </ul>

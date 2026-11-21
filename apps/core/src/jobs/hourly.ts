@@ -56,7 +56,7 @@ async function failRateAlert(deps: CoreDeps): Promise<void> {
   const sent = await opsAlert(
     deps,
     alertKey,
-    `Threatline: ${bad} of ${total} security reviews in the last hour failed or timed out. Work items stay blocked until they are re-run. Check the site's Rovo credits and the Threatline admin page.` +
+    `Threatline: ${bad} of ${total} security reviews in the last hour failed or timed out. Work items stay blocked until they are re-run. Check the Threatline admin page (Recent runs, Budgets) and, in Rovo agent mode, the site's Rovo credits.` +
       (silent > 0 && engine
         ? ` ${silent} of them got no Threatline Engine run at all: Forge LLMs did not answer. Check the app's Forge logs (llm.failed) and the developer console usage; until it recovers, choose Threatline admin → Review mode → Rule-based checks only.`
         : silent > 0

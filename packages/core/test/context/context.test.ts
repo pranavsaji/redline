@@ -149,6 +149,13 @@ describe('extractSignals', () => {
     }
     expect(s.evidence.llmFeatures?.quote).toMatch(/LLM/);
   });
+  it('an "agent" who is a person is not an AI feature; an AI agent still is, even later in the same text', () => {
+    const one = (excerpt: string) => extractSignals([normalizeFact({ ...rawFacts[0]!, title: 'Export', text: excerpt })]).llmFeatures;
+    expect(one('Support agents also use it to export for customers over the phone.')).toBe(false);
+    expect(one('Ask a sales agent or a call center agent.')).toBe(false);
+    expect(one('The triage agent reads every email.')).toBe(true);
+    expect(one('Support agents review what the AI coding agent proposes.')).toBe(true);
+  });
   it('an empty bundle yields internal exposure and no signals', () => {
     const s = extractSignals([]);
     expect(s).toMatchObject({ dataClasses: [], exposure: 'internal', llmFeatures: false, fileUpload: false, auth: false, payment: false, thirdParty: [] });

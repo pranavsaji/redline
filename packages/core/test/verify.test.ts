@@ -33,6 +33,12 @@ describe('engineVerify (Threatline Engine stage 4)', () => {
     expect(usage.tokensIn).toBeGreaterThan(0);
   });
 
+  it("names the threat a reason refers to (\"repeats T1\") instead of the verifier's own id", async () => {
+    const llm = new FakeLlm({ verify: [JSON.stringify({ verdicts: [{ id: 'T1', keep: true, reason: 'ok' }, { id: 'T2', keep: false, reason: 'Repeats T1; see also T9' }] })] });
+    const r = await engineVerify({ llm, policy: DEFAULT_SITE_POLICY }, [refund, generic], { tokensIn: 0, tokensOut: 0, modelIds: new Set<string>() }, 'n');
+    expect(r.ok && r.value[1]!.reason).toBe('Repeats “Refund abuse”; see also T9');
+  });
+
   it('a reply that misses an id fails (so nothing is changed on a partial answer)', async () => {
     const llm = new FakeLlm({ verify: () => JSON.stringify({ verdicts: [{ id: 'T1', keep: true, reason: 'ok' }] }) });
     const r = await engineVerify({ llm, policy: DEFAULT_SITE_POLICY }, [refund, generic], { tokensIn: 0, tokensOut: 0, modelIds: new Set() }, 'n');

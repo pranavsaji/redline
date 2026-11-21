@@ -31,7 +31,7 @@ export function LedgerVerify({ api }: { api: AdminApi }) {
     const r = await api.verifyLedger().catch((): ApiError => ({ error: 'unavailable' }));
     setChecking(false);
     if (isError(r)) return setVerdict(errorText(r));
-    setVerdict(r.ok ? `The ledger is intact: ${r.length} entries.` : `The ledger is broken at entry ${r.firstBrokenSeq}: ${BROKEN[r.reason]}. Entries from there on cannot be trusted.`);
+    setVerdict(r.ok ? `The ledger is intact: ${r.length} ${r.length === 1 ? 'entry' : 'entries'}.` : `The ledger is broken at entry ${r.firstBrokenSeq}: ${BROKEN[r.reason]}. Entries from there on cannot be trusted.`);
   };
 
   const exportPack = async (e: FormEvent) => {

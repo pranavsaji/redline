@@ -181,7 +181,7 @@ export async function confirmReview(deps: CoreDeps, actor: string, issue: JiraIs
     await opsAlert(
       deps,
       `alert:budget-confirm:${review.id}`,
-      `Threatline: a security champion let ${issue.key} through while reviews are paused at the AI budget (token budget or the site's Rovo credits). It is recorded in the ledger (entry ${row.value.seq}). Check the Rovo credits and the Threatline admin page.`,
+      `Threatline: a security champion let ${issue.key} through while reviews are paused at the AI budget (token budget or the site's Rovo credits). It is recorded in the ledger (entry ${row.value.seq}). Check the Threatline admin page (Budgets).`,
     );
   await refreshVerdict(deps, issue.id);
   await deps.queue.push([{ kind: 'propagate', issueId: issue.id }]);

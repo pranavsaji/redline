@@ -25,7 +25,8 @@ export const SIGNAL_KEYWORDS = {
   secrets: ['api key*', 'secret key*', 'private key*', 'signing key*', 'access token*'],
   public: ['public', 'internet-facing', 'external customer*', 'mobile app*', 'website', 'webhook*', 'public api', 'anonymous user*'],
   partner: ['partner*', 'b2b', 'vendor portal', 'third-party integration*'],
-  llm: ['llm*', 'gpt*', 'claude', 'language model*', 'ai agent*', 'agent', 'agents', 'rag', 'embedding*', 'tool call*', 'prompt*', 'chatbot*', 'genai', 'generative ai'],
+  // "agent" alone counts unless a person is meant ("support agents", "sales agent"): see HUMAN_AGENT.
+  llm: ['llm*', 'gpt*', 'claude', 'language model*', 'ai agent*', 'ai assistant*', 'agentic', 'agent', 'agents', 'rag', 'embedding*', 'tool call*', 'prompt', 'prompts', 'system prompt*', 'chatbot*', 'copilot*', 'genai', 'generative ai'],
   fileUpload: ['upload*', 'attachment*', 'file import*'],
   auth: ['authenticat*', 'login*', 'log in', 'sign in', 'session*', 'oauth', 'sso', 'jwt*', 'mfa', 'single sign-on'],
   thirdParty: ['stripe', 'paypal', 'twilio', 'sendgrid', 'openai', 'anthropic', 'salesforce', 'slack', 'zendesk', 'shopify', 's3', 'google'],
@@ -34,8 +35,14 @@ export const SIGNAL_KEYWORDS = {
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const toRegex = (kw: string): RegExp =>
   kw.endsWith('*') ? new RegExp(`\\b${escape(kw.slice(0, -1))}[a-z]*`, 'i') : new RegExp(`\\b${escape(kw)}\\b`, 'i');
+/**
+ * "agent" preceded by a word that makes it a person. Judged per occurrence, so extra text can never hide another
+ * occurrence: signals stay monotonic.
+ */
+const HUMAN_AGENT = '(?<!\\b(?:support|sales|service|call[- ]cent(?:er|re)|human|travel|insurance|user|estate|booking|customer|field|leasing|ticket) )';
+const keywordRegex = (kw: string): RegExp => (kw === 'agent' || kw === 'agents' ? new RegExp(`\\b${HUMAN_AGENT}${kw}\\b`, 'i') : toRegex(kw));
 const COMPILED = Object.fromEntries(
-  Object.entries(SIGNAL_KEYWORDS).map(([k, list]) => [k, (list as readonly string[]).map((kw) => ({ kw: kw.replace(/\*$/, ''), re: toRegex(kw) }))]),
+  Object.entries(SIGNAL_KEYWORDS).map(([k, list]) => [k, (list as readonly string[]).map((kw) => ({ kw: kw.replace(/\*$/, ''), re: keywordRegex(kw) }))]),
 ) as Record<keyof typeof SIGNAL_KEYWORDS, Array<{ kw: string; re: RegExp }>>;
 
 /** The sentence around `index`, at most 200 chars, always a verbatim substring of `text`. */

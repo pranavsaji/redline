@@ -67,6 +67,20 @@ describe('Admin: setup checklist (Task 24)', () => {
     expect((await within(list).findByText(/Rule-based checks only: no Rovo or Automation rule needed/)).closest('li')!.textContent).toMatch(/Done/);
   });
 
+  it('feature: when the gate has not been seen, one click adds it to the workflow and says where', async () => {
+    const installGate = vi.fn(async () => ({ projects: [{ projectKey: 'PAY', added: ['Software workflow for project PAY: Done'], already: [], readOnly: [] }] }));
+    const api: AdminApi = {
+      ...mockAdminApi(),
+      installGate,
+      setupStatus: async () => ({ keys: true, sqlVersion: 4, validatorSeenOn: [], automationRuleSeen: false, mcpEnabledHint: 'x', bitbucketKeyCopied: false }),
+    };
+    render(<AdminPage api={api} />);
+    const list = await screen.findByRole('list', { name: 'Setup checklist' });
+    await userEvent.click(within(list).getByRole('button', { name: 'Add the gate for me' }));
+    expect(installGate).toHaveBeenCalledOnce();
+    expect(await within(list).findByText('Added the gate to Software workflow for project PAY: Done.')).toBeTruthy();
+  });
+
   it('a non-admin sees a plain message', async () => {
     render(<AdminPage api={{ ...mockAdminApi(), setupStatus: async () => ({ error: 'forbidden' as const, message: 'Only a Jira administrator can do this.' }) }} />);
     expect(await screen.findByText('Only a Jira administrator can do this.')).toBeTruthy();

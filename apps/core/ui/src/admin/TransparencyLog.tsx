@@ -52,7 +52,7 @@ export function TransparencyLog({ api }: { api: AdminApi }) {
       {headError && <p style={{ margin: 0 }}>{headError}</p>}
       {head && (
         <div role="group" aria-label="Signed tree head" style={{ ...box, gap: 2, font: token('font.body.small') }}>
-          <span>{`${head.treeHead.treeSize} entries, signed ${utc(head.treeHead.timestamp)} with key ${head.treeHead.kid}.`}</span>
+          <span>{`${head.treeHead.treeSize} ${head.treeHead.treeSize === 1 ? 'entry' : 'entries'}, signed ${utc(head.treeHead.timestamp)} with key ${head.treeHead.kid}.`}</span>
           <span style={{ fontFamily: token('font.family.code'), wordBreak: 'break-all' }}>{`Root ${head.treeHead.rootHash.slice(0, 12)}…`}</span>
           <span style={{ color: token('color.text.subtle') }}>{head.publishedPageId ? 'Published to Confluence.' : 'Not published to Confluence yet (it is posted daily once a digest space is set under Notifications).'}</span>
         </div>

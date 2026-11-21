@@ -14,12 +14,18 @@ is verified or its risk is accepted by someone allowed to accept it.
 Install the Jira app into Jira and Confluence. In **Atlassian Administration → Apps → Rovo MCP**, allow the clients you
 want to use with Threatline's MCP tools (optional).
 
+**Tested from scratch on 2026-11-20:** a brand-new free Jira + Confluence site, the install link above, the wizard,
+one-click gate, demo data, and a story reviewed by Threatline Engine in about five minutes, with Done blocked until
+its requirements were handled. No Rovo, Automation rule or other setup was needed.
+
 ## The 2-minute path
 
 1. **Open the admin page**: Jira settings → Apps → **Threatline**. The first-run wizard asks for a project, the transition
    to guard (for example Done) and the security champion group. Save.
-2. **Add the gate**: in the project's workflow, add the rule **Threatline security gate** (Marketplace rules) to the
-   transition you chose.
+2. **Add the gate**: click **Add the gate for me** (right after saving the wizard, or on the setup checklist).
+   Threatline adds **Threatline security gate** to the transition you chose, in team-managed and company-managed
+   projects alike. (Jira's team-managed workflow editor does not list app rules, so this is the way there; in a
+   company-managed project you can also add it yourself under the transition's rules, Marketplace rules.)
 3. **Load the demo data**: admin page → **Demo data** → enter the project and a Confluence space → **Load demo data**.
    It creates an epic "Add AI support agent" with stories (order lookup, refunds), two incidents, and a design page
    with one poisoned paragraph that tells the AI to approve the change.
@@ -27,7 +33,8 @@ want to use with Threatline's MCP tools (optional).
    story or epic itself on Atlassian-hosted Claude models. It takes two to four minutes: a quarantined extraction, three
    independent analyses on the strongest model, then a verifier. To start one by hand: the work item → Threatline panel →
    **Run review**. (Prefer your site's Rovo agent? Choose **Rovo agent review** and follow "Rovo agent mode" below.)
-5. **Open the epic "Add AI support agent"**. Loading the demo queues its review; within three to four minutes the Threatline panel shows:
+5. **Open the epic "Add AI support agent"**. If the Threatline panel is not on it, add it once from the apps button
+   under the title (**Threatline security review**), then in the panel's **⋯** menu choose **Show for all work items**. Loading the demo queues its review; within three to four minutes the Threatline panel shows:
    - the risk score and why Done is blocked;
    - threats in plain language first, each with the quote it rests on and a link to its source;
    - a banner naming the design page as containing instructions aimed at the AI: they were treated as data, and the
@@ -64,9 +71,11 @@ that ran the rule.
 - **Reviews time out and the risk ledger shows `review.sample_rejected`**: the Automation rule runs as an account that
   is not a review author. Add it under Threatline admin → **Review mode → Who can submit AI review runs**.
 - **The Threatline panel is not on a work item**: add it once from the apps button under the work item title
-  (**Threatline security review**).
+  (**Threatline security review**), then **⋯ → Show for all work items** so it is on every work item.
+- **"Threatline could not reach Jira, or is still finishing its install"** right after installing: a new install sets
+  up its database in the first minute. Try again a minute later.
 - **Load demo data says the Confluence space was not found**: create a space (any name) and enter its key.
-- **Run review on this work item does nothing for a long time**: the re-run needs a second Automation rule with the
+- **Run review on this work item does nothing for a long time** (Rovo agent mode only): the re-run needs a second Automation rule with the
   trigger *Field value changed → Labels → Value added*, condition `{{issue.labels}}` contains `threatline-review`, and the
   same three **Use agent: Threatline** steps.
 

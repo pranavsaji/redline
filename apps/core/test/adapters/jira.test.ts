@@ -397,3 +397,22 @@ describe('jira client: permission checks as the user (impersonation)', () => {
     expect(await jira.canBrowse('acc', '10042')).toEqual({ ok: true, value: false });
   });
 });
+
+describe('jira client: installGate', () => {
+  it('reads the project workflows and updates them as the admin, adding the gate once', async () => {
+    const app = fakeHttp([[/GET \/rest\/api\/3\/project\/PAY$/, { status: 200, body: JSON.stringify({ id: '10001', key: 'PAY', issueTypes: [{ id: '1', name: 'Story' }] }) }]]);
+    const read = {
+      statuses: [{ statusReference: '5', name: 'Done' }],
+      workflows: [{ id: 'w1', name: 'Software workflow for project PAY', isEditable: true, version: { versionNumber: 1 }, transitions: [{ name: 'Done', toStatusReference: '5', validators: [] }] }],
+    };
+    const user = fakeHttp([
+      [/POST \/rest\/api\/3\/workflows$/, { status: 200, body: JSON.stringify(read) }, /"projectAndIssueTypes":\[\{"projectId":"10001","issueTypeId":"1"\}\]/],
+      [/POST \/rest\/api\/3\/workflows\/update$/, { status: 200, body: '{}' }],
+    ]);
+    const jira = createJiraClient(app.request, { sleep: noSleep().sleep, asUser: () => user.request });
+    const ext = 'ari:cloud:ecosystem::extension/13898a7c-6897-48d3-a512-079d9f9f5f00/511a7dd3-8745-4121-8c4d-664f8fff2fae/static/threatline-gate';
+    expect(await jira.installGate('acc-admin', 'PAY', 'Done', ext)).toEqual({ ok: true, value: { added: ['Software workflow for project PAY: Done'], already: [], readOnly: [] } });
+    const update = JSON.parse(user.calls.at(-1)!.init!.body!);
+    expect(update.workflows[0].transitions[0].validators).toEqual([{ ruleKey: 'forge:expression-validator', parameters: { key: ext, config: '' } }]);
+  });
+});

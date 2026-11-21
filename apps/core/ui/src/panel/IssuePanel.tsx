@@ -195,7 +195,7 @@ export function IssuePanel({ api }: { api: PanelApi }) {
                   : []
               }
             >
-              The site reached its review budget or ran out of Rovo credits. A security champion can confirm this work
+              The site reached its review budget (or, in Rovo agent mode, ran out of Rovo credits). A security champion can confirm this work
               item; the confirmation is recorded in the ledger.
             </SectionMessage>
           )}

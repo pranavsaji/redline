@@ -71,18 +71,51 @@ verbatim quotes, coverage, the verifier) mattered more than adding threat types.
 
 Marketplace listing, Jira Service Management incident feedback into reviews, and per-team policies.
 
-## Demo script (about 3 minutes)
+## Demo video (2:51)
 
-1. **0:00 Problem (15 s).** "Security review is advisory, so it loses to the deadline. Threatline makes it part of Done."
-2. **0:15 Create a story (30 s).** In PAY, create "Let customers export their order history as CSV via a shareable
-   link", describing a public S3 bucket, a link that never expires, and a `customerId` query parameter. Cut to the
-   panel a few minutes later.
-3. **0:45 The review (45 s).** Show the Threatline Engine banner, the risk score, the threats (the `customerId` IDOR,
-   the never-expiring public link), each with its quote, "Verified" badges, and one threat the verifier dropped with
-   its reason.
-4. **1:30 The gate (20 s).** Move the story to Done: blocked, with the open requirements listed.
-5. **1:50 Injection (25 s).** Open the demo epic "Add AI support agent": the banner names the poisoned design
-   paragraph; the threats resting on it wait for a champion.
-6. **2:15 Fix and merge (30 s).** Verify a requirement with a PR link, accept one risk; Done passes. Copy the merge
-   attestation into the pull request: the check passes; change one character in the commit and it fails.
-7. **2:45 Audit (15 s).** Admin → Risk ledger → Verify the ledger; download an inclusion proof.
+A rough cut with synthetic narration is built from real screenshots of a fresh site (outside the repo, in
+`threatline-video/`: `python3 build.py` renders the frames, narration and captions into `threatline-demo.mp4` and
+`threatline-demo.srt`). Record your own voice over the same script for the final upload; put "Threatline" in the YouTube
+title, and upload it as public or unlisted.
+
+| # | On screen | Narration |
+| --- | --- | --- |
+| 1 | Title card | Threatline. Security review that gates Done, and merge. |
+| 2 | The problem | Every team says it does security review. A checklist in the ticket. A threat model page nobody updates. A reviewer pinged the night before release. It's advisory, so it loses to the deadline. And A.I. made it worse: a chatbot will write you a threat model, but it invents risks, misses real ones, and can be talked into saying the change is fine. |
+| 3 | A new story on a brand-new Jira site | Here is a story on a brand-new Jira site. Customers want to export their order history as a CSV, through a shareable link to a public bucket, chosen by a customer I.D. parameter. And the link never expires. |
+| 4 | Reviewed by itself on Atlassian-hosted Claude models | Nobody set anything up. Within minutes, Threatline Engine reviewed it on Atlassian-hosted Claude models: three independent analyses that must agree, and quote their evidence word for word, then a verifier that checks each threat against those quotes. Risk, one hundred. It blocks Done, and merge. |
+| 5 | Plain language, quoted, verified, mapped to ASVS and CWE | The threats read like a colleague wrote them. Anyone who can guess the address can download other people's order history. Critical, quoted, verified, and mapped to A.S.V.S. and C.W.E. When the verifier doubts a high-severity threat, here a duplicate, it can't quietly drop it. A security champion decides. |
+| 6 | Move it to Done: blocked, with the reason | Now try to ship it. Done is blocked, and Jira says exactly why: open security requirements at High or above, with a link back to the review. Missing, failed, or out of date reviews block too. The gate fails closed. |
+| 7 | Prompt injection is flagged, never obeyed | Here's the attack that breaks most A.I. reviewers. This epic's design page hides an instruction telling the A.I. to approve the change. Threatline flags the page, treats the text as data, and the threats resting on it wait for a security champion. The model never decides the verdict. Code does. |
+| 8 | Fix it, or accept the risk with teeth | To get to Done, you fix, or you accept. Accepting a risk takes a reason, compensating controls, an expiry, and an approver with the right role, who isn't you. |
+| 9 | Verified with evidence: ready for Done, and a signed attestation | Verify each requirement with a pull request as evidence, and the story is ready for Done. Threatline then signs an attestation for one repository, and one exact commit. |
+| 10 | The merge check verifies the Ed25519 signature | Paste it into the pull request, and the Bitbucket merge check verifies the signature against your repository's trusted key. |
+| 11 | Change one character: rejected | Change one character, and it's rejected. |
+| 12 | Live in Bitbucket: the required check blocks the merge | On a real pull request, the required check stays red, and the merge is blocked. The same gate runs as a GitHub Action. |
+| 13 | An audit trail anyone can verify | Every acceptance, override and refusal lands in a hash-chained ledger, with signed Merkle tree heads. An auditor can download an inclusion proof, and check it offline. |
+| 14 | Coding agent over MCP | And coding agents see the same requirements. Through Threatline's M.C.P. server, Claude Code or Cursor fetch exactly what the gate will check, before they write the fix. |
+| 15 | Results and tagline | Threatline. On our eval with poisoned design docs: ninety-two percent recall on high-severity threats, and every poisoned case held. Build with context. Ship with confidence. |
+
+## Additional info (judges only): ready-to-paste answers
+
+Fields not listed here (submitter type, country, age, eligibility, employment, survey questions) are yours to answer.
+
+- **Is your project new?** New (started 2026-11-14).
+- **Installation link:** the "Install Threatline for Jira" link in `docs/JUDGE_GUIDE.md` (Jira + Confluence). Also give the
+  Bitbucket link from the same file in the testing instructions.
+- **Testing instructions:** "Follow https://github.com/pranavsaji/threatline/blob/main/docs/JUDGE_GUIDE.md: open
+  Jira settings → Apps → Threatline, save the first-run wizard, click Add the gate for me, load demo data (project
+  key + any Confluence space key), then open the epic 'Add AI support agent' a few minutes later. No Rovo or Automation
+  setup is needed; Threatline Engine runs the reviews on Forge LLMs."
+- **App ID:** `13898a7c-6897-48d3-a512-079d9f9f5f00` (Threatline for Jira). Threatline for Bitbucket:
+  `53a2efe5-9150-4e9a-b869-8bd2605d64e0`.
+- **How it meets the technology requirement:** Built entirely on Forge. Jira: issue panel, workflow validator (the
+  Done gate), admin and global pages, dashboard gadget, entity properties for JQL, issue events. Confluence: design
+  pages read as review context, threat-model pages and signed ledger heads published. Bitbucket: a merge check that
+  verifies signed attestations. Forge LLMs: Threatline Engine (Claude models hosted by Atlassian). Rovo: an agent with
+  actions and an MCP server for coding agents. Forge SQL, KVS, secret storage and queues hold state; nothing egresses.
+- **Category:** Apps for Software Teams. **Why:** it changes how software teams ship: security requirements become part
+  of Done and of the merge, in Jira and Bitbucket, where developers already work.
+- **Bonus prize:** Best app with Atlassian MCP (Threatline's MCP tools give Claude Code or Cursor the same requirements
+  the gate checks; the Rovo agent also qualifies it for Best Agents).
+- **AI tools used:** Claude Code (Claude) for pair programming and the eval harness; Forge LLMs (Claude) inside the app.
