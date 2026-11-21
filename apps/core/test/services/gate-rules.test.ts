@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ok } from '@threatline/shared';
 import { handleJob } from '../../src/consumers/review-consumer.js';
 import { acceptanceDecide, acceptanceRequest, breakGlassOverride } from '../../src/resolvers/acceptances.js';
+import { adminWarnOnly } from '../../src/resolvers/admin.js';
 import { refreshVerdict, verdictKey } from '../../src/services/verdict-service.js';
 import { validateTransition } from '../../src/validators/validate-transition.js';
 import type { JiraIssue } from '../../src/adapters/jira.js';
@@ -106,5 +107,38 @@ describe('a review that could not run while reviews were paused', () => {
     // The out-of-credits pause lifts 6 hours after the last agent run; nothing else touches the work item.
     t.clock.advance(7 * HOUR);
     expect(await gate()).toMatchObject({ result: false, errorMessage: expect.stringMatching(/Reviews have resumed, so run it again \(re-run it from the Threatline panel\)/) });
+  });
+});
+
+describe('warn-only lasts at most 14 days from when it was switched on', () => {
+  const A = { accountId: ADMIN };
+  const windows = async (t: ReturnType<typeof coreDeps>) => {
+    const p = await t.deps.config.site();
+    return p.ok ? p.value.warnOnly : [];
+  };
+
+  it('security: switching it on again while it is on keeps the original start and cannot pass 14 days from it', async () => {
+    const { t } = await reviewed();
+    const start = t.clock.now();
+    await adminWarnOnly(t.deps, A, { projectKey: 'PAY', days: 14 });
+    t.clock.advance(10 * DAY);
+    const again = await adminWarnOnly(t.deps, A, { projectKey: 'PAY', days: 14 });
+    const cap = new Date(start.getTime() + 14 * DAY).toISOString();
+    expect(again).toMatchObject({ projectKey: 'PAY', since: start.toISOString(), until: cap, message: expect.stringMatching(/at most 14 days from when it was switched on/) });
+    expect(await windows(t)).toEqual([{ projectKey: 'PAY', since: start.toISOString(), until: cap }]);
+    t.clock.advance(4 * DAY + 60_000);
+    expect(await validateTransition(t.deps, { issue: { key: 'PAY-7', id: ISSUE } })).toMatchObject({ result: false });
+  });
+
+  it('a fresh window after the last one has ended starts from now, ledgered', async () => {
+    const { t } = await reviewed();
+    await adminWarnOnly(t.deps, A, { projectKey: 'PAY', days: 3 });
+    t.clock.advance(4 * DAY);
+    const now = t.clock.now();
+    const fresh = await adminWarnOnly(t.deps, A, { projectKey: 'PAY', days: 7 });
+    expect(fresh).toMatchObject({ since: now.toISOString(), until: new Date(now.getTime() + 7 * DAY).toISOString() });
+    expect(fresh).not.toHaveProperty('message');
+    const all = await t.deps.ledger.all();
+    expect(all.ok && all.value.filter((r) => r.eventType === 'policy.warn_only')).toHaveLength(2);
   });
 });
