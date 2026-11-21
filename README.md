@@ -120,6 +120,7 @@ pnpm threatline eval --llm fake                             # deterministic base
 
 ## Docs
 
+- [Roadmap](docs/ROADMAP.md): what comes next.
 - [Architecture](docs/ARCHITECTURE.md): the review flow, the risk formula, the verdict rules, packages and ports.
 - [Security review](docs/SECURITY_REVIEW.md): Threatline threat-modelled, each control with the test that proves it.
 - [Judge guide](docs/JUDGE_GUIDE.md), [screenshots](docs/screenshots/README.md), [privacy](docs/PRIVACY.md),
