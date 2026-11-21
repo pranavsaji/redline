@@ -5,6 +5,7 @@ import type { ConfluenceClient } from '../../src/adapters/confluence.js';
 import {
   adminResumeReviews,
   adminGetPolicy,
+  adminInstallGate,
   adminProjectStatuses,
   adminPurgeProject,
   adminRuns,
@@ -26,6 +27,7 @@ const A = { accountId: ADMIN };
 const D = { accountId: DEV };
 const gate = { issue: { key: 'PAY-7', id: ISSUE } };
 const DAY = 86_400_000;
+const EXT = 'ari:cloud:ecosystem::extension/13898a7c-6897-48d3-a512-079d9f9f5f00/511a7dd3-8745-4121-8c4d-664f8fff2fae/static/threatline-gate';
 
 async function policyOf(r: Awaited<ReturnType<typeof reviewed>>): Promise<SitePolicy> {
   const p = await r.t.deps.config.site();
@@ -47,6 +49,7 @@ describe('admin: only Jira administrators', () => {
     ['usage', (r: Awaited<ReturnType<typeof reviewed>>) => adminUsage(r.t.deps, D)],
     ['setNotifications', (r: Awaited<ReturnType<typeof reviewed>>) => adminSetNotifications(r.t.deps, D, { ops: null })],
     ['projectStatuses', (r: Awaited<ReturnType<typeof reviewed>>) => adminProjectStatuses(r.t.deps, D, { projectKey: 'PAY' })],
+    ['installGate', (r: Awaited<ReturnType<typeof reviewed>>) => adminInstallGate(r.t.deps, D, EXT)],
   ])('%s: a non-admin is forbidden and nothing changes', async (_n, call) => {
     const r = await reviewed();
     const before = await policyOf(r);
@@ -324,5 +327,26 @@ describe('admin.purgeProject (privacy: delete a project’s reviews)', () => {
     const last = (await ledger(r)).at(-1)!;
     expect(last).toMatchObject({ eventType: 'project.purged', actor: ADMIN, payload: { projectKey: 'OLD' } });
     expect((res as { entryHash: string }).entryHash).toBe(last.entryHash);
+  });
+});
+
+describe('admin.installGate (one click instead of the workflow editor)', () => {
+  it('adds the gate to the guarded transition of each enabled project, as the admin, and ledgers it', async () => {
+    const r = await reviewed();
+    const calls: unknown[][] = [];
+    r.t.deps.jira.installGate = async (...args) => (calls.push(args), ok({ added: ['Software workflow for project PAY: Done'], already: [], readOnly: [] }));
+    const res = await adminInstallGate(r.t.deps, A, EXT);
+    const p = await policyOf(r);
+    expect(calls).toEqual(p.enabledProjects.map((k) => [ADMIN, k, p.guardedTransitions[0], EXT]));
+    expect(res).toMatchObject({ projects: [{ added: ['Software workflow for project PAY: Done'] }] });
+    expect((await ledger(r)).filter((e) => e.eventType === 'policy.changed').at(-1)?.payload).toMatchObject({ fields: ['doneGate'] });
+  });
+
+  it('says so plainly when Jira refuses, or the environment is unknown, and ledgers nothing', async () => {
+    const r = await reviewed();
+    r.t.deps.jira.installGate = async () => ({ ok: false, error: { code: 'forbidden', message: '403' } });
+    expect(await adminInstallGate(r.t.deps, A, EXT)).toMatchObject({ error: 'forbidden', message: expect.stringContaining('workflow editor') });
+    expect(await adminInstallGate(r.t.deps, A, null)).toMatchObject({ error: 'unavailable', message: expect.stringContaining('workflow editor') });
+    expect((await ledger(r)).filter((e) => e.eventType === 'policy.changed')).toEqual([]);
   });
 });

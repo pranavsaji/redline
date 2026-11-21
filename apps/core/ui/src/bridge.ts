@@ -93,6 +93,10 @@ export interface SeedResult {
   designPageUrl: string;
   incidentKeys: string[];
 }
+export interface GateInstallDto {
+  projects: Array<{ projectKey: string; added: string[]; already: string[]; readOnly: string[] }>;
+}
+
 export interface SetupStatus {
   keys: boolean;
   sqlVersion: number;
@@ -123,6 +127,8 @@ export interface AdminApi {
   /** Leave a key out to keep it; null turns it off. */
   setNotifications(n: { ops?: OpsConfig | null; digest?: DigestConfig | null }): Promise<{ ops: OpsConfig | null; digest: DigestConfig | null } | ApiError>;
   projectStatuses(projectKey: string): Promise<{ projectKey: string; statuses: string[] } | ApiError>;
+  /** Adds the Done gate to the guarded transition in each enabled project's workflows, as the calling admin. */
+  installGate(): Promise<GateInstallDto | ApiError>;
   /** R5: an inclusion proof (JSON) for one ledger entry against the current signed tree head. */
   ledgerProof(seq: number): Promise<{ json: string; seq: number; treeSize: number } | ApiError>;
   treeHead(): Promise<TreeHeadInfo | ApiError>;
@@ -157,6 +163,7 @@ export function adminApiOver(invoke: Invoke): AdminApi {
     resumeReviews: () => invoke('admin.resumeReviews'),
     setNotifications: (n) => invoke('admin.setNotifications', { ...n }),
     projectStatuses: (projectKey) => invoke('admin.projectStatuses', { projectKey }),
+    installGate: () => invoke('admin.installGate'),
     ledgerProof: (seq) => invoke('ledger.proof', { seq }),
     treeHead: () => invoke('ledger.treeHead'),
   };
@@ -196,5 +203,6 @@ export function errorText(e: ApiError): string {
   if (e.error === 'forbidden') return 'You do not have permission to do that.';
   if (e.error === 'not_found') return 'That item is no longer available, or you cannot open it.';
   if (e.error === 'rate_limited') return 'Too many requests. Try again later.';
+  if (e.error === 'unavailable') return 'Threatline could not reach Jira, or is still finishing its install (a new install can take a minute). Try again in a minute.';
   return 'Threatline could not save that. Try again.';
 }

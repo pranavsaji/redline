@@ -1,10 +1,12 @@
 import Resolver from '@forge/resolver';
+import { getAppContext } from '@forge/api';
 import queryKeys from '../../graph/query-keys.json';
 import { composeCore } from '../composition.js';
 import { forgeGraphRequest, graphEnricher } from '../adapters/graph-enricher.js';
 import { kvsSigningKeys } from '../adapters/signing-keys.js';
 import { systemClock } from '../adapters/clock.js';
 import { resolverTable, type ResolverViewer } from './table.js';
+import { gateExtensionKey } from '../adapters/workflow-gate.js';
 
 type Ctx = { accountId?: unknown; cloudId?: unknown; extension?: { issue?: { id?: unknown } } };
 
@@ -20,6 +22,14 @@ const table = resolverTable({
   signingKeysReady: async () => {
     const keys = await kvsSigningKeys(systemClock).publicKeys();
     return keys.ok && Object.keys(keys.value).length > 0;
+  },
+  gateExtensionKey: () => {
+    try {
+      const c = getAppContext();
+      return gateExtensionKey(`ari:cloud:ecosystem::environment/${c.appAri.appId}/${c.environmentAri.environmentId}`);
+    } catch {
+      return null;
+    }
   },
 });
 

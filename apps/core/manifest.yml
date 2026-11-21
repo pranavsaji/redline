@@ -366,3 +366,6 @@ permissions:
     write:page:confluence: {}
     read:space:confluence: {}
     manage:jira-project: {}
+    # Adds the Done gate to a project's workflow when an admin clicks "Add the gate for me" (as that admin).
+    manage:jira-configuration:
+      allowImpersonation: true

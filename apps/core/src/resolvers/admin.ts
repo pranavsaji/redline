@@ -425,3 +425,38 @@ export async function adminProjectStatuses(deps: CoreDeps, a: Admin, payload: un
   if (!r.ok) return r.error.code === 'not_found' || r.error.code === 'forbidden' ? { error: 'validation', message: `Jira project ${p.data.projectKey} was not found.` } : apiError(r.error);
   return { projectKey: p.data.projectKey, statuses: r.value };
 }
+
+export interface GateInstallDto {
+  projects: Array<{ projectKey: string; added: string[]; already: string[]; readOnly: string[] }>;
+}
+
+/**
+ * `admin.installGate`: adds "Threatline security gate" to the guarded transition in every enabled project's workflows,
+ * as the admin who clicked (Jira checks they may edit them). The one way to add it in team-managed projects, whose
+ * workflow editor does not list app validators. Ledgered as a policy change.
+ */
+export async function adminInstallGate(deps: CoreDeps, a: Admin, extensionKey: string | null): Promise<GateInstallDto | ApiError> {
+  const denied = await requireAdmin(deps, a);
+  if (denied) return denied;
+  if (!extensionKey) return { error: 'unavailable', message: 'Threatline could not tell which app environment it is running in. Add the gate in the workflow editor instead.' };
+  const policy = await deps.config.site();
+  if (!policy.ok) return apiError(policy.error);
+  const toStatus = policy.value.guardedTransitions[0];
+  if (policy.value.enabledProjects.length === 0 || !toStatus) return { error: 'validation', message: 'Turn Threatline on for a project and pick its guarded transition first.' };
+  const projects: GateInstallDto['projects'] = [];
+  for (const projectKey of policy.value.enabledProjects) {
+    const r = await deps.jira.installGate(a.accountId, projectKey, toStatus, extensionKey);
+    if (!r.ok) {
+      if (r.error.code === 'forbidden') return { error: 'forbidden', message: `Jira did not let you edit ${projectKey}'s workflow. Add the gate in the workflow editor instead.` };
+      return apiError(r.error);
+    }
+    projects.push({ projectKey, ...r.value });
+  }
+  const added = projects.flatMap((p) => p.added);
+  if (added.length > 0) {
+    const row = await appendLedger(deps.ledger, deps.clock, 'policy.changed', { fields: ['doneGate'], transitions: added }, a.accountId);
+    if (!row.ok) return apiError(row.error);
+  }
+  log('gate.installed', { added: added.length });
+  return { projects };
+}

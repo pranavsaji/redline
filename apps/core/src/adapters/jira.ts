@@ -2,6 +2,7 @@ import api, { assumeTrustedRoute } from '@forge/api';
 import { z } from 'zod';
 import { appError, err, ok, type Result } from '@threatline/shared';
 import { httpJson, seg, type FetchLike, type HttpOptions } from './http.js';
+import { planGate, updateBody, type WorkflowRead } from './workflow-gate.js';
 
 export interface AdfNode {
   type: string;
@@ -78,6 +79,11 @@ export interface JiraClient {
   removeLabel(issueId: string, label: string): Promise<Result<void>>;
   comment(issueId: string, adf: AdfDoc): Promise<Result<void>>;
   search(jql: string, fields: string[], max: number): Promise<Result<JiraIssue[]>>;
+  /**
+   * Adds the security gate to every transition into `toStatus` in the project's workflows, acting as the admin who
+   * asked (Jira checks they may edit workflows). Idempotent.
+   */
+  installGate(accountId: string, projectKey: string, toStatus: string, extensionKey: string): Promise<Result<{ added: string[]; already: string[]; readOnly: string[] }>>;
 }
 
 export const ISSUE_FIELDS = [
@@ -453,6 +459,26 @@ export function createJiraClient(request: FetchLike, opts: JiraClientOptions = {
       const p = parse(z.object({ id: z.string(), key: z.string(), issueTypes: z.array(z.object({ id: z.string(), name: z.string(), subtask: z.boolean().nullish() })).nullish() }), r.value, 'project');
       if (!p.ok) return p;
       return ok({ id: p.value.id, key: p.value.key, issueTypes: (p.value.issueTypes ?? []).map((t) => ({ id: t.id, name: t.name, subtask: t.subtask === true })) });
+    },
+
+    async installGate(accountId, projectKey, toStatus, extensionKey) {
+      if (!PROJECT_KEY.test(projectKey)) return badRef('project key');
+      if (!opts.asUser) return err(appError('internal', 'installGate needs a user transport'));
+      const as = userCall(accountId);
+      const p = await this.projectInfo(projectKey);
+      if (!p.ok) return p;
+      const types = p.value.issueTypes.map((t) => ({ projectId: p.value.id, issueTypeId: t.id }));
+      if (types.length === 0) return ok({ added: [], already: [], readOnly: [] });
+      const r = await as('/rest/api/3/workflows', json('POST', { projectAndIssueTypes: types }));
+      if (!r.ok) return r;
+      const read = r.value as WorkflowRead;
+      if (!Array.isArray(read?.workflows) || !Array.isArray(read?.statuses)) return err(appError('upstream', 'unexpected workflows response'));
+      const plan = planGate(read, toStatus, extensionKey);
+      if (plan.changed.length > 0) {
+        const u = await as('/rest/api/3/workflows/update', json('POST', updateBody(read, plan.changed)));
+        if (!u.ok) return u;
+      }
+      return ok({ added: plan.added, already: plan.already, readOnly: plan.readOnly });
     },
 
     async projectStatuses(projectKey) {

@@ -5,6 +5,7 @@ import { errorText, isError, type AdminApi } from '../bridge.js';
 import type { ApiError, SitePolicy } from '../types.js';
 import { box, errorText as errorStyle, field } from '../panel/form-styles.js';
 import { hint, h2, Labeled, sectionStyle } from './policy-editor.js';
+import { AddGate } from './AddGate.js';
 
 const PROJECT_KEY = /^[A-Z][A-Z0-9_]{0,254}$/;
 
@@ -53,7 +54,12 @@ export function FirstRun({ api, policy, onSaved }: { api: AdminApi; policy: Site
       </h2>
       {done ? (
         <SectionMessage appearance="success" title="Threatline is set up">
-          <p style={{ margin: 0 }}>{`Threatline is on for ${done.project}. Next, in ${done.project}'s workflow, add "Threatline security gate" to the ${done.transition} transition. Then load demo data, copy the public key for Bitbucket, and check the setup checklist below.`}</p>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <p style={{ margin: 0 }}>{`Threatline is on for ${done.project}. Next, add "Threatline security gate" to the ${done.transition} transition of ${done.project}'s workflow (or add it yourself in the workflow editor, under Marketplace rules). Then load demo data, copy the public key for Bitbucket, and check the setup checklist below.`}</p>
+            <div>
+              <AddGate api={api} />
+            </div>
+          </div>
         </SectionMessage>
       ) : (
         <form
@@ -66,11 +72,14 @@ export function FirstRun({ api, policy, onSaved }: { api: AdminApi; policy: Site
           }}
         >
           <ol style={{ margin: 0, paddingLeft: 20, display: 'grid', gap: 12 }}>
-            <li style={{ margin: 0, display: 'grid', gap: 6 }}>
+            <li style={{ margin: 0 }}>
+              <div style={{ display: 'grid', gap: 6 }}>
               <strong>Turn Threatline on for a project</strong>
               <Labeled text="Jira project key">{(fid) => <input id={fid} value={project} onChange={(e) => setProject(e.target.value)} placeholder="PAY" style={field} />}</Labeled>
+              </div>
             </li>
-            <li style={{ margin: 0, display: 'grid', gap: 6 }}>
+            <li style={{ margin: 0 }}>
+              <div style={{ display: 'grid', gap: 6 }}>
               <strong>Pick the transition Threatline guards</strong>
               <div style={{ display: 'flex', gap: 8, alignItems: 'end', flexWrap: 'wrap' }}>
                 <Labeled text="Guarded transition">
@@ -87,11 +96,14 @@ export function FirstRun({ api, policy, onSaved }: { api: AdminApi; policy: Site
                 <Button onClick={() => void loadStatuses()}>Load statuses</Button>
               </div>
               <p style={hint}>Load the project’s statuses, then pick the one work moves into when it ships (usually Done).</p>
+              </div>
             </li>
-            <li style={{ margin: 0, display: 'grid', gap: 6 }}>
+            <li style={{ margin: 0 }}>
+              <div style={{ display: 'grid', gap: 6 }}>
               <strong>Name the groups</strong>
               <Labeled text="Security champions group">{(fid) => <input id={fid} value={champions} onChange={(e) => setChampions(e.target.value)} style={field} />}</Labeled>
               <Labeled text="Tech leads group">{(fid) => <input id={fid} value={leads} onChange={(e) => setLeads(e.target.value)} style={field} />}</Labeled>
+              </div>
             </li>
             <li style={{ margin: 0 }}>Load demo data, copy the public key and check the setup checklist (below).</li>
           </ol>

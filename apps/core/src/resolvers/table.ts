@@ -2,7 +2,7 @@ import { panelDiff, panelEnrich, panelGet, panelRerun, panelThreats, panelWhatIf
 import { requirementsCreate, requirementsSetStatus } from './requirements.js';
 import { reviewConfirm, threatsTriage } from './threats.js';
 import { confluencePublish } from './confluence.js';
-import { adminGetPolicy, adminProjectStatuses, adminPurgeProject, adminResumeReviews, adminRuns, adminSeed, adminSetNotifications, adminSetPolicy, adminSetupStatus, adminUsage, adminWarnOnly, adminWarnOnlyEnd } from './admin.js';
+import { adminGetPolicy, adminInstallGate, adminProjectStatuses, adminPurgeProject, adminResumeReviews, adminRuns, adminSeed, adminSetNotifications, adminSetPolicy, adminSetupStatus, adminUsage, adminWarnOnly, adminWarnOnlyEnd } from './admin.js';
 import { acceptanceDecide, acceptanceRequest, acceptanceRevoke, breakGlassOverride } from './acceptances.js';
 import { ledgerExport, ledgerProof, ledgerTreeHead, ledgerVerify } from './ledger.js';
 import { postureDrill, postureGet, releaseReport } from './posture.js';
@@ -19,7 +19,7 @@ export type ResolverFn = (deps: CoreDeps, v: ResolverViewer, payload: Record<str
  * Every Custom UI resolver, by key. Forge registers this table (resolvers/index.ts); the local end-to-end harness
  * (e2e/local) serves the same table over in-memory deps, so the journeys exercise exactly these functions.
  */
-export function resolverTable(env: { enricher: () => Enricher; signingKeysReady: () => Promise<boolean> }): Record<string, ResolverFn> {
+export function resolverTable(env: { enricher: () => Enricher; signingKeysReady: () => Promise<boolean>; gateExtensionKey?: () => string | null }): Record<string, ResolverFn> {
   return {
     'panel.get': (deps, v) => panelGet(deps, v),
     'panel.threats': (deps, v, payload) => panelThreats(deps, v, payload as { cursor?: unknown }),
@@ -44,6 +44,7 @@ export function resolverTable(env: { enricher: () => Enricher; signingKeysReady:
     'admin.runs': (deps, v) => adminRuns(deps, { accountId: v.accountId }),
     'admin.usage': (deps, v) => adminUsage(deps, { accountId: v.accountId }),
     'admin.setNotifications': (deps, v, payload) => adminSetNotifications(deps, { accountId: v.accountId }, payload),
+    'admin.installGate': (deps, v) => adminInstallGate(deps, { accountId: v.accountId }, env.gateExtensionKey?.() ?? null),
     'admin.projectStatuses': (deps, v, payload) => adminProjectStatuses(deps, { accountId: v.accountId }, payload),
     'posture.get': (deps, v, payload) => postureGet(deps, { accountId: v.accountId }, payload as { project?: unknown; team?: unknown }),
     'posture.drill': (deps, v, payload) => postureDrill(deps, { accountId: v.accountId }, payload as Record<string, unknown>),
