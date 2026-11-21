@@ -69,6 +69,18 @@ describe('computeVerdict', () => {
     const v = computeVerdict(input({ requirements: [requirement({ status: 'AcceptedRisk' })], acceptances: [acceptance({ expiresAt: '2026-11-15T00:00:00Z' })] }));
     expect(v.state).toBe('block');
   });
+  it('7e. security: an acceptance stops counting once its requirement rises above the severity it was accepted at', () => {
+    const critical = { threats: [threat({ severity: 'Critical' })], requirements: [requirement({ status: 'AcceptedRisk', severity: 'Critical' })] };
+    const v = computeVerdict(input({ ...critical, acceptances: [acceptance({ severity: 'Medium' })] }));
+    expect(v.state).toBe('block');
+    expect(v.reasons.find((x) => x.code === 'open_requirement')!.requirementIds).toEqual(['req_1']);
+    expect(v.reasons.map((x) => x.message)).toContain(
+      'The risk acceptance for PROJ-150 was accepted at Medium, but the requirement is now Critical, so it no longer counts. Revoke it and request a new risk acceptance in the Threatline panel.',
+    );
+    // Accepted at the current severity (or higher) still counts.
+    expect(computeVerdict(input({ ...critical, acceptances: [acceptance({ severity: 'Critical' })] })).state).toBe('pass');
+    expect(computeVerdict(input({ requirements: [requirement({ status: 'AcceptedRisk' })], acceptances: [acceptance({ severity: 'Critical' })] })).state).toBe('pass');
+  });
   it('7d. dismissed and low-severity threats never block', () => {
     expect(computeVerdict(input({ threats: [threat({ state: 'dismissed' }), threat({ id: 'thr_2', severity: 'Medium' })], requirements: [] })).state).toBe('pass');
   });

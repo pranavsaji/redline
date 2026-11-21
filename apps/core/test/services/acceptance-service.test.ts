@@ -5,6 +5,7 @@ import { acceptanceDecide, acceptanceRequest, acceptanceRevoke, breakGlassOverri
 import { ledgerExport, ledgerVerify } from '../../src/resolvers/ledger.js';
 import { panelGet } from '../../src/resolvers/panel.js';
 import { expireAcceptances } from '../../src/services/acceptance-service.js';
+import { refreshVerdict } from '../../src/services/verdict-service.js';
 import { validateTransition } from '../../src/validators/validate-transition.js';
 import { coreDeps, jiraIssue } from '../support/core-deps.js';
 import { ADMIN, CHAMP, CHAMPIONS, DEV, ISSUE, LEADS, reviewed } from '../support/reviewed.js';
@@ -74,6 +75,32 @@ describe('Journey B: risk accepted under time pressure (RL-1, RL-2, RL-5)', () =
     const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: '', expiryDays: 30 });
     if ('error' in asked) throw new Error('request failed');
     expect(await acceptanceDecide(t.deps, as('acc-lead'), { acceptanceId: asked.acceptanceId, decision: 'approve' })).toMatchObject({ error: 'forbidden' });
+  });
+
+  it('security: approval goes by the requirement\'s severity now: a tech lead cannot approve a request whose requirement rose to High', async () => {
+    const { t, req, reqs } = await reviewed({ groups: { [DEV]: [], 'acc-lead': [LEADS], [CHAMP]: [CHAMPIONS] } });
+    await t.deps.requirements.upsert({ ...req, severity: 'Medium' });
+    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: 'Feature flag off', expiryDays: 30 });
+    if ('error' in asked) throw new Error('request failed');
+    expect(asked.needsApprover).toBe('tech_lead');
+    // A re-review (or champion triage) raises the same requirement to High before anyone approves.
+    await t.deps.requirements.upsert({ ...(await reqs()).find((r) => r.id === req.id)!, severity: 'High' });
+    expect(await acceptanceDecide(t.deps, as('acc-lead'), { acceptanceId: asked.acceptanceId, decision: 'approve' })).toMatchObject({ error: 'forbidden', message: expect.stringMatching(/security champion.*now High/) });
+    // A champion approves at High, so the acceptance covers the requirement as it is now.
+    expect(await acceptanceDecide(t.deps, as(CHAMP), { acceptanceId: asked.acceptanceId, decision: 'approve' })).toMatchObject({ state: 'active' });
+    expect(verdict(t).state).toBe('pass');
+  });
+
+  it('security: an active acceptance stops clearing the gate once its requirement rises above the accepted severity', async () => {
+    const { t, req, reqs } = await reviewed();
+    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: 'Feature flag off', expiryDays: 30 });
+    if ('error' in asked) throw new Error('request failed');
+    await acceptanceDecide(t.deps, as(CHAMP), { acceptanceId: asked.acceptanceId, decision: 'approve' });
+    expect(verdict(t).state).toBe('pass');
+    await t.deps.requirements.upsert({ ...(await reqs()).find((r) => r.id === req.id)!, severity: 'Critical' });
+    await refreshVerdict(t.deps, ISSUE);
+    expect(verdict(t).state).toBe('block');
+    expect(verdict(t).message).toMatch(/accepted at High, but the requirement is now Critical/);
   });
 
   it('expiry is capped by policy and a reason is required', async () => {

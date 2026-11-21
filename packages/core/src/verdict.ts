@@ -36,6 +36,11 @@ const IN_PROGRESS = new Set(['awaiting_agent', 'queued', 'gathering', 'modeling'
 const RESOLVED: ReadonlySet<Requirement['status']> = new Set(['Verified', 'NotApplicable']);
 
 const isActive = (a: Acceptance, now: Date) => a.state === 'active' && now.getTime() < new Date(a.expiresAt).getTime();
+/**
+ * A re-review or champion triage can raise a requirement's severity under the same id. An acceptance only covers the
+ * severity it was approved at: who could approve it and how long it may last both depend on that severity.
+ */
+export const acceptanceCovers = (a: Pick<Acceptance, 'severity'>, req: Pick<Requirement, 'severity'>) => severityRank(req.severity) <= severityRank(a.severity);
 
 /**
  * The single source of truth both gates read (via the precomputed property). Fails closed: every unknown or
@@ -91,6 +96,7 @@ export function computeVerdict(i: VerdictInput): Verdict {
 
     const mustResolve = i.threats.filter((t) => atThreshold(t) && (t.state === 'accepted' || (t.state === 'needs_human' && reviewConfirmed)));
     const open: Array<{ id: string; severity: Severity }> = [];
+    const outgrown: Array<{ name: string; accepted: Severity; now: Severity }> = [];
     for (const t of mustResolve) {
       const req = i.requirements.find((q) => q.threatId === t.id);
       if (!req) {
@@ -98,7 +104,9 @@ export function computeVerdict(i: VerdictInput): Verdict {
         continue;
       }
       if (RESOLVED.has(req.status)) continue;
-      if (i.acceptances.some((a) => a.requirementId === req.id && isActive(a, i.now))) continue;
+      const active = i.acceptances.filter((a) => a.requirementId === req.id && isActive(a, i.now));
+      if (active.some((a) => acceptanceCovers(a, req))) continue;
+      if (active[0]) outgrown.push({ name: req.subtaskKey ?? `a ${req.severity} requirement`, accepted: active[0].severity, now: req.severity });
       open.push({ id: req.id, severity: req.severity });
     }
     if (open.length > 0) {
@@ -107,6 +115,12 @@ export function computeVerdict(i: VerdictInput): Verdict {
         message: `${count(open.length, 'open security requirement')} at ${i.policy.blockAtOrAbove} or above.`,
         requirementIds: open.map((o) => o.id),
       });
+      // Its own reason (no requirementIds): the gate message appends sub-task keys to the one above.
+      for (const o of outgrown)
+        reasons.push({
+          code: 'open_requirement',
+          message: `The risk acceptance for ${o.name} was accepted at ${o.accepted}, but the requirement is now ${o.now}, so it no longer counts. Revoke it and request a new risk acceptance in the Threatline panel.`,
+        });
       for (const o of open) bump(o.severity);
     }
   }

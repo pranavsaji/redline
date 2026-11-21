@@ -47,22 +47,32 @@ describe('canApprove', () => {
     id: 'acc_1', requirementId: 'req_1', severity, reason: 'r', controls: 'c', acceptedBy: 'dev1', createdAt: now.toISOString(), expiresAt: '2026-12-01T00:00:00Z', state: 'pending',
   });
   it('forbids self-approval', () => {
-    expect(canApprove(pending('Low'), { accountId: 'dev1', roles: ['champion'] }, DEFAULT_SITE_POLICY)).toMatchObject({ ok: false, error: { code: 'forbidden' } });
+    expect(canApprove(pending('Low'), { accountId: 'dev1', roles: ['champion'] }, DEFAULT_SITE_POLICY, 'Low')).toMatchObject({ ok: false, error: { code: 'forbidden' } });
   });
   it('forbids a tech lead approving High', () => {
-    expect(canApprove(pending('High'), { accountId: 'lead', roles: ['tech_lead'] }, DEFAULT_SITE_POLICY)).toMatchObject({ ok: false, error: { code: 'forbidden' } });
+    expect(canApprove(pending('High'), { accountId: 'lead', roles: ['tech_lead'] }, DEFAULT_SITE_POLICY, 'High')).toMatchObject({ ok: false, error: { code: 'forbidden' } });
   });
   it('lets a champion approve Critical and a tech lead approve Medium', () => {
-    expect(canApprove(pending('Critical'), { accountId: 'champ', roles: ['champion'] }, DEFAULT_SITE_POLICY).ok).toBe(true);
-    expect(canApprove(pending('Medium'), { accountId: 'lead', roles: ['tech_lead'] }, DEFAULT_SITE_POLICY).ok).toBe(true);
+    expect(canApprove(pending('Critical'), { accountId: 'champ', roles: ['champion'] }, DEFAULT_SITE_POLICY, 'Critical').ok).toBe(true);
+    expect(canApprove(pending('Medium'), { accountId: 'lead', roles: ['tech_lead'] }, DEFAULT_SITE_POLICY, 'Medium').ok).toBe(true);
   });
   it('security: respects a stricter policy cap (tech leads limited to Low cannot approve Medium)', () => {
     const strict = { ...DEFAULT_SITE_POLICY, techLeadMaxSeverity: 'Low' as const };
-    expect(canApprove(pending('Medium'), { accountId: 'lead', roles: ['tech_lead'] }, strict)).toMatchObject({ ok: false, error: { code: 'forbidden' } });
-    expect(canApprove(pending('Low'), { accountId: 'lead', roles: ['tech_lead'] }, strict).ok).toBe(true);
+    expect(canApprove(pending('Medium'), { accountId: 'lead', roles: ['tech_lead'] }, strict, 'Medium')).toMatchObject({ ok: false, error: { code: 'forbidden' } });
+    expect(canApprove(pending('Low'), { accountId: 'lead', roles: ['tech_lead'] }, strict, 'Low').ok).toBe(true);
+  });
+  it('security: decides on the requirement\'s current severity, not the one recorded at request time', () => {
+    // Requested at Medium; a re-review or champion triage has since made the requirement High.
+    expect(canApprove(pending('Medium'), { accountId: 'lead', roles: ['tech_lead'] }, DEFAULT_SITE_POLICY, 'High')).toMatchObject({ ok: false, error: { code: 'forbidden', message: expect.stringMatching(/security champion.*now High/) } });
+    expect(canApprove(pending('Medium'), { accountId: 'champ', roles: ['champion'] }, DEFAULT_SITE_POLICY, 'High').ok).toBe(true);
+  });
+  it('security: refuses a request that runs longer than the cap for the requirement\'s current severity', () => {
+    const long = { ...pending('High'), expiresAt: '2027-01-14T00:00:00Z' }; // 60 days: fine for High, too long for Critical
+    expect(canApprove(long, { accountId: 'champ', roles: ['champion'] }, DEFAULT_SITE_POLICY, 'High').ok).toBe(true);
+    expect(canApprove(long, { accountId: 'champ', roles: ['champion'] }, DEFAULT_SITE_POLICY, 'Critical')).toMatchObject({ ok: false, error: { code: 'validation', message: expect.stringMatching(/at most 30 days.*now Critical/) } });
   });
   it('only pending acceptances can be approved', () => {
-    expect(canApprove({ ...pending('Low'), state: 'active' }, { accountId: 'lead', roles: ['tech_lead'] }, DEFAULT_SITE_POLICY).ok).toBe(false);
+    expect(canApprove({ ...pending('Low'), state: 'active' }, { accountId: 'lead', roles: ['tech_lead'] }, DEFAULT_SITE_POLICY, 'Low').ok).toBe(false);
   });
 });
 
@@ -78,6 +88,13 @@ describe('rebuildAcceptances', () => {
     const active = rebuildAcceptances(repo._rows, new Date('2026-11-16T00:00:00Z'));
     expect(active[0]).toMatchObject({ id: 'acc_1', state: 'active', approvedBy: 'champ', acceptedBy: 'dev1' });
     expect(rebuildAcceptances(repo._rows, new Date('2026-11-20T00:00:00Z'))[0]!.state).toBe('expired');
+  });
+  it('an approval records the severity it was approved at', async () => {
+    const repo = memoryLedgerRepo();
+    const clock = fixedClock('2026-11-15T00:00:00Z');
+    await appendLedger(repo, clock, 'acceptance.requested', { ...requested('acc_1', '2026-11-20T00:00:00.000Z'), severity: 'Medium' }, 'dev1');
+    await appendLedger(repo, clock, 'acceptance.approved', { acceptanceId: 'acc_1', severity: 'Critical' }, 'champ');
+    expect(rebuildAcceptances(repo._rows, now)[0]).toMatchObject({ state: 'active', severity: 'Critical' });
   });
   it('rejected and revoked are terminal', async () => {
     const repo = memoryLedgerRepo();
