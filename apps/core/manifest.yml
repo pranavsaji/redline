@@ -223,7 +223,7 @@ modules:
       name: Verify requirement with a pull request
       function: verifyRequirementFn
       actionVerb: UPDATE
-      description: Marks one Threatline security requirement Verified, with the pull request that fixes it as evidence. Call it after the fix is in a pull request. The caller needs edit permission on the work item; the verification is attributed to them and recorded in Threatline's ledger. It cannot accept a risk.
+      description: Marks one Threatline security requirement Verified with the pull request that fixes it as evidence. Needs edit permission on the work item; attributed to the caller and recorded in Threatline's ledger.
       inputs:
         requirementId:
           title: Requirement id
