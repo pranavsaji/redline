@@ -5,7 +5,14 @@ export const CriterionSchema = z.object({ given: z.string(), when: z.string(), t
 export type Criterion = z.infer<typeof CriterionSchema>;
 
 export const EvidenceSchema = z
-  .object({ kind: z.enum(['pr', 'test', 'confluence', 'manual']), ref: z.string().min(1).max(2000), attester: z.string().min(1) })
+  .object({
+    kind: z.enum(['pr', 'test', 'confluence', 'manual']),
+    /** The link or path itself (kept clean so the panel can open it). */
+    ref: z.string().min(1).max(2000),
+    /** Free text about the evidence (e.g. the test that covers it), shown beside the link. */
+    note: z.string().max(500).optional(),
+    attester: z.string().min(1),
+  })
   .strict();
 export type Evidence = z.infer<typeof EvidenceSchema>;
 

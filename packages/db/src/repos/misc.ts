@@ -93,6 +93,27 @@ export function sqlUsageRepo(x: SqlExecutor): UsageRepo {
       const v = r.value[0];
       return ok(v ? { tokensIn: Number(v.tokens_in), tokensOut: Number(v.tokens_out), reviews: Number(v.reviews) } : { tokensIn: 0, tokensOut: 0, reviews: 0 });
     },
+    async takeSlot(bucket, window, limit) {
+      // One row per bucket. The conditional UPDATE is the check and the increment in one statement, so parallel callers
+      // cannot all pass; `used` is assigned before `win`, so it sees the old window under MySQL and SQLite alike.
+      const take = () =>
+        x.exec('UPDATE rate_limits SET used = CASE WHEN win = ? THEN used + 1 ELSE 1 END, win = ? WHERE bucket = ? AND (win <> ? OR used < ?)', [window, window, bucket, window, limit]);
+      const used = async () => {
+        const r = await x.query<{ used: number }>('SELECT used FROM rate_limits WHERE bucket = ?', [bucket]);
+        return r.ok ? ok(Math.min(limit, Number(r.value[0]?.used ?? 1))) : r;
+      };
+      if (limit <= 0) return ok(null);
+      const u = await take();
+      if (!u.ok) return u;
+      if (u.value.affectedRows > 0) return used();
+      const i = await x.exec('INSERT INTO rate_limits (bucket, win, used) VALUES (?, ?, 1)', [bucket, window]);
+      if (i.ok) return ok(1);
+      if (i.error.code !== 'conflict') return i;
+      // Someone else created the row first: take from it, or it is already full.
+      const again = await take();
+      if (!again.ok) return again;
+      return again.value.affectedRows > 0 ? used() : ok(null);
+    },
   };
 }
 

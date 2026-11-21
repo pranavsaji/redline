@@ -38,6 +38,7 @@ function EvidenceLine({ r }: { r: Requirement }) {
       ) : (
         r.evidence.ref
       )}
+      {r.evidence.note ? ` (${r.evidence.note})` : null}
     </span>
   );
 }

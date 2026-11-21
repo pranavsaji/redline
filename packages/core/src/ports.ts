@@ -150,6 +150,13 @@ export interface LedgerRepo {
   forIssues(types: readonly LedgerEventType[], issueIds: readonly string[]): Promise<Result<LedgerRow[]>>;
   /** Scale: the newest `limit` rows of these types, in seq order. */
   latestOfTypes(types: readonly LedgerEventType[], limit: number): Promise<Result<LedgerRow[]>>;
+  /** Scale: rows of these types created at or after `sinceIso`, in seq order (indexed on type and time). */
+  ofTypesSince(types: readonly LedgerEventType[], sinceIso: string): Promise<Result<LedgerRow[]>>;
+  /**
+   * Scale: one page of the Merkle leaves' inputs — seq and entry hash only, for seq > `afterSeq`, in seq order, at most
+   * `limit` (capped at 5000). The tree head pages through these instead of reading every full entry.
+   */
+  entryHashes(afterSeq: number, limit: number): Promise<Result<Array<{ seq: number; entryHash: string }>>>;
 }
 
 export interface FeedbackRow {
@@ -219,6 +226,11 @@ export interface TreeHeadRepo {
 export interface UsageRepo {
   add(month: string, delta: { tokensIn: number; tokensOut: number; reviews: number }): Promise<Result<void>>;
   get(month: string): Promise<Result<{ tokensIn: number; tokensOut: number; reviews: number }>>;
+  /**
+   * Security: atomically takes one of `limit` slots in `bucket` for `window` (a different window starts again at zero)
+   * and returns how many are used now, or null when none is left. Parallel callers can never together exceed `limit`.
+   */
+  takeSlot(bucket: string, window: string, limit: number): Promise<Result<number | null>>;
 }
 
 export interface VerdictSink {

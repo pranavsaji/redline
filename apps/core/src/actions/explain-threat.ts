@@ -1,5 +1,5 @@
 import type { CoreDeps } from '../deps.js';
-import { scopedReview, threatExplain, type ThreatExplanation } from '../resolvers/panel.js';
+import { findThreat, scopedReview, threatExplain, type ThreatExplanation } from '../resolvers/panel.js';
 import type { ActionPayload } from './common.js';
 import { callerOnIssue, issueUrl, parseInput, SCHEMAS, type ActionError } from './schemas.js';
 
@@ -26,8 +26,7 @@ export async function explainThreat(payload: ActionPayload & Record<string, unkn
   if (!latest.value) return { error: 'not_found' };
   const scoped = await scopedReview(deps, who.viewer, latest.value.id);
   if (!scoped) return { error: 'unavailable' };
-  const ref = /^T-(\d+)$/i.exec(input.value.threatId);
-  const threat = ref ? scoped.threats[Number(ref[1]) - 1] : scoped.threats.find((t) => t.id === input.value.threatId.toLowerCase());
+  const threat = findThreat(scoped.threats, input.value.threatId);
   if (!threat) return { error: 'not_found' };
   const explained = await threatExplain(deps, who.viewer, { reviewId: latest.value.id, threatId: threat.id });
   if ('error' in explained) return { error: explained.error };

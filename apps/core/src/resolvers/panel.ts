@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ACCEPTANCE_EVENTS, rebuildAcceptances, reviewSignals, threatDiff, whatIfScore, type DiscardedThreat, type Role } from '@threatline/core';
+import { ACCEPTANCE_EVENTS, rebuildAcceptances, reviewSignals, riskScore, threatDiff, whatIfScore, type DiscardedThreat, type Role } from '@threatline/core';
 import { cweById, getAsvs } from '@threatline/frameworks';
 import { DataClassSchema, ExposureSchema, severityRank, type Acceptance, type DataClass, type Exposure, type Severity, type ContextFact, type Requirement, type Review, type Threat, type Verdict } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
@@ -88,12 +88,66 @@ export async function authorise(deps: CoreDeps, v: Viewer, need: 'browse' | 'edi
   return allowed.value ? { issueKey: issue.value.key, issue: issue.value } : { error: 'not_found' };
 }
 
+/**
+ * The threats the panel lists, in its order (most severe first). A covered rule-based threat is named on the threat
+ * covering it, not listed. Every T-n ref (get-review, explain-threat, the panel) numbers this list: T-1 is its first.
+ */
+export const listedThreats = (sorted: readonly Threat[]): Threat[] => sorted.filter((t) => t.state !== 'covered');
+export const threatRef = (index: number): string => `T-${index + 1}`;
+/** A threat by id (any the viewer may see) or by T-n ref (into listedThreats). */
+export function findThreat(sorted: readonly Threat[], idOrRef: string): Threat | undefined {
+  const ref = /^T-(\d+)$/i.exec(idOrRef);
+  if (ref) return listedThreats(sorted)[Number(ref[1]) - 1];
+  return sorted.find((t) => t.id === idOrRef.toLowerCase());
+}
+
 /** Threats and facts the viewer may see, most severe first. */
 export async function scopedReview(deps: CoreDeps, v: Viewer, reviewId: string, cache: ScopeCache = newScopeCache()) {
   const [facts, threats] = await Promise.all([deps.reviews.facts(reviewId), deps.reviews.threats(reviewId)]);
   if (!facts.ok || !threats.ok) return null;
   const scoped = await scopeForViewer(deps, v.accountId, v.issueId, facts.value, threats.value, cache);
   return { ...scoped, threats: [...scoped.threats].sort(bySeverity), allThreatIds: threats.value.map((t) => t.id) };
+}
+
+/**
+ * Security: the risk score as this viewer may see it. The stored score counts every threat and data class, including
+ * those from sources the viewer cannot open; when anything is hidden it is recomputed from what they can see (without
+ * agent-run data classes, which carry no citations), exactly as panel.whatIf's `current`.
+ */
+function viewerScore(stored: number, scoped: { threats: Threat[]; facts: ContextFact[]; hiddenFacts: number; hiddenThreats: number }): number {
+  if (scoped.hiddenFacts === 0 && scoped.hiddenThreats === 0) return stored;
+  return riskScore(scoped.threats, reviewSignals(scoped.facts, []));
+}
+
+const HIDDEN_PARENT = 'a parent work item';
+
+/**
+ * Security: an inherited reason names its ancestor ("SEC-9: …") and that ancestor's sub-tasks. For an ancestor this
+ * viewer cannot browse, the reason says "A parent work item" and drops the ancestor's requirement ids and link; the
+ * Done-gate message (built for everyone) is dropped too. A failed check counts as not browsable.
+ */
+async function scopeVerdict<V extends Verdict & { message?: unknown }>(deps: CoreDeps, accountId: string, verdict: V): Promise<V> {
+  const keys = [...new Set(verdict.inheritedFrom)];
+  if (keys.length === 0) return verdict;
+  const browsable = await Promise.all(keys.map((k) => deps.jira.canBrowse(accountId, k).then((r) => r.ok && r.value, () => false)));
+  const hidden = new Set(keys.filter((_, i) => !browsable[i]));
+  if (hidden.size === 0) return verdict;
+  const { message: _m, ...rest } = verdict;
+  return {
+    ...rest,
+    inheritedFrom: verdict.inheritedFrom.map((k) => (hidden.has(k) ? HIDDEN_PARENT : k)),
+    reasons: verdict.reasons.map((r) => {
+      const from = [...hidden].find((k) => r.message.startsWith(`${k}: `));
+      return from ? { code: r.code, message: `A parent work item you cannot open blocks this (${r.code.replace(/_/g, ' ')}).` } : r;
+    }),
+  } as V;
+}
+
+/** The stored verdict carries the unscoped score (indexed for JQL): the panel's copy gets the viewer's score, or none. */
+function viewerVerdict<V extends object>(verdict: V | null, score: number | undefined): V | null {
+  if (!verdict || !('riskScore' in verdict)) return verdict;
+  const { riskScore: _r, ...rest } = verdict as V & { riskScore: unknown };
+  return (score === undefined ? rest : { ...rest, riskScore: score }) as V;
 }
 
 export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | Denied> {
@@ -116,6 +170,7 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
     const fresh = await refreshVerdict(deps, v.issueId);
     if (fresh.ok) verdict = (await deps.state.get<Verdict & { panelUrl?: string }>(verdictKey(v.issueId)).catch(() => undefined)) ?? fresh.value;
   }
+  if (verdict) verdict = await scopeVerdict(deps, v.accountId, verdict);
   const roles = await rolesOf(deps, v.accountId, v.issueId, policy.value);
 
   const cache = newScopeCache();
@@ -125,10 +180,12 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
   let covered: PanelDto['covered'] = [];
   let discarded: DiscardedThreat[] = [];
   let hiddenDiscarded = 0;
+  let score = review?.riskScore ?? 0;
   if (review) {
     const scoped = await scopedReview(deps, v, review.id, cache);
     if (!scoped) return { error: 'unavailable' };
-    threats = scoped.threats.filter((t) => t.state !== 'covered');
+    score = viewerScore(review.riskScore, scoped);
+    threats = listedThreats(scoped.threats);
     covered = scoped.threats.flatMap((t) => (t.state === 'covered' && t.coveredBy ? [{ title: t.title, coveredBy: t.coveredBy }] : []));
     facts = scoped.facts.map(toFactDto);
     hiddenThreats = scoped.hiddenThreats;
@@ -148,7 +205,7 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
     const cur = threatSets[i] ?? [];
     const prev = i > 0 ? (threatSets[i - 1] ?? []) : [];
     const d = threatDiff(prev, cur);
-    return { revision: r.revision, createdAt: r.createdAt, riskScore: r.riskScore, status: r.status, added: d.added.length, removed: d.removed.length };
+    return { revision: r.revision, createdAt: r.createdAt, riskScore: viewerScore(r.riskScore, scopedRevisions[i]!), status: r.status, added: d.added.length, removed: d.removed.length };
   });
 
   // Fail closed: a requirement is shown only when its threat is visible to this viewer in the latest review or in one
@@ -166,8 +223,8 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
   return {
     issueId: v.issueId,
     issueKey: auth.issueKey,
-    verdict,
-    review,
+    verdict: viewerVerdict(verdict, review ? score : undefined),
+    review: review ? { ...review, riskScore: score } : null,
     threats: threats.slice(0, PAGE_SIZE),
     threatsCursor: threats.length > PAGE_SIZE ? PAGE_SIZE : null,
     threatsTotal: threats.length,
@@ -197,7 +254,7 @@ export async function panelThreats(deps: CoreDeps, v: Viewer, p: { cursor?: unkn
   const scoped = await scopedReview(deps, v, latest.value.id);
   if (!scoped) return { error: 'unavailable' };
   const from = Number.isInteger(p.cursor) && (p.cursor as number) >= 0 ? (p.cursor as number) : 0;
-  const listed = scoped.threats.filter((t) => t.state !== 'covered');
+  const listed = listedThreats(scoped.threats);
   const page = listed.slice(from, from + PAGE_SIZE);
   return { threats: page, cursor: from + PAGE_SIZE < listed.length ? from + PAGE_SIZE : null };
 }

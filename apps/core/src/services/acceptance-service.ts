@@ -21,9 +21,16 @@ const label = (r: Pick<Requirement, 'subtaskKey' | 'severity'>) => r.subtaskKey 
 /** Acceptances as the ledger events alone say (no time-based expiry applied), to find the ones that still need an expiry entry. */
 const byEvents = (rows: readonly LedgerRow[]) => rebuildAcceptances(rows, new Date(0));
 
-/** Every acceptance event (the hourly expiry sweep), or, with an issue, that work item's only (indexed; scale). */
+/**
+ * Scale: an acceptance expires at most 365 days after its request, and the hourly sweep closes it then, so the sweep
+ * reads the acceptance events of the last 400 days (indexed on type and time) rather than every one ever written.
+ */
+const SWEEP_WINDOW_MS = 400 * 86_400_000;
+
+/** The recent acceptance events (the hourly expiry sweep), or, with an issue, that work item's only (indexed; scale). */
 async function ledgerRows(deps: CoreDeps, issueId?: string): Promise<Result<LedgerRow[]>> {
-  return issueId ? deps.ledger.forIssues(ACCEPTANCE_EVENTS, [issueId]) : deps.ledger.ofTypes(ACCEPTANCE_EVENTS);
+  if (issueId) return deps.ledger.forIssues(ACCEPTANCE_EVENTS, [issueId]);
+  return deps.ledger.ofTypesSince(ACCEPTANCE_EVENTS, new Date(deps.clock.now().getTime() - SWEEP_WINDOW_MS).toISOString());
 }
 
 async function setStatus(deps: CoreDeps, requirementId: string, from: Requirement['status'][], to: Requirement['status']): Promise<Result<void>> {

@@ -200,4 +200,10 @@ describe('rerun rate limit', () => {
     t.clock.set('2026-11-15T13:00:00Z');
     expect((await checkRerunLimit(t.deps, 'acc-1')).ok).toBe(true);
   });
+
+  it('is atomic: parallel re-runs cannot all pass the check', async () => {
+    const t = coreDeps();
+    const got = await Promise.all(Array.from({ length: 25 }, () => checkRerunLimit(t.deps, 'acc-1')));
+    expect(got.filter((r) => r.ok).length).toBe(10);
+  });
 });

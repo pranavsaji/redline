@@ -1,4 +1,4 @@
-import { buildLedgerProof, ledgerLeafHashes, signTreeHead, type LedgerProof, type TreeHead } from '@threatline/core';
+import { buildLedgerProofFromHashes, ledgerLeafHashes, signTreeHead, type LedgerProof, type TreeHead } from '@threatline/core';
 import { merkleRoot } from '@threatline/crypto';
 import { appError, err, ok, type Result } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
@@ -21,8 +21,23 @@ const mismatch = (deps: CoreDeps, size: number) => {
  * stored. Before signing, the latest stored head must still match the ledger's prefix: a rewritten ledger is reported
  * (and alerted), never re-signed.
  */
+const HASH_PAGE = 5000;
+
+/** Scale: every entry's seq and hash, in seq order, read in seq-ordered pages of the two columns (never the payloads). */
+async function leafInputs(deps: CoreDeps): Promise<Result<Array<{ seq: number; entryHash: string }>>> {
+  const out: Array<{ seq: number; entryHash: string }> = [];
+  for (let after = 0; ; ) {
+    const page = await deps.ledger.entryHashes(after, HASH_PAGE);
+    if (!page.ok) return page;
+    // Until an empty page: a repository may return fewer than asked for without being at the end.
+    if (page.value.length === 0) return ok(out);
+    out.push(...page.value);
+    after = page.value.at(-1)!.seq;
+  }
+}
+
 export async function currentTreeHead(deps: CoreDeps): Promise<Result<TreeHead>> {
-  const [rows, latest] = await Promise.all([deps.ledger.all(), deps.treeHeads.latest()]);
+  const [rows, latest] = await Promise.all([leafInputs(deps), deps.treeHeads.latest()]);
   if (!rows.ok) return rows;
   if (!latest.ok) return latest;
   const leaves = ledgerLeafHashes(rows.value);
@@ -102,8 +117,9 @@ export async function publishTreeHead(deps: CoreDeps): Promise<Result<PublishOut
 export async function ledgerProofFor(deps: CoreDeps, seq: number): Promise<Result<LedgerProof>> {
   const head = await currentTreeHead(deps);
   if (!head.ok) return head;
-  const [rows, published, keys] = await Promise.all([deps.ledger.all(), deps.treeHeads.lastPublished(), deps.keys.publicKeys()]);
+  const [rows, entry, published, keys] = await Promise.all([leafInputs(deps), deps.ledger.range(seq, seq), deps.treeHeads.lastPublished(), deps.keys.publicKeys()]);
   if (!rows.ok) return rows;
+  if (!entry.ok) return entry;
   if (!published.ok) return published;
   if (!keys.ok) return keys;
   let signed = head.value;
@@ -116,5 +132,5 @@ export async function ledgerProofFor(deps: CoreDeps, seq: number): Promise<Resul
     publicKey = key.value.publicKey;
   }
   const prev = published.value && published.value.kid === signed.kid && published.value.treeSize < signed.treeSize ? published.value : null;
-  return buildLedgerProof(rows.value, seq, signed, publicKey, prev);
+  return buildLedgerProofFromHashes(rows.value, seq, entry.value[0] ?? null, signed, publicKey, prev);
 }

@@ -129,12 +129,23 @@ export function renderThreatModel(d: ThreatModelDto): string {
 
   out.push('<h2>Risk acceptances</h2>');
   const keyOf = new Map(d.requirements.map((r) => [r.id, r.subtaskKey ?? r.id]));
+  // Fail closed, like the panel: the reason and controls may describe a restricted source, so they are shown only when
+  // the requirement is on this page and its threat is shown in full.
+  const reqOf = new Map(d.requirements.map((r) => [r.id, r]));
+  const acceptanceShown = (a: Acceptance) => {
+    const r = reqOf.get(a.requirementId);
+    return r !== undefined && threatOf.has(r.threatId) && !redacted.has(r.threatId);
+  };
   out.push(
     d.acceptances.length === 0
       ? '<p>No risk acceptances.</p>'
       : table(
           ['Requirement', 'Severity', 'Reason', 'Compensating controls', 'State', 'Expires'],
-          d.acceptances.map((a) => [esc(keyOf.get(a.requirementId) ?? a.requirementId), esc(a.severity), esc(a.reason), esc(a.controls), esc(a.state), day(a.expiresAt)]),
+          d.acceptances.map((a) => {
+            const shown = acceptanceShown(a);
+            const reason = shown ? esc(a.reason) : '<em>Details in the Threatline panel.</em>';
+            return [esc(keyOf.get(a.requirementId) ?? a.requirementId), esc(a.severity), reason, shown ? esc(a.controls) : '', esc(a.state), day(a.expiresAt)];
+          }),
         ),
   );
 

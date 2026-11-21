@@ -41,6 +41,25 @@ describe('onIssueChange', () => {
     expect(t.pushed).toEqual([{ kind: 'gather', issueId: '10042', reason: 'rerun', actorAccountId: 'acc-editor' }]);
   });
 
+  it('label re-runs are rate-limited per account like the panel button (then count as ordinary updates)', async () => {
+    const t = coreDeps();
+    const toggle = issueEvent({ items: [{ field: 'labels', fieldId: 'labels', fromString: '', toString: 'threatline-review' }] });
+    for (let i = 0; i < 12; i++) await onIssueChange(t.deps, toggle);
+    expect(t.pushed.filter((j) => j.kind === 'gather' && j.reason === 'rerun').length).toBe(10);
+    expect(t.pushed.slice(10)).toEqual([
+      { kind: 'gather', issueId: '10042', reason: 'updated', actorAccountId: 'acc-editor' },
+      { kind: 'gather', issueId: '10042', reason: 'updated', actorAccountId: 'acc-editor' },
+    ]);
+  });
+
+  it('label re-runs with no actor (an Automation rule) are rate-limited per work item', async () => {
+    const t = coreDeps();
+    const { atlassianId: _a, ...toggle } = issueEvent({ items: [{ field: 'labels', fieldId: 'labels', fromString: '', toString: 'threatline-review' }] });
+    for (let i = 0; i < 11; i++) await onIssueChange(t.deps, toggle);
+    expect(t.pushed.filter((j) => j.kind === 'gather' && j.reason === 'rerun').length).toBe(10);
+    expect(t.pushed.at(-1)).toEqual({ kind: 'gather', issueId: '10042', reason: 'updated' });
+  });
+
   it('removing the label is an ordinary update, not a rerun', async () => {
     const t = coreDeps();
     await onIssueChange(t.deps, issueEvent({ items: [{ field: 'labels', fieldId: 'labels', fromString: 'threatline-review', toString: '' }] }));

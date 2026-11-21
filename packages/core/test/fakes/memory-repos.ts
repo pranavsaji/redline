@@ -184,6 +184,13 @@ export function memoryLedgerRepo(): LedgerRepo & { _rows: LedgerRow[] } {
     async latestOfTypes(types, limit) {
       return ok(rows.filter((r) => types.includes(r.eventType)).slice(-Math.max(0, limit)).map((r) => ({ ...r, payload: { ...r.payload } })));
     },
+    async ofTypesSince(types, sinceIso) {
+      return ok(rows.filter((r) => types.includes(r.eventType) && r.createdAt >= sinceIso).map(clone));
+    },
+    async entryHashes(afterSeq, limit) {
+      const n = Math.max(0, Math.min(5000, Math.floor(limit)));
+      return ok(rows.filter((r) => r.seq > afterSeq).sort((a, b) => a.seq - b.seq).slice(0, n).map((r) => ({ seq: r.seq, entryHash: r.entryHash })));
+    },
   };
 }
 
@@ -251,6 +258,7 @@ export function memoryAttestationRepo(): AttestationRepo {
 
 export function memoryUsageRepo(): UsageRepo {
   const m = new Map<string, { tokensIn: number; tokensOut: number; reviews: number }>();
+  const slots = new Map<string, { window: string; used: number }>();
   return {
     async add(month, d) {
       const cur = m.get(month) ?? { tokensIn: 0, tokensOut: 0, reviews: 0 };
@@ -259,6 +267,13 @@ export function memoryUsageRepo(): UsageRepo {
     },
     async get(month) {
       return ok(m.get(month) ?? { tokensIn: 0, tokensOut: 0, reviews: 0 });
+    },
+    async takeSlot(bucket, window, limit) {
+      const cur = slots.get(bucket);
+      const used = cur && cur.window === window ? cur.used : 0;
+      if (used >= limit) return ok(null);
+      slots.set(bucket, { window, used: used + 1 });
+      return ok(used + 1);
     },
   };
 }

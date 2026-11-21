@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import type { ReviewJob } from '../jobs/types.js';
+import { checkRerunLimit } from '../services/rate-limit.js';
 
 export const RERUN_LABEL = 'threatline-review';
 
@@ -60,7 +61,11 @@ export async function onIssueChange(deps: CoreDeps, raw: unknown): Promise<void>
   else if (e.eventType === 'avi:jira:created:issue') job = { kind: 'gather', issueId: e.issue.id, reason: 'created', ...actor };
   else {
     const rerun = items.some((i) => names(i).includes('labels') && words(i.to).includes(RERUN_LABEL) && !words(i.from).includes(RERUN_LABEL));
-    if (rerun) job = { kind: 'gather', issueId: e.issue.id, reason: 'rerun', ...actor };
+    // Security: a label re-run creates a revision and spends model calls, so it takes the same per-account limit as
+    // the panel button (per work item when the event names nobody). Over the limit it is an ordinary update.
+    const allowed = rerun && (await checkRerunLimit(deps, e.atlassianId ?? `issue:${e.issue.id}`)).ok;
+    if (rerun && !allowed) log('trigger.issue.rerun_limited', { issueId: e.issue.id });
+    if (allowed) job = { kind: 'gather', issueId: e.issue.id, reason: 'rerun', ...actor };
     else if (items.some((i) => names(i).some((n) => RELEVANT.has(n)))) job = { kind: 'gather', issueId: e.issue.id, reason: 'updated', ...actor };
   }
   if (!job) return;

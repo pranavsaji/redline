@@ -84,6 +84,19 @@ describe('Requirements tab', () => {
     expect(screen.getAllByText(/Evidence:/).length).toBeGreaterThan(0);
   });
 
+  it('a PR evidence link opens the PR itself, with its note shown beside it', async () => {
+    const url = 'https://bitbucket.org/acme/payments/pull-requests/42';
+    const api = withRoles('pass', ['viewer']);
+    const get: PanelApi['get'] = async () => {
+      const dto = (await api.get()) as PanelDto;
+      return { ...dto, requirements: dto.requirements.map((r) => ({ ...r, evidence: { kind: 'pr' as const, ref: url, note: 'test_webhook_rejects_bad_signature', attester: 'acc-dev' } })) };
+    };
+    await open({ ...api, get }, /Requirements/);
+    const links = screen.getAllByRole('link', { name: url });
+    expect(links[0]!.getAttribute('href')).toBe(url);
+    expect(screen.getAllByText(/test_webhook_rejects_bad_signature/).length).toBeGreaterThan(0);
+  });
+
   it.each(['light', 'dark'])('has no axe violations with the evidence form open (%s)', async (mode) => {
     document.documentElement.setAttribute('data-color-mode', mode);
     const { container } = await open(withRoles('ready', ['viewer', 'developer', 'champion']), /Requirements/);
