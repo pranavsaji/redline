@@ -413,4 +413,17 @@ describe('verify-requirement: a coding agent closes the loop with the pull reque
     const saved = await t.deps.requirements.get(req.id);
     expect(saved.ok && saved.value?.status).toBe('Open');
   });
+
+  it('stores the PR link itself as the evidence ref and the note beside it (a path-less link with a note works too)', async () => {
+    const { t, req } = await reviewed();
+    const url = 'https://bitbucket.org/acme/payments/pull-requests/42';
+    expect(await verifyRequirement({ requirementId: req.id, prUrl: url, note: 'test_webhook_rejects_bad_signature', ...ctx(ME) }, t.deps)).toMatchObject({ status: 'Verified' });
+    const saved = await t.deps.requirements.get(req.id);
+    expect(saved.ok && saved.value?.evidence).toEqual({ kind: 'pr', ref: url, note: 'test_webhook_rejects_bad_signature', attester: ME });
+
+    const other = await reviewed();
+    expect(await verifyRequirement({ requirementId: other.req.id, prUrl: 'https://github.example', note: 'merged as abc123', ...ctx(ME) }, other.t.deps)).toMatchObject({ status: 'Verified' });
+    const s2 = await other.t.deps.requirements.get(other.req.id);
+    expect(s2.ok && s2.value?.evidence).toMatchObject({ ref: 'https://github.example', note: 'merged as abc123' });
+  });
 });

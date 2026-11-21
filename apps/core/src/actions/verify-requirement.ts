@@ -29,8 +29,9 @@ export async function verifyRequirement(payload: ActionPayload & Record<string, 
   if (!found.value) return { error: 'not_found' };
   const who = await callerOnIssue(deps, payload, found.value.issueId, 'edit');
   if (!who.ok) return who.error;
-  const ref = input.value.note ? `${input.value.prUrl} (${input.value.note})` : input.value.prUrl;
-  const r = await setRequirementStatus(deps, who.viewer, { requirementId: found.value.id, status: 'Verified', evidence: { kind: 'pr', ref } });
+  // The link stays the evidence ref (the panel opens it); the note is stored beside it, not appended to the URL.
+  const evidence = { kind: 'pr' as const, ref: input.value.prUrl, ...(input.value.note ? { note: input.value.note } : {}) };
+  const r = await setRequirementStatus(deps, who.viewer, { requirementId: found.value.id, status: 'Verified', evidence });
   if (!r.ok) {
     log('action.verify.refused', { issueId: who.viewer.issueId, code: r.error.code });
     return actionError(r.error);

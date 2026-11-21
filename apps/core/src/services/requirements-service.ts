@@ -167,7 +167,7 @@ export async function threatVisible(deps: CoreDeps, v: Viewer, threatId: string)
 export async function setRequirementStatus(
   deps: CoreDeps,
   v: Viewer,
-  input: { requirementId: string; status: RequirementStatus; evidence?: { kind: Evidence['kind']; ref: string } },
+  input: { requirementId: string; status: RequirementStatus; evidence?: { kind: Evidence['kind']; ref: string; note?: string } },
 ): Promise<Result<Requirement>> {
   if (input.status === 'AcceptedRisk') return err(appError('validation', 'Request a risk acceptance in the Threatline panel instead.'));
   const got = await deps.requirements.get(input.requirementId);
@@ -190,7 +190,7 @@ export async function setRequirementStatus(
     const e = input.evidence;
     if (!e) return err(appError('validation', 'Verified needs evidence: a PR link, a test file path, a Confluence section, or a note.'));
     if ((e.kind === 'pr' || e.kind === 'confluence') && !HTTPS(e.ref)) return err(appError('validation', 'A PR or Confluence link must start with https://.'));
-    next = { ...next, verifiedBy: v.accountId, verifiedAt: deps.clock.now().toISOString(), evidence: { kind: e.kind, ref: e.ref, attester: v.accountId } };
+    next = { ...next, verifiedBy: v.accountId, verifiedAt: deps.clock.now().toISOString(), evidence: { kind: e.kind, ref: e.ref, ...(e.note ? { note: e.note } : {}), attester: v.accountId } };
   }
   const u = await deps.requirements.upsert(next);
   if (!u.ok) return u;
