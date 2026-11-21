@@ -68,7 +68,7 @@ describe('feature: rules-only reviews are labelled', () => {
     const api = mockApi('ready');
     const dto = await api.get();
     if ('error' in dto) throw new Error('fixture');
-    await renderState('ready', { ...api, get: async () => ({ ...dto, review: { ...dto.review!, modelIds: ['redline-rules'], samplesExpected: 0 } }) });
+    await renderState('ready', { ...api, get: async () => ({ ...dto, review: { ...dto.review!, modelIds: ['threatline-rules'], samplesExpected: 0 } }) });
     expect(screen.getByText('Rule-based review')).toBeTruthy();
     expect(screen.getByText(/AI review is off on this site/)).toBeTruthy();
   });

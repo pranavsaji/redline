@@ -37,7 +37,7 @@ describe('schemas', () => {
   });
 
   it('AgentThreatModel is strict and capped', () => {
-    const model = { schema: 'redline.threatmodel.v1', issueKey: 'PROJ-1', threats: [agentThreat] };
+    const model = { schema: 'threatline.threatmodel.v1', issueKey: 'PROJ-1', threats: [agentThreat] };
     expect(AgentThreatModelSchema.parse(model).threats).toHaveLength(1);
     expect(AgentThreatModelSchema.safeParse({ ...model, verdict: 'pass' }).success).toBe(false);
     expect(AgentThreatModelSchema.safeParse({ ...model, threats: Array(26).fill(agentThreat) }).success).toBe(false);

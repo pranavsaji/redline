@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ok, type ContextBundle } from '@redline/shared';
-import { normalizeFact, contextHash } from '@redline/core';
+import { ok, type ContextBundle } from '@threatline/shared';
+import { normalizeFact, contextHash } from '@threatline/core';
 import { getReviewContext } from '../src/actions/get-review-context.js';
 import { ingestSample, submitThreatModel } from '../src/actions/submit-threat-model.js';
 import { handleJob } from '../src/consumers/review-consumer.js';
@@ -17,7 +17,7 @@ async function submit(deps: CoreDeps, issueKey: string, threatModelJson: unknown
 const KEY = 'PAY-7';
 const ctx = (accountId?: string) => ({ context: accountId ? { accountId, agentId: 'agent-1', cloudId: 'c' } : {} });
 const MODEL = {
-  schema: 'redline.threatmodel.v1',
+  schema: 'threatline.threatmodel.v1',
   issueKey: KEY,
   threats: [
     {
@@ -141,7 +141,7 @@ describe('submit-threat-model (CREATE action) and ingestSample', () => {
     expect(r).toMatchObject({ saved: true, valid: true, received: 1, expected: 3 });
     const rev = (await t.deps.reviews.latest('10042')) as { ok: true; value: { id: string } };
     const samples = await t.deps.reviews.samples(rev.value.id);
-    expect(samples.ok && samples.value[0]).toMatchObject({ schema: 'redline.threatmodel.v1' });
+    expect(samples.ok && samples.value[0]).toMatchObject({ schema: 'threatline.threatmodel.v1' });
     expect(t.pushed).toEqual([{ kind: 'assemble', reviewId: rev.value.id }]);
     expect(t.kv.data.get('ingest:recent')).toEqual([true]);
   });
@@ -170,7 +170,7 @@ describe('submit-threat-model (CREATE action) and ingestSample', () => {
     await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
     await submit(t.deps, KEY, '  ');
     expect(t.kv.data.has('ingest:lastAt')).toBe(false);
-    await submit(t.deps, KEY, '{"schema":"redline.threatmodel.v1","issueKey":"PAY-7","threats":[]}');
+    await submit(t.deps, KEY, '{"schema":"threatline.threatmodel.v1","issueKey":"PAY-7","threats":[]}');
     expect(t.kv.data.get('ingest:lastAt')).toBe('2026-11-15T12:00:00.000Z');
   });
 

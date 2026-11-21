@@ -143,7 +143,7 @@ export function IssuePanel({ api }: { api: PanelApi }) {
               and a verifier that checks each threat against those quotes. Models: {dto.review.modelIds.join(', ')}.
             </SectionMessage>
           )}
-          {dto.review?.modelIds.includes('redline-rules') && (
+          {dto.review?.modelIds.some((m) => m === 'threatline-rules' || m === 'redline-rules') && (
             <SectionMessage appearance="information" title="Rule-based review">
               AI review is off on this site, so these threats come from Threatline's built-in checks only. An admin can turn on AI review under Threatline admin → Review mode once Rovo is available.
             </SectionMessage>
@@ -252,7 +252,7 @@ export function IssuePanel({ api }: { api: PanelApi }) {
               </ul>
             </SectionMessage>
           )}
-          <Tabs id="redline-tabs">
+          <Tabs id="threatline-tabs">
             {/* A narrow panel scrolls the tab row itself rather than the whole page sideways. */}
             <div style={{ overflowX: 'auto', minWidth: 0 }}>
               <TabList>

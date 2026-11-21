@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentThreat } from '@redline/shared';
+import type { AgentThreat } from '@threatline/shared';
 import {
   baselineThreats,
   clusterSamples,

@@ -1,5 +1,5 @@
 {
-  "name": "@redline/core",
+  "name": "@threatline/core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,10 +10,10 @@
     "./testing": "./test/fakes/index.ts"
   },
   "dependencies": {
-    "@redline/crypto": "workspace:*",
-    "@redline/frameworks": "workspace:*",
-    "@redline/prompts": "workspace:*",
-    "@redline/shared": "workspace:*",
+    "@threatline/crypto": "workspace:*",
+    "@threatline/frameworks": "workspace:*",
+    "@threatline/prompts": "workspace:*",
+    "@threatline/shared": "workspace:*",
     "picomatch": "^4.0.7",
     "yaml": "^2.9.1",
     "zod": "^4.6.6"

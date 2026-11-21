@@ -35,15 +35,15 @@ describe('onIssueChange', () => {
     }
   });
 
-  it('adding the redline-review label is a rerun', async () => {
+  it('adding the threatline-review label is a rerun', async () => {
     const t = coreDeps();
-    await onIssueChange(t.deps, issueEvent({ items: [{ field: 'labels', fieldId: 'labels', fromString: 'pci', toString: 'pci redline-review' }] }));
+    await onIssueChange(t.deps, issueEvent({ items: [{ field: 'labels', fieldId: 'labels', fromString: 'pci', toString: 'pci threatline-review' }] }));
     expect(t.pushed).toEqual([{ kind: 'gather', issueId: '10042', reason: 'rerun', actorAccountId: 'acc-editor' }]);
   });
 
   it('removing the label is an ordinary update, not a rerun', async () => {
     const t = coreDeps();
-    await onIssueChange(t.deps, issueEvent({ items: [{ field: 'labels', fieldId: 'labels', fromString: 'redline-review', toString: '' }] }));
+    await onIssueChange(t.deps, issueEvent({ items: [{ field: 'labels', fieldId: 'labels', fromString: 'threatline-review', toString: '' }] }));
     expect(t.pushed).toEqual([{ kind: 'gather', issueId: '10042', reason: 'updated', actorAccountId: 'acc-editor' }]);
   });
 
@@ -95,7 +95,7 @@ describe('onInstall', () => {
 describe('onIssueChange: hostile changelog shapes', () => {
   it('a changelog item with a non-string toString (or prototype keys) does not crash or count as a rerun', async () => {
     const t = coreDeps();
-    await onIssueChange(t.deps, issueEvent({ items: [JSON.parse('{"field":"labels","toString":{"x":1},"__proto__":{"toString":"redline-review"}}')] }));
+    await onIssueChange(t.deps, issueEvent({ items: [JSON.parse('{"field":"labels","toString":{"x":1},"__proto__":{"toString":"threatline-review"}}')] }));
     expect(t.pushed).toEqual([{ kind: 'gather', issueId: '10042', reason: 'updated', actorAccountId: 'acc-editor' }]);
   });
 });

@@ -151,22 +151,22 @@ api.asApp().requestBitbucket(route`/2.0/repositories/${wsUuid}/${repoUuid}/pullr
 - Properties are JQL-searchable **only if indexed** via `jira:entityProperty` (manifest-reference/modules/jira-entity-property/):
 ```yaml
 jira:entityProperty:
-  - key: redline-index
+  - key: threatline-index
     entityType: issue          # issue (default) | user | project
-    propertyKey: redline
+    propertyKey: threatline
     values:
-      - { path: score,  type: number, searchAlias: redlineScore }   # types: number|string|text|user|date
-      - { path: status, type: string, searchAlias: redlineStatus }
+      - { path: score,  type: number, searchAlias: threatlineScore }   # types: number|string|text|user|date
+      - { path: status, type: string, searchAlias: threatlineStatus }
 ```
-- JQL: `redlineScore > 3` or `issue.property['redline'].score > 3`. All `jira:entityProperty` modules share a limit of 100 values; use `jira:entityPropertySet` for more.
+- JQL: `threatlineScore > 3` or `issue.property['threatline'].score > 3`. All `jira:entityProperty` modules share a limit of 100 values; use `jira:entityPropertySet` for more.
 
 ## 5. `jira:workflowValidator`: manifest-reference/modules/jira-workflow-validator/ (Preview)
 - Properties: `key`, `name`, `description`, `function` **or** `expression` (not both), `errorMessage` (string | i18n | `{expression}`), `create`/`edit`/`view` `{ resource }` (config UI), `projectTypes`, `configurationDescription`, `resolver` (the page lists it as "required"; probably only needed with config UI, **UNCONFIRMED**).
 ```yaml
 jira:workflowValidator:
-  - key: redline-gate
-    name: Redline gate
-    description: Blocks transition when the issue fails Redline checks
+  - key: threatline-gate
+    name: Threatline gate
+    description: Blocks transition when the issue fails Threatline checks
     function: validate
 ```
 ```ts
@@ -206,7 +206,7 @@ export async function analyzeIssue(payload, context) {
 **Automation** (Jira only per the page; a GA post mentions Confluence, **UNCONFIRMED**):
 ```yaml
 automation:actionProvider:
-  - key: redline-automation
+  - key: threatline-automation
     actions: [analyze-issue]       # only listed actions appear in the rule builder
 ```
 - For Automation the `action` also **requires** `config: { resource, render: native }` (a UI Kit/Custom UI config form). It can declare `outputs` (`type`, `nullable`, `description`) and `outputContext` (`entityName` ≤12, `outputType` OBJECT|LIST, `outputDomain` ≤12). Smart values: declare a hidden input whose value is a smart value (e.g. `"{{issue.key}}"`); Automation resolves it at run time. The handler reads `payload.<input>`. Errors: return `{ errors: [...] }` to fail the rule, which writes to the audit log and emails the rule owner. Outputs become a smart value named from `actionVerb`+`outputDomain`+`entityName`. Limits: 20 Automation actions per app; config JSON ≤100 KB; changes can take up to 20 min to appear (caching).
@@ -215,21 +215,21 @@ automation:actionProvider:
 `rovo:agent` (manifest-reference/modules/rovo-agent/):
 ```yaml
 rovo:agent:
-  - key: redline-agent
-    name: Redline             # ≤30 chars
+  - key: threatline-agent
+    name: Threatline             # ≤30 chars
     description: Reviews requirements for risk
     icon: resource:assets;icons/agent.svg
     prompt: resource:prompts;agent.md        # inline string also OK; resource refs need CLI ≥10.6.0
     conversationStarters: [Review this issue, Summarize open risks]
     followUpPrompt: Suggest next steps.
     actions: [analyze-issue]
-    skills: [redline-review]                 # rovo:skill keys (Preview)
+    skills: [threatline-review]                 # rovo:skill keys (Preview)
 ```
 `rovo:skill` (**Preview**, not EAP; .../rovo-skill/):
 ```yaml
 rovo:skill:
-  - key: redline-review
-    source: { dir: skills/redline-review }      # must contain SKILL.md
+  - key: threatline-review
+    source: { dir: skills/threatline-review }      # must contain SKILL.md
     dependencies: { tools: [analyze-issue] }    # action keys; SKILL.md `allowed-tools` must include them
 ```
 - No skill-to-skill dependencies and no scripts. The agent selects a skill by its description.
@@ -237,8 +237,8 @@ rovo:skill:
 `rovo:mcp` (**Preview**; .../rovo-mcp/):
 ```yaml
 rovo:mcp:
-  - key: redline-mcp
-    name: Redline MCP           # ≤30 chars
+  - key: threatline-mcp
+    name: Threatline MCP           # ≤30 chars
     tools: [analyze-issue]      # action keys (<64 chars each), max 50; ONE rovo:mcp per app
 ```
 - Each listed `action` becomes a tool, and the action's `inputs` presumably form the tool schema (implied, not explicit). The endpoint is `https://mcp.atlassian.com/forge/<appId>` (the UUID part of `app.id`). Clients use OAuth 2.1 consent, and calls are bound by the user's permissions. External exposure is **off by default**. An admin enables it per site under Admin → Apps → Sites → Connected apps.
@@ -278,10 +278,10 @@ const { data, errors } = await r.json();
 ## 10. Custom UI: forge/custom-ui/, apis-reference/ui-api-bridge/{invoke,view}/, runtime-reference/forge-resolver/, design-tokens-and-theming/
 ```yaml
 jira:issuePanel:
-  - key: redline-panel
+  - key: threatline-panel
     resource: main-ui
     resolver: { function: resolver }
-    title: Redline
+    title: Threatline
 resources:
   - { key: main-ui, path: static/main/build }   # must contain index.html; set Vite `base: './'`, outDir to this path
 function:
@@ -306,14 +306,14 @@ export const handler = resolver.getDefinitions();
 ```yaml
 modules:
   bitbucket:mergeCheck:
-    - key: redline-check
+    - key: threatline-check
       function: mergeCheck
-      name: Redline requirements check
+      name: Threatline requirements check
       description: Blocks merge when linked requirements fail
       triggers: [on-code-pushed, on-reviewer-status-changed, on-merge]   # ≥1
   bitbucket:repoSettingsMenuPage:
-    - key: redline-repo-settings
-      title: Redline
+    - key: threatline-repo-settings
+      title: Threatline
       resource: settings-ui           # + render: native for UI Kit; resolver: { function: ... }
 permissions:
   scopes: [read:pullrequest:bitbucket, read:repository:bitbucket]   # mergeCheck REQUIRES read:pullrequest:bitbucket

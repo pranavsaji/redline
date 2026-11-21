@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { appendLedger, DEFAULT_SITE_POLICY } from '@redline/core';
-import { ok, type Review, type SitePolicy } from '@redline/shared';
+import { appendLedger, DEFAULT_SITE_POLICY } from '@threatline/core';
+import { ok, type Review, type SitePolicy } from '@threatline/shared';
 import type { ConfluenceClient } from '../../src/adapters/confluence.js';
 import {
   adminResumeReviews,

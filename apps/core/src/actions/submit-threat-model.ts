@@ -1,6 +1,6 @@
 import { storeSample } from '../services/samples.js';
-import { appendLedger, extractAgentJson, type Sample } from '@redline/core';
-import { appError, err, ok, type Result } from '@redline/shared';
+import { appendLedger, extractAgentJson, type Sample } from '@threatline/core';
+import { appError, err, ok, type Result } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { handleJob } from '../consumers/review-consumer.js';

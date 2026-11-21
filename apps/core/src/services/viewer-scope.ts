@@ -1,4 +1,4 @@
-import type { ContextFact, Threat } from '@redline/shared';
+import type { ContextFact, Threat } from '@threatline/shared';
 import type { ConfluenceClient } from '../adapters/confluence.js';
 import type { JiraClient } from '../adapters/jira.js';
 

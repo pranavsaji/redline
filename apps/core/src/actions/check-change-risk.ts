@@ -1,5 +1,5 @@
-import { DEFAULT_SITE_POLICY, isSensitive, scoreDiff, type DiffSignal } from '@redline/core';
-import type { Requirement, Severity } from '@redline/shared';
+import { DEFAULT_SITE_POLICY, isSensitive, scoreDiff, type DiffSignal } from '@threatline/core';
+import type { Requirement, Severity } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { panelGet } from '../resolvers/panel.js';
@@ -26,7 +26,7 @@ const OPEN = new Set<Requirement['status']>(['Open', 'InProgress']);
 
 /**
  * GET (Agent, MCP): a preview of the Bitbucket merge check for a set of changed paths. Scores the paths the way the
- * merge check does (site sensitive globs; a repository's own `.redline/policy.yml` may add more), lists the
+ * merge check does (site sensitive globs; a repository's own `.threatline/policy.yml` may add more), lists the
  * requirements whose file hints match, and says whether the work item's verdict would let it through.
  */
 export async function checkChangeRisk(payload: ActionPayload & Record<string, unknown>, deps: CoreDeps): Promise<ChangeRiskResult | ActionError> {

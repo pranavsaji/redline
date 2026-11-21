@@ -1,6 +1,6 @@
-import { contextHash, normalizeFact, type ClockPort, type ContextGatherer, type GatherOptions, type IssueRepo, type RawFact, type ReviewRepo } from '@redline/core';
-import { sha256Hex } from '@redline/crypto';
-import { ok, type ContextBundle, type ContextFact, type Result } from '@redline/shared';
+import { contextHash, normalizeFact, type ClockPort, type ContextGatherer, type GatherOptions, type IssueRepo, type RawFact, type ReviewRepo } from '@threatline/core';
+import { sha256Hex } from '@threatline/crypto';
+import { ok, type ContextBundle, type ContextFact, type Result } from '@threatline/shared';
 import type { ConfluenceClient } from './confluence.js';
 import type { JiraClient, JiraIssue } from './jira.js';
 
@@ -208,7 +208,7 @@ export function restGatherer(d: RestGathererDeps): ContextGatherer {
           // Numbers and enums only: threat titles came from a model that read untrusted text, so they are not repeated here.
           facts.push(
             raw({
-              sourceAri: `ari:redline:review/${last.id}`,
+              sourceAri: `ari:threatline:review/${last.id}`,
               sourceType: 'review',
               title: `Earlier Threatline review, revision ${last.revision}`,
               url: browse(issue.key),

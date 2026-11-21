@@ -50,13 +50,13 @@ importers:
       '@forge/resolver':
         specifier: ^2.0.2
         version: 2.0.2(typescript@5.9.3)
-      '@redline/core':
+      '@threatline/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@redline/crypto':
+      '@threatline/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
-      '@redline/shared':
+      '@threatline/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       zod:
@@ -81,7 +81,7 @@ importers:
       '@forge/bridge':
         specifier: ^7.3.0
         version: 7.3.0(@types/react@18.3.31)(react@18.3.1)(typescript@5.9.3)
-      '@redline/crypto':
+      '@threatline/crypto':
         specifier: workspace:*
         version: link:../../../packages/crypto
       react:
@@ -139,22 +139,22 @@ importers:
       '@forge/sql':
         specifier: ^4.0.10
         version: 4.0.10(typescript@5.9.3)
-      '@redline/core':
+      '@threatline/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@redline/crypto':
+      '@threatline/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
-      '@redline/db':
+      '@threatline/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@redline/frameworks':
+      '@threatline/frameworks':
         specifier: workspace:*
         version: link:../../packages/frameworks
-      '@redline/prompts':
+      '@threatline/prompts':
         specifier: workspace:*
         version: link:../../packages/prompts
-      '@redline/shared':
+      '@threatline/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       zod:
@@ -197,7 +197,7 @@ importers:
       '@forge/bridge':
         specifier: ^7.3.0
         version: 7.3.0(@types/react@18.3.31)(react@18.3.1)(typescript@5.9.3)
-      '@redline/shared':
+      '@threatline/shared':
         specifier: workspace:*
         version: link:../../../packages/shared
       react:
@@ -237,13 +237,13 @@ importers:
 
   apps/github-action:
     dependencies:
-      '@redline/core':
+      '@threatline/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@redline/crypto':
+      '@threatline/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
-      '@redline/shared':
+      '@threatline/shared':
         specifier: workspace:*
         version: link:../../packages/shared
     devDependencies:
@@ -253,19 +253,19 @@ importers:
 
   apps/local:
     dependencies:
-      '@redline/core':
+      '@threatline/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@redline/crypto':
+      '@threatline/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
-      '@redline/llm-dev':
+      '@threatline/llm-dev':
         specifier: workspace:*
         version: link:../../packages/llm-dev
 
   e2e:
     dependencies:
-      '@redline/shared':
+      '@threatline/shared':
         specifier: workspace:*
         version: link:../packages/shared
     devDependencies:
@@ -275,28 +275,28 @@ importers:
 
   evals:
     dependencies:
-      '@redline/core':
+      '@threatline/core':
         specifier: workspace:*
         version: link:../packages/core
-      '@redline/prompts':
+      '@threatline/prompts':
         specifier: workspace:*
         version: link:../packages/prompts
-      '@redline/shared':
+      '@threatline/shared':
         specifier: workspace:*
         version: link:../packages/shared
 
   packages/core:
     dependencies:
-      '@redline/crypto':
+      '@threatline/crypto':
         specifier: workspace:*
         version: link:../crypto
-      '@redline/frameworks':
+      '@threatline/frameworks':
         specifier: workspace:*
         version: link:../frameworks
-      '@redline/prompts':
+      '@threatline/prompts':
         specifier: workspace:*
         version: link:../prompts
-      '@redline/shared':
+      '@threatline/shared':
         specifier: workspace:*
         version: link:../shared
       picomatch:
@@ -324,16 +324,16 @@ importers:
       '@noble/hashes':
         specifier: ^1.8.0
         version: 1.8.0
-      '@redline/shared':
+      '@threatline/shared':
         specifier: workspace:*
         version: link:../shared
 
   packages/db:
     dependencies:
-      '@redline/core':
+      '@threatline/core':
         specifier: workspace:*
         version: link:../core
-      '@redline/shared':
+      '@threatline/shared':
         specifier: workspace:*
         version: link:../shared
       zod:
@@ -342,22 +342,22 @@ importers:
 
   packages/frameworks:
     dependencies:
-      '@redline/shared':
+      '@threatline/shared':
         specifier: workspace:*
         version: link:../shared
 
   packages/llm-dev:
     dependencies:
-      '@redline/core':
+      '@threatline/core':
         specifier: workspace:*
         version: link:../core
-      '@redline/shared':
+      '@threatline/shared':
         specifier: workspace:*
         version: link:../shared
 
   packages/prompts:
     dependencies:
-      '@redline/shared':
+      '@threatline/shared':
         specifier: workspace:*
         version: link:../shared
       zod:

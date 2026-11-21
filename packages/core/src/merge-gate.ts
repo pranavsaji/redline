@@ -1,5 +1,5 @@
-import { decodeAttestation, findAttestations, fromB64url, fromUtf8 } from '@redline/crypto';
-import type { AttestationPayload } from '@redline/shared';
+import { decodeAttestation, findAttestations, fromB64url, fromUtf8 } from '@threatline/crypto';
+import type { AttestationPayload } from '@threatline/shared';
 import { DEFAULT_SITE_POLICY, parseRepoPolicy } from './policy.js';
 import { scoreDiff, type DiffFile } from './diffscore.js';
 

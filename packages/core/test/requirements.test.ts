@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isValidRef } from '@redline/frameworks';
+import { isValidRef } from '@threatline/frameworks';
 import { assembleReview, contextHash, DEFAULT_SITE_POLICY, normalizeFact, requirementsFor } from '../src/index.js';
 import { rawFacts } from './fixtures/ai-support-agent.js';
 import { ISSUE_KEY, model, refundAbuse } from './fixtures/agent-samples.js';

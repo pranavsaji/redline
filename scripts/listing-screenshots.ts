@@ -1,6 +1,6 @@
 // Marketplace listing screenshots (Task 32): 5 per listing, from the mock-bridge previews, into docs/screenshots/.
 //
-//   pnpm --filter @redline/core-ui dev --port 5179 & pnpm --filter @redline/bitbucket-ui dev --port 5180 &
+//   pnpm --filter @threatline/core-ui dev --port 5179 & pnpm --filter @threatline/bitbucket-ui dev --port 5180 &
 //   pnpm exec tsx scripts/listing-screenshots.ts
 //
 // The Bitbucket attestation shots use a throwaway key pair generated here, so the browser really verifies a signature;

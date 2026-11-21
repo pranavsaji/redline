@@ -2,7 +2,7 @@ import { useId, useState } from 'react';
 import Button from '@atlaskit/button/new';
 import Lozenge from '@atlaskit/lozenge';
 import { token } from '@atlaskit/tokens';
-import { fixBy, TEST_LANGUAGES, testScaffold, type TestLanguage } from '@redline/shared/requirement-tools';
+import { fixBy, TEST_LANGUAGES, testScaffold, type TestLanguage } from '@threatline/shared/requirement-tools';
 import type { Requirement } from '../types.js';
 import { field } from './form-styles.js';
 

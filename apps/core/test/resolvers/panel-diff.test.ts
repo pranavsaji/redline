@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { EXPOSURE_MULTIPLIER, normalizeFact, contextHash } from '@redline/core';
-import { ok, type AgentThreatModel, type ContextFact } from '@redline/shared';
+import { EXPOSURE_MULTIPLIER, normalizeFact, contextHash } from '@threatline/core';
+import { ok, type AgentThreatModel, type ContextFact } from '@threatline/shared';
 import { handleJob } from '../../src/consumers/review-consumer.js';
 import { panelDiff, panelWhatIf } from '../../src/resolvers/panel.js';
 import { ISSUE, reviewed } from '../support/reviewed.js';
@@ -26,7 +26,7 @@ async function twoRevisions() {
   await handleJob(t.deps, { kind: 'gather', issueId: ISSUE, reason: 'rerun' });
   const rev2 = (await t.deps.reviews.latest(ISSUE)) as { ok: true; value: { id: string; revision: number } };
   const model: AgentThreatModel = {
-    schema: 'redline.threatmodel.v1',
+    schema: 'threatline.threatmodel.v1',
     issueKey: 'PAY-7',
     threats: [
       { stride: 'Spoofing', title: 'Forged refund webhooks', scenario: 'An attacker posts a fake refund event.', component: 'webhook endpoint', likelihood: 4, impact: 4, evidence: [{ quote: 'Public webhook that receives refund events' }] },

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ArchitectureSketchSchema, StrideSchema } from '@redline/shared';
+import { ArchitectureSketchSchema, StrideSchema } from '@threatline/shared';
 
 export const EVIDENCE_TAGS = ['auth', 'pii', 'payment', 'upload', 'public', 'llm', 'tool', 'storage', 'third_party', 'secrets'] as const;
 

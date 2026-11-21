@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Review } from '@redline/shared';
+import type { Review } from '@threatline/shared';
 import { assembleReview, contextHash, DEFAULT_SITE_POLICY, extractAgentJson, normalizeFact, type Sample } from '../src/index.js';
 import { poisonedRawFact, rawFacts } from './fixtures/ai-support-agent.js';
 import { AGENT_TEXT, goalHijack, invented, ISSUE_KEY, model, paraphrased, refundAbuse, transcriptLeak } from './fixtures/agent-samples.js';
@@ -231,9 +231,9 @@ describe('assembleReview', () => {
 describe('fitAgentModel (Threatline Engine: strong models write long)', () => {
   it('trims wording, shortens quotes from the end only, drops unknown keys, and a sound model then validates', async () => {
     const { fitAgentModel } = await import('../src/index.js');
-    const { AgentThreatModelSchema } = await import('@redline/shared');
+    const { AgentThreatModelSchema } = await import('@threatline/shared');
     const raw = {
-      schema: 'redline.threatmodel.v1',
+      schema: 'threatline.threatmodel.v1',
       issueKey: 'PROJ-1',
       notes: 'extra',
       sketch: { components: ['a'.repeat(300)], exposure: 'public', confidence: 0.9 },
@@ -249,8 +249,8 @@ describe('fitAgentModel (Threatline Engine: strong models write long)', () => {
 
   it('does not invent evidence', async () => {
     const { fitAgentModel } = await import('../src/index.js');
-    const { AgentThreatModelSchema } = await import('@redline/shared');
-    const raw = { schema: 'redline.threatmodel.v1', issueKey: 'PROJ-1', threats: [{ stride: 'Tampering', title: 't', scenario: 's', component: 'c', likelihood: 3, impact: 3, evidence: [] }] };
+    const { AgentThreatModelSchema } = await import('@threatline/shared');
+    const raw = { schema: 'threatline.threatmodel.v1', issueKey: 'PROJ-1', threats: [{ stride: 'Tampering', title: 't', scenario: 's', component: 'c', likelihood: 3, impact: 3, evidence: [] }] };
     expect(AgentThreatModelSchema.safeParse(fitAgentModel(raw)).success).toBe(false);
   });
 });

@@ -1,4 +1,4 @@
-import type { Framework, Stride } from '@redline/shared';
+import type { Framework, Stride } from '@threatline/shared';
 import asvsData from '../data/asvs-5.0.json' with { type: 'json' };
 import cweData from '../data/cwe.json' with { type: 'json' };
 import llmData from '../data/llm-top10-2025.json' with { type: 'json' };

@@ -1,4 +1,4 @@
-import type { ApproverNeeded } from '@redline/core';
+import type { ApproverNeeded } from '@threatline/core';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { requestAcceptance } from '../services/acceptance-service.js';

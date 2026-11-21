@@ -11,7 +11,7 @@ export function gitHubClient(o: { api: string; token: string; repo: string; numb
   const f = o.fetch ?? fetch;
   const base = `${o.api.replace(/\/+$/, '')}/repos/${o.repo}`;
   const get = (path: string, accept = 'application/vnd.github+json') =>
-    f(`${base}${path}`, { headers: { authorization: `Bearer ${o.token}`, accept, 'x-github-api-version': '2022-11-28', 'user-agent': 'redline-merge-gate' } });
+    f(`${base}${path}`, { headers: { authorization: `Bearer ${o.token}`, accept, 'x-github-api-version': '2022-11-28', 'user-agent': 'threatline-merge-gate' } });
   return {
     async pullRequest(): Promise<Fetched<GitHubPr>> {
       const r = await get(`/pulls/${o.number}`);

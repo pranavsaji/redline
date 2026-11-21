@@ -1,6 +1,6 @@
-import { appError, err, ok, type Result } from '@redline/shared';
-import type { Sample } from '@redline/core';
-import type { Review } from '@redline/shared';
+import { appError, err, ok, type Result } from '@threatline/shared';
+import type { Sample } from '@threatline/core';
+import type { Review } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 
 /**

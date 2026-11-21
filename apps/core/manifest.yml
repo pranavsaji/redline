@@ -13,7 +13,7 @@ app:
 modules:
   # Threatline Engine: Threatline runs reviews itself on Atlassian-hosted Claude models (billed to the app's developer).
   llm:
-    - key: redline-engine-llm
+    - key: threatline-engine-llm
       model:
         - claude
   sql:
@@ -32,8 +32,8 @@ modules:
       function: pageEventsFn
       events: [ avi:confluence:updated:page ]
   consumer:
-    - key: redline-jobs-consumer
-      queue: redline-jobs
+    - key: threatline-jobs-consumer
+      queue: threatline-jobs
       function: jobConsumerFn
   scheduledTrigger:
     - key: sweeper
@@ -46,26 +46,26 @@ modules:
       function: dailyFn
       interval: day
   jira:issuePanel:
-    - key: redline-panel
+    - key: threatline-panel
       resource: panel
       resolver:
         function: panelResolverFn
       title: Threatline security review
       icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
   jira:adminPage:
-    - key: redline-admin
+    - key: threatline-admin
       resource: panel
       resolver:
         function: panelResolverFn
       title: Threatline
   jira:globalPage:
-    - key: redline-posture
+    - key: threatline-posture
       resource: panel
       resolver:
         function: panelResolverFn
       title: Threatline security posture
   jira:dashboardGadget:
-    - key: redline-posture-gadget
+    - key: threatline-posture-gadget
       title: Threatline security posture
       description: Open security requirements by severity, expiring risk acceptances, mean time to verify and reviews in flight, for the work items you can see.
       thumbnail: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
@@ -73,19 +73,19 @@ modules:
       resolver:
         function: panelResolverFn
   jira:workflowValidator:
-    - key: redline-gate
+    - key: threatline-gate
       name: Threatline security gate
       description: Blocks the transition while Threatline's verdict for the work item is block (open security requirements, or a missing, failed or out-of-date review).
       function: validateTransitionFn
   jira:entityProperty:
-    - key: redline-verdict-index
+    - key: threatline-verdict-index
       entityType: issue
-      propertyKey: redline.verdict
+      propertyKey: threatline.verdict
       values:
-        - { path: state, type: string, searchAlias: redlineState }
-        - { path: blockingCount, type: number, searchAlias: redlineBlocking }
-        - { path: maxOpenSeverity, type: string, searchAlias: redlineMaxSeverity }
-        - { path: riskScore, type: number, searchAlias: redlineRisk }
+        - { path: state, type: string, searchAlias: threatlineState }
+        - { path: blockingCount, type: number, searchAlias: threatlineBlocking }
+        - { path: maxOpenSeverity, type: string, searchAlias: threatlineMaxSeverity }
+        - { path: riskScore, type: number, searchAlias: threatlineRisk }
   action:
     - key: get-review-context
       name: Get Threatline review context
@@ -118,7 +118,7 @@ modules:
           title: Threat model JSON
           type: string
           required: true
-          description: The complete threat model as a JSON string with "schema" set to "redline.threatmodel.v1"
+          description: The complete threat model as a JSON string with "schema" set to "threatline.threatmodel.v1"
     - key: get-merge-attestation
       name: Get Threatline merge attestation
       function: getMergeAttestationFn
@@ -283,7 +283,7 @@ modules:
           - check-change-risk
           - get-merge-attestation
   rovo:mcp:
-    - key: redline-mcp
+    - key: threatline-mcp
       name: Threatline
       tools:
         - get-review
@@ -294,7 +294,7 @@ modules:
         - explain-threat
         - posture-summary
   rovo:agent:
-    - key: redline-reviewer
+    - key: threatline-reviewer
       name: Threatline
       description: Security reviewer for Jira work items. Builds cited STRIDE threat models and explains what must be fixed before Done or merge.
       prompt: resource:agent-prompt;prompt.md

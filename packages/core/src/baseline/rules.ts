@@ -1,4 +1,4 @@
-import type { AgentThreat, Stride } from '@redline/shared';
+import type { AgentThreat, Stride } from '@threatline/shared';
 import type { Signals } from '../context/signals.js';
 
 interface Rule {

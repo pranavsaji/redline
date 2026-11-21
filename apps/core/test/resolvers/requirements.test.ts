@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeFact } from '@redline/core';
-import { ok, type AgentThreatModel, type Requirement, type Threat, type Verdict } from '@redline/shared';
+import { normalizeFact } from '@threatline/core';
+import { ok, type AgentThreatModel, type Requirement, type Threat, type Verdict } from '@threatline/shared';
 import { handleJob } from '../../src/consumers/review-consumer.js';
 import { requirementsCreate, requirementsSetStatus } from '../../src/resolvers/requirements.js';
 import { gateMessage, refreshVerdict } from '../../src/services/verdict-service.js';
@@ -9,10 +9,10 @@ import { coreDeps, drain, jiraIssue } from '../support/core-deps.js';
 
 const ISSUE = '10042';
 const dev = { accountId: 'acc-dev', issueId: ISSUE };
-const CHAMPIONS = 'redline-security-champions';
+const CHAMPIONS = 'threatline-security-champions';
 
 const sample: AgentThreatModel = {
-  schema: 'redline.threatmodel.v1',
+  schema: 'threatline.threatmodel.v1',
   issueKey: 'PAY-7',
   threats: [
     {
@@ -52,14 +52,14 @@ const reqFor = async (t: ReturnType<typeof coreDeps>, threatId: string) =>
 const prop = (t: ReturnType<typeof coreDeps>, id = ISSUE) => t.verdicts._written.get(id) as (Verdict & { message: string; riskScore?: number }) | undefined;
 
 describe('requirements.create (RQ-2)', () => {
-  it('creating requirements twice creates each subtask once, labelled redline, with Given/When/Then, ASVS ids and the panel link', async () => {
+  it('creating requirements twice creates each subtask once, labelled threatline, with Given/When/Then, ASVS ids and the panel link', async () => {
     const { t, agent, created } = await settled();
     const first = await requirementsCreate(t.deps, dev, { threatIds: [agent.id] });
     expect(first).toEqual({ created: [{ requirementId: expect.stringMatching(/^req_/), subtaskKey: 'PAY-100' }], skipped: [] });
     const again = await requirementsCreate(t.deps, dev, { threatIds: [agent.id, agent.id] });
     expect(again).toEqual({ created: [], skipped: [{ threatId: agent.id, reason: 'exists' }] });
     expect(created).toHaveLength(1);
-    expect(created[0]).toMatchObject({ parentId: ISSUE, labels: ['redline'], issueTypeId: '10003' });
+    expect(created[0]).toMatchObject({ parentId: ISSUE, labels: ['threatline'], issueTypeId: '10003' });
     const text = JSON.stringify(created[0]!.description);
     expect(text).toMatch(/Given/);
     expect(text).toContain('https://one-atlas-mefc.atlassian.net/browse/PAY-7');
@@ -174,7 +174,7 @@ describe('requirement subtasks follow their own requirement, not the story', () 
   it('a Threatline subtask passes once its requirement is verified even while the story still blocks', async () => {
     const { t, agent, threats } = await settled();
     await requirementsCreate(t.deps, dev, { threatIds: [agent.id] });
-    const sub = jiraIssue({ id: '20001', key: 'PAY-100', labels: ['redline'], issueType: { id: '10003', name: 'Subtask', subtask: true }, parent: { id: ISSUE, key: 'PAY-7' } });
+    const sub = jiraIssue({ id: '20001', key: 'PAY-100', labels: ['threatline'], issueType: { id: '10003', name: 'Subtask', subtask: true }, parent: { id: ISSUE, key: 'PAY-7' } });
     const base = t.jira.issue;
     t.jira.issue = async (ref) => (ref === '20001' || ref === 'PAY-100' ? ok(structuredClone(sub)) : base(ref));
     await refreshVerdict(t.deps, '20001');

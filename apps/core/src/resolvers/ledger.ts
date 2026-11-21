@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { verifyChain, type ChainVerdict } from '@redline/crypto';
+import { verifyChain, type ChainVerdict } from '@threatline/crypto';
 import type { CoreDeps } from '../deps.js';
 import { evidencePack } from '../services/evidence-pack.js';
 import { currentTreeHead, ledgerProofFor } from '../services/transparency.js';

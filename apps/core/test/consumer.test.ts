@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentThreatModel, Verdict } from '@redline/shared';
+import type { AgentThreatModel, Verdict } from '@threatline/shared';
 import { handleJob, reviewConsumer } from '../src/consumers/review-consumer.js';
 import { refreshVerdict } from '../src/services/verdict-service.js';
 import { coreDeps, drain, jiraIssue, POLICY } from './support/core-deps.js';
 import { ISSUE, reviewed } from './support/reviewed.js';
 
 const sample = (issueKey: string): AgentThreatModel => ({
-  schema: 'redline.threatmodel.v1',
+  schema: 'threatline.threatmodel.v1',
   issueKey,
   threats: [
     {
@@ -153,7 +153,7 @@ describe('gather job', () => {
     const t = coreDeps({ policy: { ...POLICY, reviewMode: 'rules_only' } });
     await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
     const l = (await t.deps.reviews.latest('10042')) as { ok: true; value: { id: string; status: string; samplesExpected: number; modelIds: string[] } };
-    expect(l.value).toMatchObject({ status: 'ready', samplesExpected: 0, modelIds: ['redline-rules'] });
+    expect(l.value).toMatchObject({ status: 'ready', samplesExpected: 0, modelIds: ['threatline-rules'] });
     const threats = (await t.deps.reviews.threats(l.value.id)) as { ok: true; value: Array<{ origin: string }> };
     expect(threats.value.length).toBeGreaterThan(0);
     expect(threats.value.every((x) => x.origin === 'baseline')).toBe(true);

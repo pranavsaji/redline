@@ -2,7 +2,7 @@
  * Demo content for a fresh site: an AI support agent that looks up orders and issues refunds. Fictional; no real data.
  * Every item carries the DEMO_LABEL so seeding is idempotent and the demo can be found (and cleaned up) by JQL.
  */
-export const DEMO_LABEL = 'redline-demo';
+export const DEMO_LABEL = 'threatline-demo';
 export const DEMO_COMPONENT = 'support-agent';
 
 export const EPIC = {

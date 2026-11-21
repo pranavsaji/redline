@@ -1,5 +1,5 @@
-import { requirementsFor } from '@redline/core';
-import { appError, err, ok, type Evidence, type Requirement, type RequirementStatus, type Result, type Threat } from '@redline/shared';
+import { requirementsFor } from '@threatline/core';
+import { appError, err, ok, type Evidence, type Requirement, type RequirementStatus, type Result, type Threat } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import type { AdfDoc, AdfNode, JiraIssue } from '../adapters/jira.js';
 import { log } from '../adapters/log.js';
@@ -9,7 +9,7 @@ import { refreshVerdict } from './verdict-service.js';
 import { rolesOf } from './roles.js';
 import { citesOnlyTheWorkItem } from './viewer-scope.js';
 
-export const REQUIREMENT_LABEL = 'redline';
+export const REQUIREMENT_LABEL = 'threatline';
 const LOCK_MS = 120_000;
 const HISTORY_REVISIONS = 5;
 

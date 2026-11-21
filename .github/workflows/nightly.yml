@@ -40,13 +40,13 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @redline/e2e exec playwright install --with-deps chromium
+      - run: pnpm --filter @threatline/e2e exec playwright install --with-deps chromium
       - run: pnpm e2e
 
   e2e-site:
     name: Smoke test on the demo Jira site
     # Runs only when the repository has the secrets: E2E_SITE_URL, E2E_ISSUE_KEY, and E2E_SITE_STATE_B64 (a session
-    # saved with `pnpm --filter @redline/e2e login`, base64-encoded). No password is ever stored or typed by CI.
+    # saved with `pnpm --filter @threatline/e2e login`, base64-encoded). No password is ever stored or typed by CI.
     if: ${{ vars.E2E_SITE_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -55,12 +55,12 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 22 }
       - run: corepack enable && pnpm install --frozen-lockfile
-      - run: pnpm --filter @redline/e2e exec playwright install --with-deps chromium
+      - run: pnpm --filter @threatline/e2e exec playwright install --with-deps chromium
       - name: Restore the saved session
         env:
           STATE: ${{ secrets.E2E_SITE_STATE_B64 }}
         run: mkdir -p e2e/.auth && printf '%s' "$STATE" | base64 -d > e2e/.auth/site.json
-      - run: pnpm --filter @redline/e2e exec playwright test --project site
+      - run: pnpm --filter @threatline/e2e exec playwright test --project site
         env:
           E2E_SITE_URL: ${{ secrets.E2E_SITE_URL }}
           E2E_ISSUE_KEY: ${{ secrets.E2E_ISSUE_KEY }}

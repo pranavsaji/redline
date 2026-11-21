@@ -1,4 +1,4 @@
-import type { ContextFact, Grounding } from '@redline/shared';
+import type { ContextFact, Grounding } from '@threatline/shared';
 import { normalizeText } from './text.js';
 
 const MIN_SUPPORTED_CHARS = 12;

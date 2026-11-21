@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { appendLedger, WARN_ONLY_MAX_DAYS, warnOnlyUntil } from '@redline/core';
-import { SitePolicySchema, type SitePolicy } from '@redline/shared';
+import { appendLedger, WARN_ONLY_MAX_DAYS, warnOnlyUntil } from '@threatline/core';
+import { SitePolicySchema, type SitePolicy } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { monthOf, pauseReasons, RECENT_INGESTS_KEY } from '../services/budget.js';

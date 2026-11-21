@@ -1,5 +1,5 @@
-import { allAddedText, DIFF_UNREAD_PATH, evaluateMergeCheck, MAX_DIFF_TEXT, TRUNCATED_PATH, type CheckResult, type DiffFile, type RepoSettings } from '@redline/core';
-import { fromB64url, isValidPublicKey, kidOf } from '@redline/crypto';
+import { allAddedText, DIFF_UNREAD_PATH, evaluateMergeCheck, MAX_DIFF_TEXT, TRUNCATED_PATH, type CheckResult, type DiffFile, type RepoSettings } from '@threatline/core';
+import { fromB64url, isValidPublicKey, kidOf } from '@threatline/crypto';
 
 /** What the merge gate needs from GitHub's REST API, read with the workflow's token. */
 export interface GitHubPr {
@@ -30,7 +30,7 @@ export const WARN_MAX_DAYS = 14;
  * Changing the gate's own configuration (the workflow that runs it, local actions, Threatline's policy file) is always
  * sensitive: loosening the gate needs an attestation like any other security change.
  */
-export const GATE_CONFIG_PATHS = ['.github/workflows/**', '.github/actions/**', '.redline/**'];
+export const GATE_CONFIG_PATHS = ['.github/workflows/**', '.github/actions/**', '.threatline/**', '.redline/**'];
 const KEY_HINT = 'Add it to the public-keys input of the Threatline step in your workflow (Threatline admin → Signing keys → Copy public key).';
 const lines = (v: string | undefined) => (v ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
 
@@ -87,7 +87,9 @@ export async function runGitHubCheck(i: { settings: RepoSettings; client: GitHub
   const [pr, files] = await Promise.all([i.client.pullRequest(), i.client.files()]);
   if (!pr.ok) return unreadable('pull request', pr.status);
   if (!files.ok) return unreadable('changed files', files.status);
-  const policy = await i.client.fileAt(pr.value.base.sha, '.redline/policy.yml');
+  // `.redline/policy.yml`: the name before the rename to Threatline, still read when the new file is absent.
+  const current = await i.client.fileAt(pr.value.base.sha, '.threatline/policy.yml');
+  const policy = current.ok && current.value === null ? await i.client.fileAt(pr.value.base.sha, '.redline/policy.yml') : current;
   if (!policy.ok) return unreadable('policy file', policy.status);
   return evaluateMergeCheck({
     pr: { description: pr.value.body ?? '', headSha: pr.value.head.sha, destSha: pr.value.base.sha, repoFullName: pr.value.base.repo.full_name, title: pr.value.title, branch: pr.value.head.ref },

@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { ClockPort, PublicKeyInfo, SigningKeyStore } from '@redline/core';
-import { generateKeyPair, type KeyPair } from '@redline/crypto';
-import { appError, err, ok, type Result } from '@redline/shared';
+import type { ClockPort, PublicKeyInfo, SigningKeyStore } from '@threatline/core';
+import { generateKeyPair, type KeyPair } from '@threatline/crypto';
+import { appError, err, ok, type Result } from '@threatline/shared';
 import { forgeKvs, type KvsPort } from './kvs-config.js';
 
 const CONFIG_KEY = 'config:keys';

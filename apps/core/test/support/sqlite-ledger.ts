@@ -1,4 +1,4 @@
-import { MIGRATIONS, migrate, sqlLedgerRepo } from '@redline/db';
+import { MIGRATIONS, migrate, sqlLedgerRepo } from '@threatline/db';
 import { sqliteExecutor } from '../../../../packages/db/test/sqlite-executor.js';
 
 /** A real SQL ledger (SQLite in memory, same DDL) plus the raw executor, so tests can tamper with rows at rest. */

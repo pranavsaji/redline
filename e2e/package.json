@@ -1,5 +1,5 @@
 {
-  "name": "@redline/e2e",
+  "name": "@threatline/e2e",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
     "login": "tsx site/login.ts"
   },
   "dependencies": {
-    "@redline/shared": "workspace:*"
+    "@threatline/shared": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1"

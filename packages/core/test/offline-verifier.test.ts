@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { generateKeyPair } from '@redline/crypto';
+import { generateKeyPair } from '@threatline/crypto';
 import { appendLedger, buildLedgerProof, signTreeHead, verifyLedgerProof, type LedgerProof } from '../src/index.js';
 import { fixedClock, memoryLedgerRepo } from './fakes/index.js';
 
@@ -45,7 +45,7 @@ describe('offline verifier script (no Threatline code, Node built-ins only)', ()
   });
 
   it('runs from the command line', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'redline-proof-'));
+    const dir = mkdtempSync(join(tmpdir(), 'threatline-proof-'));
     const file = join(dir, 'proof.json');
     writeFileSync(file, JSON.stringify(await proof()));
     expect(execFileSync(process.execPath, [SCRIPT, file], { encoding: 'utf8' })).toMatch(/^OK: ledger entry 5 \(acceptance.approved\) is in the signed tree of 11 entries/);

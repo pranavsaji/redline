@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Review } from '@redline/shared';
-import { extractPrompt } from '@redline/prompts';
+import type { Review } from '@threatline/shared';
+import { extractPrompt } from '@threatline/prompts';
 import { contextHash, DEFAULT_SITE_POLICY, normalizeFact, runPipeline, type PipelineDeps } from '../src/index.js';
 import { FakeLlm, fixedClock, memoryFeedbackRepo, memoryReviewRepo } from './fakes/index.js';
 import { rawFacts } from './fixtures/ai-support-agent.js';

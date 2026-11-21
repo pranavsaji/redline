@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { ApproverNeeded } from '@redline/core';
-import type { AcceptanceState } from '@redline/shared';
+import type { ApproverNeeded } from '@threatline/core';
+import type { AcceptanceState } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { BREAK_GLASS_MAX_HOURS, BREAK_GLASS_MIN_REASON, breakGlass, decideAcceptance, requestAcceptance, revokeAcceptance } from '../services/acceptance-service.js';
 import { apiError, type ApiError } from './errors.js';

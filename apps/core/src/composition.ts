@@ -1,6 +1,6 @@
 import { forgeLlm } from './adapters/forge-llm.js';
 import api, { route } from '@forge/api';
-import { sqlAttestationRepo, sqlTreeHeadRepo, sqlFeedbackRepo, sqlIssueRepo, sqlLedgerRepo, sqlRequirementRepo, sqlReviewRepo, sqlUsageRepo } from '@redline/db';
+import { sqlAttestationRepo, sqlTreeHeadRepo, sqlFeedbackRepo, sqlIssueRepo, sqlLedgerRepo, sqlRequirementRepo, sqlReviewRepo, sqlUsageRepo } from '@threatline/db';
 import type { CoreDeps } from './deps.js';
 import { systemClock } from './adapters/clock.js';
 import { confluenceClient } from './adapters/confluence.js';
@@ -10,7 +10,7 @@ import { forgeSqlExecutor } from './adapters/forge-sql.js';
 import { jiraClient } from './adapters/jira.js';
 import { defaultsFromEnv, forgeKvs, kvsConfigStore, type KvsPort } from './adapters/kvs-config.js';
 import { restGatherer } from './adapters/rest-gatherer.js';
-import { sqlRetention } from '@redline/db';
+import { sqlRetention } from '@threatline/db';
 import { kvsSigningKeys } from './adapters/signing-keys.js';
 import { jiraVerdictSink } from './adapters/verdict-sink.js';
 

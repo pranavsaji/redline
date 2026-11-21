@@ -4,10 +4,10 @@
  * actual UI against the actual services, verdict logic, ledger and signing. Only Jira, Confluence, Rovo and the clock
  * are simulated. Never deployed; listens on localhost only.
  *
- *   pnpm --filter @redline/e2e harness            # http://localhost:5190
+ *   pnpm --filter @threatline/e2e harness            # http://localhost:5190
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { ok } from '@redline/shared';
+import { ok } from '@threatline/shared';
 import { coreDeps, drain, jiraIssue } from '../../apps/core/test/support/core-deps.js';
 import { handleJob } from '../../apps/core/src/consumers/review-consumer.js';
 import { getReviewContext } from '../../apps/core/src/actions/get-review-context.js';
@@ -25,7 +25,7 @@ export const USERS = { dev: 'acc-dev', champion: 'acc-champ', admin: 'acc-admin'
 
 /** What the Threatline agent proposes in each of its three runs (it quotes the work item word for word). */
 const AGENT_MODEL = {
-  schema: 'redline.threatmodel.v1',
+  schema: 'threatline.threatmodel.v1',
   issueKey: ISSUE_KEY,
   threats: [
     { stride: 'Spoofing', title: 'Forged refund webhooks', scenario: 'An attacker posts a fake refund event to the public webhook and triggers a refund.', component: 'webhook endpoint', likelihood: 4, impact: 4, evidence: [{ quote: 'Public webhook that receives refund events' }] },
@@ -35,7 +35,7 @@ const AGENT_MODEL = {
 
 function fresh() {
   const t = coreDeps({ issues: [jiraIssue({ id: ISSUE_ID, key: ISSUE_KEY, summary: 'Refund webhook', assignee: 'acc-owner' })], now: new Date().toISOString() });
-  const groups: Record<string, string[]> = { [USERS.dev]: ['redline-tech-leads'], [USERS.champion]: ['redline-security-champions'] };
+  const groups: Record<string, string[]> = { [USERS.dev]: ['threatline-tech-leads'], [USERS.champion]: ['threatline-security-champions'] };
   t.jira.groupsOf = async (id) => ok(groups[id] ?? []);
   t.jira.isAdmin = async (id) => ok(id === USERS.admin);
   let n = 100;

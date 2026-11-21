@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeFact } from '@redline/core';
-import { appError, err, ok, type AgentThreatModel, type ContextFact, type Threat } from '@redline/shared';
+import { normalizeFact } from '@threatline/core';
+import { appError, err, ok, type AgentThreatModel, type ContextFact, type Threat } from '@threatline/shared';
 import { handleJob } from '../../src/consumers/review-consumer.js';
 import { confluencePublish } from '../../src/resolvers/confluence.js';
 import { PAGE_KEY, publishThreatModel } from '../../src/services/confluence-page.js';
@@ -41,7 +41,7 @@ function fakeConfluence() {
 }
 
 const sample: AgentThreatModel = {
-  schema: 'redline.threatmodel.v1',
+  schema: 'threatline.threatmodel.v1',
   issueKey: 'PAY-7',
   threats: [
     { stride: 'Spoofing', title: 'Forged refund webhooks', scenario: 'An attacker posts a fake refund event.', component: 'webhook endpoint', likelihood: 4, impact: 4, evidence: [{ quote: 'Public webhook that receives refund events' }] },
@@ -84,7 +84,7 @@ describe('confluence.publish (RQ-5)', () => {
     const page = conf.pages.get('900')!;
     expect(page).toMatchObject({ title: 'Threat model: PAY-7 Add AI support agent that can issue refunds', parentId: '500', spaceId: 'S1' });
     expect(page.storage).toContain('<h2>Owner notes</h2>');
-    expect(links).toEqual([{ issueId: ISSUE, url: 'https://x/wiki/pages/900', title: 'Threat model: PAY-7 Add AI support agent that can issue refunds', globalId: 'redline-threat-model-10042' }]);
+    expect(links).toEqual([{ issueId: ISSUE, url: 'https://x/wiki/pages/900', title: 'Threat model: PAY-7 Add AI support agent that can issue refunds', globalId: 'threatline-threat-model-10042' }]);
     expect(t.kv.data.get(PAGE_KEY(ISSUE))).toMatchObject({ pageId: '900', parentId: '500' });
   });
 

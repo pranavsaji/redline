@@ -1,5 +1,5 @@
-import type { AgentThreat, Mapping } from '@redline/shared';
-import { agenticTop10, isValidRef, llmTop10, strideDefaults, type FrameworkItem } from '@redline/frameworks';
+import type { AgentThreat, Mapping } from '@threatline/shared';
+import { agenticTop10, isValidRef, llmTop10, strideDefaults, type FrameworkItem } from '@threatline/frameworks';
 
 const normCwe = (id: string): string => (/^\d+$/.test(id.trim()) ? `CWE-${id.trim()}` : id.trim().toUpperCase());
 

@@ -1,5 +1,5 @@
-import { agentPrompt, automationPrompt, PROMPT_VERSION } from '@redline/prompts';
-import { appError, err, ok, severityRank, type AgentThreatModel, type ContextBundle, type Result, type Review, type Threat } from '@redline/shared';
+import { agentPrompt, automationPrompt, PROMPT_VERSION } from '@threatline/prompts';
+import { appError, err, ok, severityRank, type AgentThreatModel, type ContextBundle, type Result, type Review, type Threat } from '@threatline/shared';
 import {
   applyVerification,
   assembleReview,
@@ -15,7 +15,7 @@ import {
   runPipeline,
   type LlmPort,
   type Sample,
-} from '@redline/core';
+} from '@threatline/core';
 import { CLEAN_CASES, POISONED_CASES, type CleanCase, type PoisonedCase } from '../fixtures/cases.js';
 import { scoreCase, summarize, type CaseResult } from './metrics.js';
 import { loadRecording, recordingLlm, replayLlm, saveRecording, type Recording } from './recorded.js';
@@ -88,7 +88,7 @@ export async function runCase(c: CleanCase, llm: LlmPort | null, samples: number
   }
   const runs = llm
     ? await Promise.all(Array.from({ length: samples }, () => agentSample(llm, b)))
-    : Array.from({ length: samples }, () => ({ sample: { schema: 'redline.threatmodel.v1', issueKey: b.issueKey, threats: [] } as AgentThreatModel as Sample, tokensIn: 0, tokensOut: 0, quotes: [] as string[], modelId: 'baseline-only' }));
+    : Array.from({ length: samples }, () => ({ sample: { schema: 'threatline.threatmodel.v1', issueKey: b.issueKey, threats: [] } as AgentThreatModel as Sample, tokensIn: 0, tokensOut: 0, quotes: [] as string[], modelId: 'baseline-only' }));
   // A rate limit or outage is not "the model found nothing": a case with no answer at all fails instead of scoring.
   if (llm && runs.every((x) => 'failed' in x.sample)) {
     const code = (runs[0]!.sample as { failed: string }).failed;

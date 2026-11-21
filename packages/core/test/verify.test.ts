@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Threat } from '@redline/shared';
+import type { Threat } from '@threatline/shared';
 import { applyVerification, engineVerify } from '../src/index.js';
 import { FakeLlm } from './fakes/fake-llm.js';
 import { DEFAULT_SITE_POLICY } from '../src/index.js';

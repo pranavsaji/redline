@@ -4,7 +4,7 @@
  *
  *   pnpm tsx apps/core/scripts/register-graph-queries.ts
  *
- * Reads REDLINE_SITE (e.g. one-atlas-mefc.atlassian.net), ATLASSIAN_EMAIL and ATLASSIAN_API_TOKEN from the repo's .env.
+ * Reads THREATLINE_SITE (e.g. one-atlas-mefc.atlassian.net), ATLASSIAN_EMAIL and ATLASSIAN_API_TOKEN from the repo's .env.
  * Persisted queries are immutable and take about a minute to propagate (QUERY_NOT_FOUND until then). Re-running with
  * unchanged Cypher returns the existing key (HTTP 200).
  */
@@ -26,14 +26,14 @@ function loadEnv(): Record<string, string> {
 }
 
 const env = loadEnv();
-for (const k of ['REDLINE_SITE', 'ATLASSIAN_EMAIL', 'ATLASSIAN_API_TOKEN'])
+for (const k of ['THREATLINE_SITE', 'ATLASSIAN_EMAIL', 'ATLASSIAN_API_TOKEN'])
   if (!env[k]) {
     console.error(`Missing ${k} in .env`);
     process.exit(1);
   }
-const site = env.REDLINE_SITE!.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+const site = env.THREATLINE_SITE!.replace(/^https?:\/\//, '').replace(/\/+$/, '');
 if (!/^[a-z0-9-]+\.atlassian\.net$/i.test(site)) {
-  console.error('REDLINE_SITE must look like <name>.atlassian.net');
+  console.error('THREATLINE_SITE must look like <name>.atlassian.net');
   process.exit(1);
 }
 const appId = /^\s*id:\s*(\S+)/m.exec(readFileSync(join(appDir, 'manifest.yml'), 'utf8'))?.[1];
@@ -57,7 +57,7 @@ for (const file of readdirSync(dir).filter((f) => f.endsWith('.cypher')).sort())
   const res = await fetch(`https://${site}/gateway/api/twg/cypher-queries`, {
     method: 'POST',
     headers: { Authorization: auth, 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ appId, name: `redline-${name}`, cypher, paramsSchema: [{ name: 'issueAri', required: true, type: 'ARI' }] }),
+    body: JSON.stringify({ appId, name: `threatline-${name}`, cypher, paramsSchema: [{ name: 'issueAri', required: true, type: 'ARI' }] }),
   });
   const body = (await res.json().catch(() => ({}))) as { queryKey?: string; status?: string; errors?: Array<{ code?: string; message?: string }> };
   if ((res.status === 200 || res.status === 201) && body.queryKey) {

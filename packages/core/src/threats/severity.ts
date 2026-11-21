@@ -1,4 +1,4 @@
-import type { Severity } from '@redline/shared';
+import type { Severity } from '@threatline/shared';
 
 /** likelihood x impact: >= 20 Critical, >= 12 High, >= 6 Medium, else Low. */
 export function severityOf(likelihood: number, impact: number): Severity {

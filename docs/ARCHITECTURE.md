@@ -21,7 +21,7 @@ flowchart LR
   subgraph Jira
     WI[Work item created or re-run] --> AR[Automation rule:<br/>3 × Use agent: Threatline<br/>take actions on]
     P[Issue panel] -->|panel.* resolvers| R
-    V[Workflow validator<br/>redline-gate] -->|reads KVS verdict| K[(KVS)]
+    V[Workflow validator<br/>threatline-gate] -->|reads KVS verdict| K[(KVS)]
   end
   AR --> AG[Rovo agent<br/>Threatline prompt v1.x]
   AG -->|GET get-review-context| R[Threatline functions]
@@ -45,7 +45,7 @@ flowchart LR
    actor cannot read are left out (they still count towards the context hash). Secrets are redacted and text that
    looks like instructions to an AI is flagged (`injectionSuspected`). The response carries a single-use submission
    token bound to this review and context hash.
-3. **Proposal (the agent).** The Rovo agent writes a `redline.threatmodel.v1` JSON document: STRIDE threats, each with
+3. **Proposal (the agent).** The Rovo agent writes a `threatline.threatmodel.v1` JSON document: STRIDE threats, each with
    verbatim quotes from the sources as evidence.
 4. **Submission (`submit-threat-model`).** The token is checked and spent. Nothing the model wrote decides anything by
    itself; `assembleReview` does, deterministically:
@@ -113,7 +113,7 @@ when the policy changes or a lenient verdict's window ends.
 | `packages/llm-dev` | Dev-only `claude -p` adapter for evals; never bundled into an app. |
 | `apps/core` | Forge functions, resolvers, Rovo actions, jobs, adapters (Jira, Confluence, KVS, SQL, queue) and the Custom UI (`apps/core/ui`). |
 | `apps/bitbucket` | Merge check, repository settings page, settings store. |
-| `apps/local` | `pnpm redline` CLI: offline review, evals, demo signing. |
+| `apps/local` | `pnpm threatline` CLI: offline review, evals, demo signing. |
 | `evals` | 40 clean and 15 poisoned cases, the runner, metrics and recorded model outputs. |
 
 Core logic depends only on ports (`packages/core/src/ports.ts`): `ClockPort`, `LlmPort`, `ContextGatherer`,
@@ -128,7 +128,7 @@ SQL implementation (`packages/core/test/contracts`).
 | Forge SQL | `reviews`, `review_stages` (doubles as the run trace), `agent_samples`, `context_facts`, `threats`, `review_discarded`, `requirements`, `feedback`, `issues`, `issue_pages`, `attestations`, `ledger`, `merkle_heads`, `posture_snapshots`, `usage_monthly`. Reviews are purged after 400 days; the ledger never is. |
 | KVS | Verdicts (what the gate reads), site and project policy and its version, rate-limit counters, single-use submission tokens. |
 | Forge secret storage | The Ed25519 signing key (generated on install, never sent to the UI; rotation keeps old keys verifying for a grace period). |
-| Issue property `redline.verdict` | Searchable copy of the verdict for JQL and dashboards. It is never read by the gate, because users can edit issue properties. |
+| Issue property `threatline.verdict` | Searchable copy of the verdict for JQL and dashboards. It is never read by the gate, because users can edit issue properties. |
 
 ## The ledger
 

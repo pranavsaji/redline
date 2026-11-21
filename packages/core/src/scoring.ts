@@ -1,4 +1,4 @@
-import type { DataClass, Exposure, Severity, ThreatState } from '@redline/shared';
+import type { DataClass, Exposure, Severity, ThreatState } from '@threatline/shared';
 
 export const SEVERITY_WEIGHT: Record<Severity, number> = { Low: 2, Medium: 5, High: 12, Critical: 25 };
 export const DATA_CLASS_WEIGHT: Record<DataClass, number> = { pii: 6, credentials: 8, payment: 10, health: 8, secrets: 8 };

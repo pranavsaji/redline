@@ -1,6 +1,6 @@
-import type { Criterion, Requirement, Threat } from '@redline/shared';
-import { getAsvs } from '@redline/frameworks';
-import { sha256Hex } from '@redline/crypto';
+import type { Criterion, Requirement, Threat } from '@threatline/shared';
+import { getAsvs } from '@threatline/frameworks';
+import { sha256Hex } from '@threatline/crypto';
 
 /** Whole words only: "unauthorised" is not auth code, "monkey" not a key, "profile" not a file, "tokenizer" not a token. */
 const FILE_HINTS: Array<{ re: RegExp; globs: string[] }> = [

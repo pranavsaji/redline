@@ -1,5 +1,5 @@
-import { appError, DismissReasonSchema, err, ok, StrideSchema, type DismissReason, type Stride } from '@redline/shared';
-import type { AttestationRepo, FeedbackRepo, IssueRepo, TreeHead, TreeHeadRepo, UsageRepo } from '@redline/core';
+import { appError, DismissReasonSchema, err, ok, StrideSchema, type DismissReason, type Stride } from '@threatline/shared';
+import type { AttestationRepo, FeedbackRepo, IssueRepo, TreeHead, TreeHeadRepo, UsageRepo } from '@threatline/core';
 import type { SqlExecutor } from '../executor.js';
 
 export function sqlFeedbackRepo(x: SqlExecutor): FeedbackRepo {

@@ -1,4 +1,4 @@
-import type { Acceptance } from '@redline/shared';
+import type { Acceptance } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { threatVisible } from '../services/requirements-service.js';
 

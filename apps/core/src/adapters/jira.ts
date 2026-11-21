@@ -1,6 +1,6 @@
 import api, { assumeTrustedRoute } from '@forge/api';
 import { z } from 'zod';
-import { appError, err, ok, type Result } from '@redline/shared';
+import { appError, err, ok, type Result } from '@threatline/shared';
 import { httpJson, seg, type FetchLike, type HttpOptions } from './http.js';
 
 export interface AdfNode {

@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Offline harness: `pnpm redline <command>`.
+ * Offline harness: `pnpm threatline <command>`.
  *   review <caseId> [--llm fake|claude-code] [--samples 3] [--model m] [--path agent|pipeline] [--yes]
  *   eval [--subset 30|all] [--llm fake|claude-code|recorded] [--samples 3] [--model m] [--path agent|pipeline] [--concurrency 1] [--yes]
  *        [--write-baseline] [--gate evals/results/baseline.json] [--resume] [--judge claude-code|recorded]
@@ -11,9 +11,9 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
-import { decodeAttestation, generateKeyPair } from '@redline/crypto';
-import { claudeCodeLlm } from '@redline/llm-dev';
-import { computeVerdict, DEFAULT_SITE_POLICY, issueAttestation, type LlmPort } from '@redline/core';
+import { decodeAttestation, generateKeyPair } from '@threatline/crypto';
+import { claudeCodeLlm } from '@threatline/llm-dev';
+import { computeVerdict, DEFAULT_SITE_POLICY, issueAttestation, type LlmPort } from '@threatline/core';
 import { CLEAN_CASES, POISONED_CASES } from '../../../evals/fixtures/cases.js';
 import { reportMarkdown, runCase, runEval, selectCases, type EvalPath } from '../../../evals/runner/run.js';
 import { gateCheck, loadRecording, replayLlm } from '../../../evals/runner/recorded.js';
@@ -161,7 +161,7 @@ async function main() {
     console.log('verify with one character changed →', t.ok ? 'PASS (unexpected!)' : `FAIL: ${t.error.message}`);
     return;
   }
-  console.log('usage: pnpm redline review <caseId> | eval [--subset 30|all] | sign-demo   (add --llm claude-code to use your Claude subscription)');
+  console.log('usage: pnpm threatline review <caseId> | eval [--subset 30|all] | sign-demo   (add --llm claude-code to use your Claude subscription)');
 }
 
 main().catch((e: unknown) => {

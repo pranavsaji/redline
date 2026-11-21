@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { fromB64url, kidOf } from '@redline/crypto';
-import { appError, err, ok, type Result } from '@redline/shared';
+import { fromB64url, kidOf } from '@threatline/crypto';
+import { appError, err, ok, type Result } from '@threatline/shared';
 import { DEFAULT_REPO_SETTINGS, type RepoSettings } from './merge-check.js';
 
 export interface SettingsKvs {

@@ -1,5 +1,5 @@
 {
-  "name": "@redline/core-ui",
+  "name": "@threatline/core-ui",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,7 +18,7 @@
     "@atlaskit/tokens": "^20.12.0",
     "@atlaskit/tooltip": "^24.4.6",
     "@forge/bridge": "^7.3.0",
-    "@redline/shared": "workspace:*",
+    "@threatline/shared": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

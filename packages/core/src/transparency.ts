@@ -1,5 +1,5 @@
-import { consistencyProof, entryHash, entryLeafHash, inclusionProof, merkleRoot, signB64, utf8, verifyB64, verifyConsistency, verifyInclusion, type KeyPair } from '@redline/crypto';
-import { appError, err, ok, type Result } from '@redline/shared';
+import { consistencyProof, entryHash, entryLeafHash, inclusionProof, merkleRoot, signB64, utf8, verifyB64, verifyConsistency, verifyInclusion, type KeyPair } from '@threatline/crypto';
+import { appError, err, ok, type Result } from '@threatline/shared';
 import type { LedgerRow, TreeHead } from './ports.js';
 
 /**
@@ -8,8 +8,12 @@ import type { LedgerRow, TreeHead } from './ports.js';
  * consistency proof shows a later head extends an earlier one, so nothing published was rewritten.
  */
 
-export const TREE_HEAD_CONTEXT = 'redline-tree-head-v1';
-export const treeHeadMessage = (h: Pick<TreeHead, 'treeSize' | 'rootHash' | 'timestamp'>): Uint8Array => utf8(`${TREE_HEAD_CONTEXT}\n${h.treeSize}\n${h.rootHash}\n${h.timestamp}`);
+export const TREE_HEAD_CONTEXT = 'threatline-tree-head-v1';
+/** Heads signed before the rename to Threatline; they still verify. New heads are always signed with TREE_HEAD_CONTEXT. */
+const LEGACY_TREE_HEAD_CONTEXT = 'redline-tree-head-v1';
+export const LEDGER_PROOF_FORMAT = 'threatline-ledger-proof-v1';
+const LEGACY_LEDGER_PROOF_FORMAT = 'redline-ledger-proof-v1';
+export const treeHeadMessage = (h: Pick<TreeHead, 'treeSize' | 'rootHash' | 'timestamp'>, context = TREE_HEAD_CONTEXT): Uint8Array => utf8(`${context}\n${h.treeSize}\n${h.rootHash}\n${h.timestamp}`);
 
 const bySeq = (rows: readonly Pick<LedgerRow, 'seq'>[]) => [...rows].sort((a, b) => a.seq - b.seq);
 const HEX64 = /^[0-9a-f]{64}$/;
@@ -25,11 +29,11 @@ export function signTreeHead(rows: readonly Pick<LedgerRow, 'seq' | 'entryHash'>
 
 export function verifyTreeHead(h: TreeHead, publicKey: string): boolean {
   if (!Number.isInteger(h.treeSize) || h.treeSize < 0 || !HEX64.test(h.rootHash) || typeof h.timestamp !== 'string') return false;
-  return verifyB64(h.signature, treeHeadMessage(h), publicKey);
+  return [TREE_HEAD_CONTEXT, LEGACY_TREE_HEAD_CONTEXT].some((c) => verifyB64(h.signature, treeHeadMessage(h, c), publicKey));
 }
 
 export interface LedgerProof {
-  format: 'redline-ledger-proof-v1';
+  format: typeof LEDGER_PROOF_FORMAT | typeof LEGACY_LEDGER_PROOF_FORMAT;
   /** The full ledger entry, so its entry hash can be recomputed. */
   entry: Pick<LedgerRow, 'seq' | 'eventType' | 'payload' | 'actor' | 'createdAt' | 'prevHash' | 'entryHash'>;
   leafIndex: number;
@@ -54,7 +58,7 @@ export function buildLedgerProof(rows: readonly LedgerRow[], seq: number, head: 
   if (index < 0) return err(appError('not_found', `ledger entry ${seq} is not in this tree head`));
   const e = covered[index]!;
   const proof: LedgerProof = {
-    format: 'redline-ledger-proof-v1',
+    format: LEDGER_PROOF_FORMAT,
     entry: { seq: e.seq, eventType: e.eventType, payload: e.payload, actor: e.actor, createdAt: e.createdAt, prevHash: e.prevHash, entryHash: e.entryHash },
     leafIndex: index,
     leafHash: leaves[index]!,
@@ -70,7 +74,7 @@ export type ProofVerdict = { ok: true; treeSize: number; seq: number } | { ok: f
 
 /** Everything an auditor checks, in order: the entry's own hash, the head's signature, inclusion, then consistency. */
 export function verifyLedgerProof(p: LedgerProof): ProofVerdict {
-  if (p?.format !== 'redline-ledger-proof-v1' || !p.entry || !p.treeHead || !Array.isArray(p.auditPath)) return { ok: false, reason: 'format' };
+  if ((p?.format !== LEDGER_PROOF_FORMAT && p?.format !== LEGACY_LEDGER_PROOF_FORMAT) || !p.entry || !p.treeHead || !Array.isArray(p.auditPath)) return { ok: false, reason: 'format' };
   const e = p.entry;
   let recomputed: string;
   try {

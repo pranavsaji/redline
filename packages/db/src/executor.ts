@@ -1,4 +1,4 @@
-import type { Result } from '@redline/shared';
+import type { Result } from '@threatline/shared';
 
 /**
  * Minimal SQL port. Implementations must use parameter binding for every value and must map unique/primary key

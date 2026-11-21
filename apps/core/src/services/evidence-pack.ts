@@ -1,6 +1,6 @@
-import { verifyChain } from '@redline/crypto';
-import type { LedgerRow } from '@redline/core';
-import { ok, type Result } from '@redline/shared';
+import { verifyChain } from '@threatline/crypto';
+import type { LedgerRow } from '@threatline/core';
+import { ok, type Result } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 
 const DAY = 86_400_000;

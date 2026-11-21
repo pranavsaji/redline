@@ -1,4 +1,4 @@
-import { sha256Hex } from '@redline/crypto';
+import { sha256Hex } from '@threatline/crypto';
 import type { CoreDeps } from '../deps.js';
 
 export const TOKEN_TTL_MS = 30 * 60_000;

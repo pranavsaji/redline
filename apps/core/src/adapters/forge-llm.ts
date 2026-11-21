@@ -1,6 +1,6 @@
 import type { ChatResponse, Prompt } from '@forge/llm';
-import type { LlmPort, LlmRequest, LlmResponse, ModelTier } from '@redline/core';
-import { appError, err, ok, type Result } from '@redline/shared';
+import type { LlmPort, LlmRequest, LlmResponse, ModelTier } from '@threatline/core';
+import { appError, err, ok, type Result } from '@threatline/shared';
 import { log } from './log.js';
 
 /**

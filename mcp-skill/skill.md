@@ -1,5 +1,5 @@
 ---
-name: redline
+name: threatline
 description: Use Threatline's security requirements and merge attestations while coding a Jira work item. Use before editing code for a Jira issue, before opening a pull request, and after tests pass, when the project uses Threatline on Jira and Bitbucket.
 license: MIT
 ---
@@ -14,7 +14,7 @@ Threatline is a Jira app that threat-models work items and blocks Done and merge
 2. Add the MCP server to your client. The URL is `https://mcp.atlassian.com/forge/<appId>`, where `<appId>` is the UUID at the end of Threatline's app id. With Claude Code:
 
    ```sh
-   claude mcp add --transport http redline https://mcp.atlassian.com/forge/<appId>
+   claude mcp add --transport http threatline https://mcp.atlassian.com/forge/<appId>
    ```
 
 3. Sign in when the client opens the Atlassian consent screen. Pick the site and approve the tools. Every call runs as you, with your Jira permissions.

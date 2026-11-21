@@ -1,6 +1,6 @@
-import { buildLedgerProof, ledgerLeafHashes, signTreeHead, type LedgerProof, type TreeHead } from '@redline/core';
-import { merkleRoot } from '@redline/crypto';
-import { appError, err, ok, type Result } from '@redline/shared';
+import { buildLedgerProof, ledgerLeafHashes, signTreeHead, type LedgerProof, type TreeHead } from '@threatline/core';
+import { merkleRoot } from '@threatline/crypto';
+import { appError, err, ok, type Result } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { DIGEST_CONFIG_KEY } from './digest.js';
@@ -64,7 +64,7 @@ export async function publishTreeHead(deps: CoreDeps): Promise<Result<PublishOut
     .map((h) => `<tr><td>${h.treeSize}</td><td><code>${esc(h.rootHash)}</code></td><td>${esc(h.timestamp)}</td><td><code>${esc(h.kid)}</code></td><td><code>${esc(h.signature)}</code></td></tr>`)
     .join('');
   const storage = [
-    `<p>Signed heads of the Merkle tree over Threatline's risk ledger (RFC 9162 hashing; leaves are the ledger entry hashes in order). Each head signs the text <code>redline-tree-head-v1</code>, the tree size, the root hash and the time, one per line, with Ed25519. Keep a copy: a later inclusion proof must be consistent with every head here.</p>`,
+    `<p>Signed heads of the Merkle tree over Threatline's risk ledger (RFC 9162 hashing; leaves are the ledger entry hashes in order). Each head signs the text <code>threatline-tree-head-v1</code>, the tree size, the root hash and the time, one per line, with Ed25519. Keep a copy: a later inclusion proof must be consistent with every head here.</p>`,
     `<p>Check a proof downloaded from the Threatline admin page offline with <code>node scripts/verify-ledger-proof.mjs proof.json</code>, and compare its public key with the one below.</p>`,
     '<h2>Signing keys</h2>',
     `<table><tbody><tr><th>Key id</th><th>Public key (Ed25519, base64url)</th></tr>${keyRows}</tbody></table>`,

@@ -7,13 +7,13 @@ app:
     path: dist
 modules:
   bitbucket:mergeCheck:
-    - key: redline-merge-check
+    - key: threatline-merge-check
       function: mergeCheck
       name: Threatline security attestation
       description: Requires a valid Threatline attestation for security-sensitive changes
       triggers: [ on-code-pushed, on-merge ]
   bitbucket:repoSettingsMenuPage:
-    - key: redline-repo-settings
+    - key: threatline-repo-settings
       title: Threatline
       resource: settings
       resolver:

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { scanForInjection } from '@redline/core';
-import { appError, err, ok } from '@redline/shared';
+import { scanForInjection } from '@threatline/core';
+import { appError, err, ok } from '@threatline/shared';
 import type { AdfDoc, JiraIssue } from '../src/adapters/jira.js';
 import type { ConfluenceClient } from '../src/adapters/confluence.js';
 import { DEMO_COMPONENT, DEMO_LABEL, DESIGN_PAGE_TITLE, designPageStorage, HIDDEN_DIRECTIVE } from '../src/seeder/content/demo.js';

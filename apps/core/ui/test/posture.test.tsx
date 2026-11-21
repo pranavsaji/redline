@@ -110,8 +110,8 @@ describe('accessibility', () => {
 
 describe('router', () => {
   it.each([
-    ['redline-posture', 'Release report'],
-    ['redline-posture-gadget', null],
+    ['threatline-posture', 'Release report'],
+    ['threatline-posture-gadget', null],
   ])('%s shows the posture view', async (moduleKey, release) => {
     render(<Router moduleKey={moduleKey} api={mockApi()} admin={mockAdminApi()} posture={mockPostureApi()} />);
     expect(await screen.findByRole('heading', { name: 'Security posture' })).toBeTruthy();

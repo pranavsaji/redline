@@ -94,12 +94,12 @@ describe('log', () => {
 });
 
 describe('jiraVerdictSink and systemClock', () => {
-  it('writes the verdict to the redline.verdict property', async () => {
+  it('writes the verdict to the threatline.verdict property', async () => {
     const setProperty = vi.fn(async () => ({ ok: true as const, value: undefined }));
     const sink = jiraVerdictSink({ setProperty } as unknown as JiraClient);
     const v = { state: 'pass', reasons: [], blocking: [] } as never;
     expect((await sink.write('10042', v)).ok).toBe(true);
-    expect(setProperty).toHaveBeenCalledWith('10042', 'redline.verdict', v);
+    expect(setProperty).toHaveBeenCalledWith('10042', 'threatline.verdict', v);
   });
 
   it('systemClock returns the current time', () => {

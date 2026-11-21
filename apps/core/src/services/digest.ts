@@ -1,5 +1,5 @@
-import { postureSummary } from '@redline/core';
-import { ok, SEVERITIES, type Result } from '@redline/shared';
+import { postureSummary } from '@threatline/core';
+import { ok, SEVERITIES, type Result } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { postureRows, postureScope } from './posture-service.js';

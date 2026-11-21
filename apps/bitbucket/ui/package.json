@@ -1,5 +1,5 @@
 {
-  "name": "@redline/bitbucket-ui",
+  "name": "@threatline/bitbucket-ui",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "@atlaskit/css-reset": "^8.4.10",
     "@atlaskit/tokens": "^20.12.0",
     "@forge/bridge": "^7.3.0",
-    "@redline/crypto": "workspace:*",
+    "@threatline/crypto": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

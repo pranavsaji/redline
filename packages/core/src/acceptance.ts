@@ -9,7 +9,7 @@ import {
   type Result,
   type Severity,
   type SitePolicy,
-} from '@redline/shared';
+} from '@threatline/shared';
 import type { LedgerRow } from './ports.js';
 
 export type Role = 'viewer' | 'developer' | 'tech_lead' | 'champion' | 'admin';

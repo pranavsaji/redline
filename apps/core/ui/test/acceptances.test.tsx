@@ -157,6 +157,6 @@ describe('Admin: ledger (RL-4, RL-7)', () => {
     await userEvent.click(within(form).getByRole('button', { name: 'Export' }));
     expect(exportLedger).toHaveBeenCalledWith('PAY', '2026-11-01', '2026-11-30');
     expect(await screen.findByRole('link', { name: 'Download CSV' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Download JSON' }).getAttribute('download')).toBe('redline-evidence-PAY-2026-11-01-2026-11-30.json');
+    expect(screen.getByRole('link', { name: 'Download JSON' }).getAttribute('download')).toBe('threatline-evidence-PAY-2026-11-01-2026-11-30.json');
   });
 });

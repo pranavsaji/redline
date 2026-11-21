@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { SEVERITIES, severityRank, type ReviewStatus, type Severity } from '@redline/shared';
+import { SEVERITIES, severityRank, type ReviewStatus, type Severity } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
-import type { TrendPoint } from '@redline/db';
+import type { TrendPoint } from '@threatline/db';
 import { log } from '../adapters/log.js';
 import { getPostureSummary, type PostureSummaryResult } from '../actions/posture-summary.js';
 import { getReleaseReadiness, type ReleaseReadinessResult } from '../actions/release-readiness.js';
@@ -75,7 +75,7 @@ export interface DrillDto {
 /**
  * PR-2: the work items behind a dashboard number. A severity drill lists work items with an open requirement of that
  * severity; a heatmap cell (team = project, component) lists those with any open requirement. The JQL is the exact
- * key list, so the number, the list and Jira agree (the `redlineMaxSeverity` alias holds only the highest *blocking*
+ * key list, so the number, the list and Jira agree (the `threatlineMaxSeverity` alias holds only the highest *blocking*
  * severity, so it cannot reproduce a Medium count).
  */
 export async function postureDrill(deps: CoreDeps, v: PostureViewer, payload: Record<string, unknown>): Promise<DrillDto | ActionError> {

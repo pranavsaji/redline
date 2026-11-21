@@ -157,7 +157,7 @@ describe('keyboard path (Task 32)', () => {
   });
 
   it('admin: the first Tab lands on the section index, and each link targets a section that exists', async () => {
-    render(<Router moduleKey="redline-admin" api={mockApi('ready')} admin={mockAdminApi('ready')} posture={mockPostureApi('ready')} />);
+    render(<Router moduleKey="threatline-admin" api={mockApi('ready')} admin={mockAdminApi('ready')} posture={mockPostureApi('ready')} />);
     await screen.findByRole('heading', { name: 'Severity policy' });
     await userEvent.tab();
     const nav = screen.getByRole('navigation', { name: 'Admin sections' });
@@ -198,9 +198,9 @@ describe('axe and control names on every surface (Task 32)', () => {
   });
 
   it.each([
-    ['redline-admin', 'first'],
-    ['redline-posture', 'empty'],
-    ['redline-posture-gadget', 'ready'],
+    ['threatline-admin', 'first'],
+    ['threatline-posture', 'empty'],
+    ['threatline-posture-gadget', 'ready'],
   ])('%s (%s state)', async (moduleKey, state) => {
     const { container } = render(<Router moduleKey={moduleKey} api={mockApi('ready')} admin={mockAdminApi(state)} posture={mockPostureApi(state)} />);
     await waitFor(() => expect(container.querySelector('[aria-busy="true"], [role="status"][aria-label^="Loading"]')).toBeNull());

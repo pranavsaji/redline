@@ -1,4 +1,4 @@
-import type { Acceptance, ArchitectureSketch, Requirement, Review, Threat } from '@redline/shared';
+import type { Acceptance, ArchitectureSketch, Requirement, Review, Threat } from '@threatline/shared';
 import { count } from '../verdict.js';
 
 export interface ThreatModelDto {

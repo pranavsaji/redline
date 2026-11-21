@@ -1,4 +1,4 @@
-import { buildReviewContext, type ReviewContextDto } from '@redline/core';
+import { buildReviewContext, type ReviewContextDto } from '@threatline/core';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { issueSubmissionToken } from '../services/submission-token.js';

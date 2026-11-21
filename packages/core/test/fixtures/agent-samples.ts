@@ -1,4 +1,4 @@
-import type { AgentThreat, AgentThreatModel } from '@redline/shared';
+import type { AgentThreat, AgentThreatModel } from '@threatline/shared';
 
 export const ISSUE_KEY = 'PROJ-1';
 
@@ -57,7 +57,7 @@ export const paraphrased: AgentThreat = {
 };
 
 export const model = (threats: AgentThreat[], extra: Partial<AgentThreatModel> = {}): AgentThreatModel => ({
-  schema: 'redline.threatmodel.v1',
+  schema: 'threatline.threatmodel.v1',
   issueKey: ISSUE_KEY,
   threats,
   ...extra,

@@ -1,4 +1,4 @@
-import type { ContextFact } from '@redline/shared';
+import type { ContextFact } from '@threatline/shared';
 
 const randomNonce = (): string => {
   const b = new Uint8Array(8);

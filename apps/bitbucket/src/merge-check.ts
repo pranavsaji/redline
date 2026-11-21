@@ -1,10 +1,10 @@
-import { DEFAULT_REPO_SETTINGS, evaluateMergeCheck, withAddedText, type DiffFile, type RepoSettings } from '@redline/core';
-import { log } from '@redline/shared';
+import { DEFAULT_REPO_SETTINGS, evaluateMergeCheck, withAddedText, type DiffFile, type RepoSettings } from '@threatline/core';
+import { log } from '@threatline/shared';
 import type { BitbucketClient, DiffstatEntry } from './bitbucket-client.js';
 
 const STATUS: Record<string, DiffFile['status']> = { added: 'added', removed: 'removed', renamed: 'renamed', modified: 'modified' };
 
-export { DEFAULT_REPO_SETTINGS, evaluateMergeCheck, WARN_ONLY_MAX_DAYS, type RepoSettings } from '@redline/core';
+export { DEFAULT_REPO_SETTINGS, evaluateMergeCheck, WARN_ONLY_MAX_DAYS, type RepoSettings } from '@threatline/core';
 
 export function toDiffFiles(entries: DiffstatEntry[]): DiffFile[] {
   return entries.flatMap((e) => {
@@ -46,7 +46,9 @@ export async function runMergeCheck(
   const dest = pr.value.destination?.commit?.hash ?? '';
   const fullName = pr.value.destination?.repository?.full_name ?? '';
   if (!head || !dest || !fullName) return unreadable('commits');
-  const policy = await deps.client.fileAt(ws, repo, dest, '.redline/policy.yml');
+  // `.redline/policy.yml`: the name before the rename to Threatline, still read when the new file is absent.
+  const current = await deps.client.fileAt(ws, repo, dest, '.threatline/policy.yml');
+  const policy = current.ok && current.value === null ? await deps.client.fileAt(ws, repo, dest, '.redline/policy.yml') : current;
   if (!policy.ok) return unreadable('policy file');
   const r = await evaluateMergeCheck({
     pr: { description: pr.value.description ?? '', headSha: head, destSha: dest, repoFullName: fullName, title: pr.value.title ?? '', branch: pr.value.source?.branch?.name ?? '' },

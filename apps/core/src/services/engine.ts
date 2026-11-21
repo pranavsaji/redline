@@ -1,5 +1,5 @@
-import { applyVerification, engineAgentRun, engineExtract, engineVerify, requirementsFor, type Extracted, type Usage } from '@redline/core';
-import { appError, err, ok, type ContextBundle, type Result, type Review } from '@redline/shared';
+import { applyVerification, engineAgentRun, engineExtract, engineVerify, requirementsFor, type Extracted, type Usage } from '@threatline/core';
+import { appError, err, ok, type ContextBundle, type Result, type Review } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import type { ReviewJob } from '../jobs/types.js';

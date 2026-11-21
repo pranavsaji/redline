@@ -17,6 +17,6 @@ await build({
   logLevel: 'warning',
   loader: { '.json': 'json' },
 });
-writeFileSync('dist/package.json', JSON.stringify({ name: 'redline-bundle', private: true, type: 'commonjs' }, null, 2));
+writeFileSync('dist/package.json', JSON.stringify({ name: 'threatline-bundle', private: true, type: 'commonjs' }, null, 2));
 if (existsSync('src/prebuilt')) cpSync('src/prebuilt', 'dist', { recursive: true });
 console.log('built dist/index.js');

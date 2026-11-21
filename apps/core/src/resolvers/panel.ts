@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { ACCEPTANCE_EVENTS, rebuildAcceptances, reviewSignals, threatDiff, whatIfScore, type DiscardedThreat, type Role } from '@redline/core';
-import { cweById, getAsvs } from '@redline/frameworks';
-import { DataClassSchema, ExposureSchema, severityRank, type Acceptance, type DataClass, type Exposure, type Severity, type ContextFact, type Requirement, type Review, type Threat, type Verdict } from '@redline/shared';
+import { ACCEPTANCE_EVENTS, rebuildAcceptances, reviewSignals, threatDiff, whatIfScore, type DiscardedThreat, type Role } from '@threatline/core';
+import { cweById, getAsvs } from '@threatline/frameworks';
+import { DataClassSchema, ExposureSchema, severityRank, type Acceptance, type DataClass, type Exposure, type Severity, type ContextFact, type Requirement, type Review, type Threat, type Verdict } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import type { JiraIssue } from '../adapters/jira.js';
 import { log } from '../adapters/log.js';
@@ -202,7 +202,7 @@ export async function panelThreats(deps: CoreDeps, v: Viewer, p: { cursor?: unkn
   return { threats: page, cursor: from + PAGE_SIZE < listed.length ? from + PAGE_SIZE : null };
 }
 
-/** (Re-)adds the redline-review label (visible in Jira; starts the Automation re-run rule) and queues the gather. */
+/** (Re-)adds the threatline-review label (visible in Jira; starts the Automation re-run rule) and queues the gather. */
 export async function panelRerun(deps: CoreDeps, v: Viewer): Promise<{ ok: true } | Denied> {
   const auth = await authorise(deps, v, 'edit');
   if ('error' in auth) return auth;
@@ -264,7 +264,7 @@ export async function threatExplain(deps: CoreDeps, v: Viewer, p: { reviewId?: u
 export async function panelEnrich(
   deps: CoreDeps,
   v: Viewer & { cloudId: string },
-  enricher: { enrich(issueAri: string): Promise<import('@redline/shared').Result<{ facts: ContextFact[]; partial: boolean; reasons: string[] }>> },
+  enricher: { enrich(issueAri: string): Promise<import('@threatline/shared').Result<{ facts: ContextFact[]; partial: boolean; reasons: string[] }>> },
 ): Promise<{ added: number; partial: boolean; facts: FactDto[] } | Denied> {
   const auth = await authorise(deps, v, 'browse');
   if ('error' in auth) return auth;

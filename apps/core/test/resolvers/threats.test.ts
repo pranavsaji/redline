@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ok, type AgentThreatModel, type Requirement, type Threat, type Verdict } from '@redline/shared';
+import { ok, type AgentThreatModel, type Requirement, type Threat, type Verdict } from '@threatline/shared';
 import { handleJob } from '../../src/consumers/review-consumer.js';
 import { reviewConfirm, threatsTriage } from '../../src/resolvers/threats.js';
 import { OPS_CONFIG_KEY } from '../../src/jobs/hourly.js';
@@ -7,10 +7,10 @@ import { coreDeps, jiraIssue } from '../support/core-deps.js';
 
 const ISSUE = '10042';
 const who = { accountId: 'acc-champ', issueId: ISSUE };
-const CHAMPIONS = 'redline-security-champions';
+const CHAMPIONS = 'threatline-security-champions';
 
 const twoThreats: AgentThreatModel = {
-  schema: 'redline.threatmodel.v1',
+  schema: 'threatline.threatmodel.v1',
   issueKey: 'PAY-7',
   threats: [
     { stride: 'Spoofing', title: 'Forged refund webhooks', scenario: 'An attacker posts a fake refund event.', component: 'webhook endpoint', likelihood: 4, impact: 4, evidence: [{ quote: 'Public webhook that receives refund events' }] },

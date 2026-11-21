@@ -8,7 +8,7 @@ import {
   type SitePolicy,
   type Threat,
   type Verdict,
-} from '@redline/shared';
+} from '@threatline/shared';
 import { warnOnlyUntil } from './policy.js';
 
 /** "1 threat", "2 threats": counts in messages read as words, never "threat(s)". */

@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { LedgerRow } from '@redline/core';
-import { DismissReasonSchema, StrideSchema, type Threat } from '@redline/shared';
+import type { LedgerRow } from '@threatline/core';
+import { DismissReasonSchema, StrideSchema, type Threat } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { rolesOf } from '../services/roles.js';
 import { applyTriage, confirmReview, triageable } from '../services/triage-service.js';

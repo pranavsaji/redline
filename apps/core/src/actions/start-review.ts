@@ -12,7 +12,7 @@ export interface StartReviewResult {
 }
 
 /**
- * TRIGGER (Agent): queues a fresh review as the caller (who needs edit permission): re-adds the redline-review label,
+ * TRIGGER (Agent): queues a fresh review as the caller (who needs edit permission): re-adds the threatline-review label,
  * which starts the Automation re-run, and queues the gather. Rate-limited per person like the panel's Re-run.
  */
 export async function startReview(payload: ActionPayload & Record<string, unknown>, deps: CoreDeps): Promise<StartReviewResult | ActionError> {

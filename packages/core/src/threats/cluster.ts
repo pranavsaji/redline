@@ -1,4 +1,4 @@
-import type { AgentThreat, Stride } from '@redline/shared';
+import type { AgentThreat, Stride } from '@threatline/shared';
 import { jaccard, normalizeText } from './text.js';
 
 interface Comparable {

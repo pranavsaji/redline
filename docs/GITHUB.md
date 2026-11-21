@@ -8,7 +8,7 @@ so both platforms give the same answer for the same change.
 ## Set it up (5 minutes)
 
 1. In Jira, open **Threatline admin → Signing keys** and copy the active public key. It is public: no secret is needed.
-2. Add `.github/workflows/redline.yml` to the repository:
+2. Add `.github/workflows/threatline.yml` to the repository:
 
    ```yaml
    name: Threatline
@@ -40,7 +40,7 @@ author could swap in their own key, switch to warn mode, or replace the step. `p
 branch's workflow. The action warns if it runs on `pull_request`. Do not add a checkout of the pull request's code to
 this job. For organisation-wide enforcement, add the workflow as a required workflow in an organisation ruleset.
 
-Changes to `.github/workflows/**`, `.github/actions/**` and `.redline/**` always count as sensitive, so loosening the
+Changes to `.github/workflows/**`, `.github/actions/**` and `.threatline/**` always count as sensitive, so loosening the
 gate needs an attestation like any other security change.
 
 ## Inputs
@@ -53,7 +53,7 @@ gate needs an attestation like any other security change.
 | `mode` | `block` | `warn` reports failures but passes, until `warn-until`. |
 | `warn-until` | none | Required in warn mode: an ISO date at most 14 days away. After it, the check blocks again. |
 
-The base branch's `.redline/policy.yml` can add sensitive paths and lower the threshold. It can never weaken them, and
+The base branch's `.threatline/policy.yml` can add sensitive paths and lower the threshold. It can never weaken them, and
 an unreadable policy file makes every changed file count as sensitive.
 
 ## How a developer gets through the gate

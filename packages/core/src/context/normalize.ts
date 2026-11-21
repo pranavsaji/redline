@@ -1,5 +1,5 @@
-import { MAX_EXCERPT, type ContextFact, type SourceType } from '@redline/shared';
-import { sha256Hex } from '@redline/crypto';
+import { MAX_EXCERPT, type ContextFact, type SourceType } from '@threatline/shared';
+import { sha256Hex } from '@threatline/crypto';
 import { INVISIBLE_CHARS, scanForInjection } from './injection.js';
 import { redactSecrets } from './redact.js';
 

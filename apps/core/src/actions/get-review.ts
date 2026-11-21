@@ -1,4 +1,4 @@
-import type { Review, Severity, Stride, Verdict } from '@redline/shared';
+import type { Review, Severity, Stride, Verdict } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { panelGet } from '../resolvers/panel.js';

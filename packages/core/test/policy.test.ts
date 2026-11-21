@@ -22,7 +22,7 @@ describe('policy', () => {
     expect(!r.ok && r.error.code).toBe('validation');
   });
 
-  it('parses .redline/policy.yml with defaults', () => {
+  it('parses .threatline/policy.yml with defaults', () => {
     const r = parseRepoPolicy('sensitivePaths:\n  - "src/auth/**"\n');
     expect(r.ok && r.value).toEqual({ sensitivePaths: ['src/auth/**'], mode: 'block', diffScoreThreshold: 40 });
     expect(parseRepoPolicy('').ok).toBe(true);

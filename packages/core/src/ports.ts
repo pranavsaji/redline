@@ -10,8 +10,8 @@ import type {
   Stride,
   Threat,
   Verdict,
-} from '@redline/shared';
-import type { KeyPair } from '@redline/crypto';
+} from '@threatline/shared';
+import type { KeyPair } from '@threatline/crypto';
 
 export interface ClockPort {
   now(): Date;

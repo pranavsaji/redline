@@ -5,7 +5,7 @@ Threatline, how it is prevented, and the test that proves each control. Threats 
 plain language first, the way Threatline writes them for its users.
 
 Scope: Threatline for Jira (`apps/core`, with Confluence) and Threatline for Bitbucket (`apps/bitbucket`) as built on branch
-`build/redline`. Method: the spec's threat and control table (§ Security, privacy and trust), checked control by control
+`build/threatline`. Method: the spec's threat and control table (§ Security, privacy and trust), checked control by control
 against the code, with the defects found during the build and the reviews of each task recorded under "Found and fixed".
 
 ## Threats and controls

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { appError, err, ok } from '@redline/shared';
-import type { LlmPort } from '@redline/core';
+import { appError, err, ok } from '@threatline/shared';
+import type { LlmPort } from '@threatline/core';
 
 /** Raw model replies for one eval case, saved from a live `claude -p` run and replayed by the offline CI gate. */
 export interface Recording {

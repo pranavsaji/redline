@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ok } from '@redline/shared';
+import { ok } from '@threatline/shared';
 import type { ConfluenceClient } from '../../src/adapters/confluence.js';
 import { DIGEST_CONFIG_KEY, publishWeeklyDigest } from '../../src/services/digest.js';
 import { daily } from '../../src/jobs/daily.js';

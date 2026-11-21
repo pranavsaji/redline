@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { appError, err, ok } from '@redline/shared';
+import { appError, err, ok } from '@threatline/shared';
 import type { SqlExecutor } from '../src/executor.js';
 
 /** Translates the MySQL DDL we use into SQLite so repository contracts run in-process. Test-only. */

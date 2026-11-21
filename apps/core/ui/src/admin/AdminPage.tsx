@@ -32,7 +32,7 @@ const SECTIONS = [
   { id: 'retention', title: 'Data retention', needsPolicy: false },
   { id: 'demo', title: 'Demo data', needsPolicy: false },
 ] as const;
-const anchor = (id: string) => `redline-admin-${id}`;
+const anchor = (id: string) => `threatline-admin-${id}`;
 
 /** Threatline's Jira admin page: first-run wizard, policy sections, observability, keys, ledger and demo data. */
 export function AdminPage({ api }: { api: AdminApi }) {

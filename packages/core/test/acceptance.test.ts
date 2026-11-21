@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Acceptance, Requirement } from '@redline/shared';
+import type { Acceptance, Requirement } from '@threatline/shared';
 import { appendLedger, canApprove, DEFAULT_SITE_POLICY, rebuildAcceptances, validateAcceptanceRequest } from '../src/index.js';
 import { fixedClock, memoryLedgerRepo } from './fakes/index.js';
 

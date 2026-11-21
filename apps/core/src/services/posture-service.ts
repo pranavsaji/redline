@@ -1,5 +1,5 @@
-import { ACCEPTANCE_EVENTS, rebuildAcceptances, verifiedHours, type PostureRow } from '@redline/core';
-import { appError, err, ok, type Acceptance, type Requirement, type Result } from '@redline/shared';
+import { ACCEPTANCE_EVENTS, rebuildAcceptances, verifiedHours, type PostureRow } from '@threatline/core';
+import { appError, err, ok, type Acceptance, type Requirement, type Result } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import type { JiraIssue } from '../adapters/jira.js';
 import { jqlString } from '../actions/schemas.js';

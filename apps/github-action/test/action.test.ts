@@ -5,8 +5,8 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { encodeAttestation, generateKeyPair } from '@redline/crypto';
-import type { AttestationPayload } from '@redline/shared';
+import { encodeAttestation, generateKeyPair } from '@threatline/crypto';
+import type { AttestationPayload } from '@threatline/shared';
 import { parseInputs, runGitHubCheck, type GitHubClient, type GitHubFile, type GitHubPr } from '../src/run.js';
 
 const NOW = 1_763_208_000; // 2025-11-15T12:00:00Z
@@ -57,8 +57,8 @@ describe('parseInputs (GitHub Action inputs)', () => {
 });
 
 describe('runGitHubCheck (the merge gate on GitHub)', () => {
-  it("changing the gate's own configuration is always sensitive (workflows, local actions, .redline)", async () => {
-    for (const filename of ['.github/workflows/redline.yml', '.github/actions/setup/action.yml', '.redline/policy.yml'])
+  it("changing the gate's own configuration is always sensitive (workflows, local actions, .threatline)", async () => {
+    for (const filename of ['.github/workflows/threatline.yml', '.github/actions/setup/action.yml', '.threatline/policy.yml'])
       expect(await runGitHubCheck({ settings: inputs(), client: client({ files: [{ ...DOCS, filename }] }), nowSec: NOW })).toMatchObject({ success: false, outcome: 'fail_missing' });
   });
   it('changes that touch no sensitive paths merge freely', async () => {
@@ -88,7 +88,7 @@ describe('runGitHubCheck (the merge gate on GitHub)', () => {
     // A binary file (no patch, no added lines) is not by itself sensitive.
     expect(await runGitHubCheck({ settings: inputs(), client: client({ files: [{ filename: 'docs/logo.png', status: 'added', additions: 0 }] }), nowSec: NOW })).toMatchObject({ success: true });
   });
-  it("the base branch's .redline/policy.yml can add sensitive paths", async () => {
+  it("the base branch's .threatline/policy.yml can add sensitive paths", async () => {
     const r = await runGitHubCheck({ settings: inputs(), client: client({ files: [DOCS], policy: 'sensitivePaths:\n  - "README.md"\n' }), nowSec: NOW });
     expect(r).toMatchObject({ success: false, outcome: 'fail_missing' });
   });
@@ -117,7 +117,7 @@ describe('the bundled action', () => {
       if (req.headers.authorization !== 'Bearer test-token') return res.writeHead(401).end('{}');
       if (url.startsWith('/repos/acme/payments/pulls/12/files')) return res.end(JSON.stringify(url.includes('page=1') ? [AUTH] : []));
       if (url.startsWith('/repos/acme/payments/pulls/12')) return res.end(JSON.stringify(PR(body)));
-      if (url.startsWith('/repos/acme/payments/contents/.redline/policy.yml')) return res.writeHead(404).end('{}');
+      if (url.startsWith('/repos/acme/payments/contents/.threatline/policy.yml')) return res.writeHead(404).end('{}');
       res.writeHead(404).end('{}');
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
@@ -127,7 +127,7 @@ describe('the bundled action', () => {
 
   const runDist = (description: string, eventName = 'pull_request_target') => {
     body = description;
-    const dir = mkdtempSync(join(tmpdir(), 'redline-action-'));
+    const dir = mkdtempSync(join(tmpdir(), 'threatline-action-'));
     const event = join(dir, 'event.json');
     writeFileSync(event, JSON.stringify({ pull_request: { number: 12 }, repository: { full_name: REPO } }));
     const out = join(dir, 'out.txt');
@@ -136,7 +136,7 @@ describe('the bundled action', () => {
     writeFileSync(summary, '');
     // Async, so this process can keep serving the stand-in API while the action runs.
     const child = spawn(process.execPath, [dist.pathname], {
-      env: { PATH: process.env.PATH ?? '', GITHUB_EVENT_NAME: eventName, GITHUB_EVENT_PATH: event, GITHUB_API_URL: api, GITHUB_OUTPUT: out, GITHUB_STEP_SUMMARY: summary, 'INPUT_GITHUB-TOKEN': 'test-token', 'INPUT_PUBLIC-KEYS': key.publicKey, REDLINE_NOW: String(NOW) },
+      env: { PATH: process.env.PATH ?? '', GITHUB_EVENT_NAME: eventName, GITHUB_EVENT_PATH: event, GITHUB_API_URL: api, GITHUB_OUTPUT: out, GITHUB_STEP_SUMMARY: summary, 'INPUT_GITHUB-TOKEN': 'test-token', 'INPUT_PUBLIC-KEYS': key.publicKey, THREATLINE_NOW: String(NOW) },
     });
     let stdout = '';
     child.stdout.on('data', (d: Buffer) => (stdout += d.toString()));

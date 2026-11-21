@@ -1,4 +1,4 @@
-import { fixBy, SEVERITIES, severityRank, type Acceptance, type Requirement, type Severity } from '@redline/shared';
+import { fixBy, SEVERITIES, severityRank, type Acceptance, type Requirement, type Severity } from '@threatline/shared';
 import { SEVERITY_WEIGHT } from './scoring.js';
 
 const OPEN: ReadonlySet<Requirement['status']> = new Set(['Open', 'InProgress']);

@@ -161,7 +161,7 @@ describe('jira client: permissions', () => {
 
   it('groupsOf returns group names', async () => {
     const { jira, calls } = client([[/GET \/rest\/api\/3\/user\/groups\?accountId=acc-1/, { status: 200, body: fixture('jira', 'groups') }]]);
-    expect(await jira.groupsOf('acc-1')).toEqual({ ok: true, value: ['redline-champions', 'jira-software-users'] });
+    expect(await jira.groupsOf('acc-1')).toEqual({ ok: true, value: ['threatline-champions', 'jira-software-users'] });
     expect(calls).toHaveLength(1);
   });
 });
@@ -221,8 +221,8 @@ describe('jira client: reads', () => {
 
 describe('jira client: writes', () => {
   it('setProperty PUTs JSON with an explicit content type', async () => {
-    const { jira, calls } = client([[/PUT \/rest\/api\/3\/issue\/10042\/properties\/redline\.verdict/, { status: 200, body: '' }]]);
-    expect(await jira.setProperty('10042', 'redline.verdict', { state: 'block' })).toEqual({ ok: true, value: undefined });
+    const { jira, calls } = client([[/PUT \/rest\/api\/3\/issue\/10042\/properties\/threatline\.verdict/, { status: 200, body: '' }]]);
+    expect(await jira.setProperty('10042', 'threatline.verdict', { state: 'block' })).toEqual({ ok: true, value: undefined });
     expect(calls[0]!.init).toMatchObject({ method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{"state":"block"}' });
   });
 
@@ -232,10 +232,10 @@ describe('jira client: writes', () => {
       [/GET \/rest\/api\/3\/issue\/10042\?/, { status: 200, body: fixture('jira', 'issue') }],
       [/POST \/rest\/api\/3\/issue$/, { status: 201, body: fixture('jira', 'created') }],
     ]);
-    const r = await jira.createSubtask('10042', { summary: 'Verify HMAC', description: doc, labels: ['redline'], issueTypeId: '10002' });
+    const r = await jira.createSubtask('10042', { summary: 'Verify HMAC', description: doc, labels: ['threatline'], issueTypeId: '10002' });
     expect(r).toEqual({ ok: true, value: { id: '10070', key: 'PAY-13' } });
     expect(JSON.parse(calls[1]!.init!.body!)).toEqual({
-      fields: { project: { id: '10000' }, parent: { id: '10042' }, summary: 'Verify HMAC', description: doc, labels: ['redline'], issuetype: { id: '10002' } },
+      fields: { project: { id: '10000' }, parent: { id: '10042' }, summary: 'Verify HMAC', description: doc, labels: ['threatline'], issuetype: { id: '10002' } },
     });
   });
 
@@ -252,18 +252,18 @@ describe('jira client: writes', () => {
 
   it('getProperty returns the value, null when the property is absent', async () => {
     const { jira } = client([
-      [/GET \/rest\/api\/3\/issue\/PAY-7\/properties\/redline\.verdict$/, { status: 200, body: JSON.stringify({ key: 'redline.verdict', value: { state: 'block' } }) }],
-      [/GET \/rest\/api\/3\/issue\/PAY-8\/properties\/redline\.verdict$/, { status: 404, body: '{}' }],
+      [/GET \/rest\/api\/3\/issue\/PAY-7\/properties\/threatline\.verdict$/, { status: 200, body: JSON.stringify({ key: 'threatline.verdict', value: { state: 'block' } }) }],
+      [/GET \/rest\/api\/3\/issue\/PAY-8\/properties\/threatline\.verdict$/, { status: 404, body: '{}' }],
     ]);
-    expect(await jira.getProperty('PAY-7', 'redline.verdict')).toEqual({ ok: true, value: { state: 'block' } });
-    expect(await jira.getProperty('PAY-8', 'redline.verdict')).toEqual({ ok: true, value: null });
-    expect(await jira.getProperty('PAY 8', 'redline.verdict')).toMatchObject({ ok: false, error: { code: 'validation' } });
+    expect(await jira.getProperty('PAY-7', 'threatline.verdict')).toEqual({ ok: true, value: { state: 'block' } });
+    expect(await jira.getProperty('PAY-8', 'threatline.verdict')).toEqual({ ok: true, value: null });
+    expect(await jira.getProperty('PAY 8', 'threatline.verdict')).toMatchObject({ ok: false, error: { code: 'validation' } });
   });
 
   it('addRemoteLink upserts by globalId', async () => {
     const { jira, calls } = client([[/POST \/rest\/api\/3\/issue\/10042\/remotelink$/, { status: 200, body: JSON.stringify({ id: 1 }) }]]);
-    expect(await jira.addRemoteLink('10042', { globalId: 'redline-threat-model-10042', url: 'https://x/wiki/pages/9', title: 'Threat model' })).toEqual({ ok: true, value: undefined });
-    expect(JSON.parse(calls[0]!.init!.body!)).toEqual({ globalId: 'redline-threat-model-10042', object: { url: 'https://x/wiki/pages/9', title: 'Threat model' } });
+    expect(await jira.addRemoteLink('10042', { globalId: 'threatline-threat-model-10042', url: 'https://x/wiki/pages/9', title: 'Threat model' })).toEqual({ ok: true, value: undefined });
+    expect(JSON.parse(calls[0]!.init!.body!)).toEqual({ globalId: 'threatline-threat-model-10042', object: { url: 'https://x/wiki/pages/9', title: 'Threat model' } });
   });
 
   it('projectInfo returns the project id and its issue types', async () => {
@@ -294,16 +294,16 @@ describe('jira client: writes', () => {
   it('createIssue posts project, type, summary, ADF, labels, components and parent', async () => {
     const doc: AdfDoc = { type: 'doc', version: 1, content: [] };
     const { jira, calls } = client([[/POST \/rest\/api\/3\/issue$/, { status: 201, body: fixture('jira', 'created') }]]);
-    expect(await jira.createIssue({ projectId: '10000', issueTypeId: '2', summary: 'S', description: doc, labels: ['redline-demo'], components: ['support-agent'], parentId: '10042' })).toEqual({ ok: true, value: { id: '10070', key: 'PAY-13' } });
-    expect(JSON.parse(calls[0]!.init!.body!)).toEqual({ fields: { project: { id: '10000' }, issuetype: { id: '2' }, summary: 'S', description: doc, labels: ['redline-demo'], components: [{ name: 'support-agent' }], parent: { id: '10042' } } });
+    expect(await jira.createIssue({ projectId: '10000', issueTypeId: '2', summary: 'S', description: doc, labels: ['threatline-demo'], components: ['support-agent'], parentId: '10042' })).toEqual({ ok: true, value: { id: '10070', key: 'PAY-13' } });
+    expect(JSON.parse(calls[0]!.init!.body!)).toEqual({ fields: { project: { id: '10000' }, issuetype: { id: '2' }, summary: 'S', description: doc, labels: ['threatline-demo'], components: [{ name: 'support-agent' }], parent: { id: '10042' } } });
   });
 
   it('addLabel / removeLabel use the update verbs', async () => {
     const { jira, calls } = client([[/PUT \/rest\/api\/3\/issue\/10042$/, { status: 204 }]]);
-    await jira.addLabel('10042', 'redline-review');
-    await jira.removeLabel('10042', 'redline-review');
-    expect(JSON.parse(calls[0]!.init!.body!)).toEqual({ update: { labels: [{ add: 'redline-review' }] } });
-    expect(JSON.parse(calls[1]!.init!.body!)).toEqual({ update: { labels: [{ remove: 'redline-review' }] } });
+    await jira.addLabel('10042', 'threatline-review');
+    await jira.removeLabel('10042', 'threatline-review');
+    expect(JSON.parse(calls[0]!.init!.body!)).toEqual({ update: { labels: [{ add: 'threatline-review' }] } });
+    expect(JSON.parse(calls[1]!.init!.body!)).toEqual({ update: { labels: [{ remove: 'threatline-review' }] } });
   });
 
   it('comment posts the ADF body', async () => {

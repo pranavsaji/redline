@@ -3,7 +3,7 @@ import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import type { ReviewJob } from '../jobs/types.js';
 
-export const RERUN_LABEL = 'redline-review';
+export const RERUN_LABEL = 'threatline-review';
 
 const EventSchema = z.object({
   eventType: z.string().optional(),

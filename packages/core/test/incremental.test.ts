@@ -30,7 +30,7 @@ describe('incremental re-review', () => {
   });
 });
 
-import type { AgentThreat, Review, Threat } from '@redline/shared';
+import type { AgentThreat, Review, Threat } from '@threatline/shared';
 import { assembleReview, contextHash, DEFAULT_SITE_POLICY, EXPOSURE_MULTIPLIER, normalizeFact, riskScore, whatIfScore, type Sample } from '../src/index.js';
 import { rawFacts } from './fixtures/ai-support-agent.js';
 import { ISSUE_KEY, model, refundAbuse, transcriptLeak } from './fixtures/agent-samples.js';

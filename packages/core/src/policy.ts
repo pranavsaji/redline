@@ -9,7 +9,7 @@ import {
   type RepoPolicy,
   type Result,
   type SitePolicy,
-} from '@redline/shared';
+} from '@threatline/shared';
 
 export const WARN_ONLY_MAX_DAYS = 14;
 
@@ -18,8 +18,8 @@ export const DEFAULT_SITE_POLICY: SitePolicy = {
   guardedTransitions: ['Done'],
   enabledProjects: [],
   reviewIssueTypes: ['Epic', 'Story'],
-  techLeadGroup: 'redline-tech-leads',
-  championGroup: 'redline-security-champions',
+  techLeadGroup: 'threatline-tech-leads',
+  championGroup: 'threatline-security-champions',
   maxExpiryDays: { Critical: 30, default: 90 },
   techLeadMaxSeverity: 'Medium',
   agentSamples: 3,
@@ -48,7 +48,7 @@ export function parseRepoPolicy(yamlText: string): Result<RepoPolicy> {
     return err(appError('validation', 'policy.yml is not valid YAML', { error: e instanceof Error ? e.message : String(e) }));
   }
   const r = RepoPolicySchema.safeParse(raw);
-  return r.success ? ok(r.data) : err(appError('validation', 'invalid .redline/policy.yml', { issues: issuesOf(r.error) }));
+  return r.success ? ok(r.data) : err(appError('validation', 'invalid .threatline/policy.yml', { issues: issuesOf(r.error) }));
 }
 
 export function isSensitive(path: string, globs: string[]): boolean {

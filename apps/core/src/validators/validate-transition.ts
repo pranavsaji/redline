@@ -26,7 +26,7 @@ type Outcome = { result: boolean; errorMessage?: string };
 const blocked = (errorMessage: string): Outcome => ({ result: false, errorMessage });
 
 /**
- * The Done gate. Reads the verdict from app storage, which only Threatline can write — never the `redline.verdict` issue
+ * The Done gate. Reads the verdict from app storage, which only Threatline can write — never the `threatline.verdict` issue
  * property, which anyone who can edit the work item can overwrite. No stored verdict yet: compute it once. Fails closed:
  * only `pass` and `warn` let the transition through; every error or unknown value blocks with a message.
  */

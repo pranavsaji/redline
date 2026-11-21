@@ -13,7 +13,7 @@ async function start() {
   let api: PanelApi;
   let admin: AdminApi;
   let posture: PostureApi;
-  let moduleKey = 'redline-panel';
+  let moduleKey = 'threatline-panel';
   if (inForge) {
     api = await forgeApi();
     admin = await forgeAdminApi();
@@ -36,9 +36,9 @@ async function start() {
       posture = mock.mockPostureApi();
     }
     const view = params.get('view');
-    if (view === 'admin') moduleKey = 'redline-admin';
-    if (view === 'posture') moduleKey = 'redline-posture';
-    if (view === 'gadget') moduleKey = 'redline-posture-gadget';
+    if (view === 'admin') moduleKey = 'threatline-admin';
+    if (view === 'posture') moduleKey = 'threatline-posture';
+    if (view === 'gadget') moduleKey = 'threatline-posture-gadget';
   }
   createRoot(document.getElementById('root')!).render(
     <StrictMode>

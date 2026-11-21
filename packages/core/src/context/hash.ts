@@ -1,6 +1,6 @@
-import { canonicalJson } from '@redline/shared';
-import { sha256Hex } from '@redline/crypto';
-import type { ContextFact } from '@redline/shared';
+import { canonicalJson } from '@threatline/shared';
+import { sha256Hex } from '@threatline/crypto';
+import type { ContextFact } from '@threatline/shared';
 
 /** SHA-256 over the sorted (sourceAri, version) pairs: changes exactly when a source is added, removed or edited. */
 export function contextHash(facts: ReadonlyArray<Pick<ContextFact, 'sourceAri' | 'version'>>): string {

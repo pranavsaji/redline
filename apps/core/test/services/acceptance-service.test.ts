@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { verifyChain } from '@redline/crypto';
-import { ok, type Verdict } from '@redline/shared';
+import { verifyChain } from '@threatline/crypto';
+import { ok, type Verdict } from '@threatline/shared';
 import { acceptanceDecide, acceptanceRequest, acceptanceRevoke, breakGlassOverride } from '../../src/resolvers/acceptances.js';
 import { ledgerExport, ledgerVerify } from '../../src/resolvers/ledger.js';
 import { panelGet } from '../../src/resolvers/panel.js';

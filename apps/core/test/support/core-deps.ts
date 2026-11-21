@@ -1,4 +1,4 @@
-import type { LlmPort } from '@redline/core';
+import type { LlmPort } from '@threatline/core';
 import { FakeLlm } from '../../../../packages/core/test/fakes/fake-llm.js';
 import {
   fixedClock,
@@ -11,17 +11,17 @@ import {
   memoryTreeHeadRepo,
   memoryUsageRepo,
   memoryVerdictSink,
-} from '@redline/core/testing';
-import { DEFAULT_SITE_POLICY } from '@redline/core';
-import { ok, type ContextBundle, type Result, type SitePolicy } from '@redline/shared';
-import { normalizeFact } from '@redline/core';
+} from '@threatline/core/testing';
+import { DEFAULT_SITE_POLICY } from '@threatline/core';
+import { ok, type ContextBundle, type Result, type SitePolicy } from '@threatline/shared';
+import { normalizeFact } from '@threatline/core';
 import type { CoreDeps } from '../../src/deps.js';
 import type { JiraClient, JiraIssue } from '../../src/adapters/jira.js';
 import type { ConfluenceClient } from '../../src/adapters/confluence.js';
 import type { ReviewJob } from '../../src/jobs/types.js';
 import { memoryKvs } from './memory-kvs.js';
 import { kvsSigningKeys } from '../../src/adapters/signing-keys.js';
-import { contextHash } from '@redline/core';
+import { contextHash } from '@threatline/core';
 
 export const POLICY: SitePolicy = { ...DEFAULT_SITE_POLICY, enabledProjects: ['PAY'], reviewIssueTypes: ['Story', 'Epic'], agentSamples: 3, agentTimeoutMinutes: 15, reviewMode: 'agent' };
 

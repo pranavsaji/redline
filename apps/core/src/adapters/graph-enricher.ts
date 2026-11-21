@@ -1,6 +1,6 @@
 import api from '@forge/api';
-import { normalizeFact } from '@redline/core';
-import { appError, err, ok, type ContextFact, type Result, type SourceType } from '@redline/shared';
+import { normalizeFact } from '@threatline/core';
+import { appError, err, ok, type ContextFact, type Result, type SourceType } from '@threatline/shared';
 
 export type GraphRequest = (query: string, variables: object) => Promise<{ data?: unknown; errors?: unknown[] }>;
 
@@ -11,7 +11,7 @@ export interface GraphEnrichment {
 }
 
 /** CE-2: persisted queries only. `value` is a union; Threatline reads node ids only (no untrusted titles). */
-export const CUSTOM_QUERY = `query RedlineCustomQuery($queryKey: String!, $queryParams: CypherRequestParams, $first: Int, $after: String) {
+export const CUSTOM_QUERY = `query ThreatlineCustomQuery($queryKey: String!, $queryParams: CypherRequestParams, $first: Int, $after: String) {
   customQuery(queryKey: $queryKey, queryParams: $queryParams, first: $first, after: $after) {
     edges { node { columns { key value { __typename ... on CypherQueryResultNode { id } } } } }
     pageInfo { hasNextPage endCursor }

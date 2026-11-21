@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RequirementStatusSchema, type Requirement } from '@redline/shared';
+import { RequirementStatusSchema, type Requirement } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { createRequirementSubtasks, setRequirementStatus, type SkipReason } from '../services/requirements-service.js';
 import { apiError, type ApiError } from './errors.js';

@@ -1,6 +1,6 @@
 import { migrationRunner } from '@forge/sql';
-import { MIGRATIONS, type Migration } from '@redline/db';
-import { appError, err, ok, type Result } from '@redline/shared';
+import { MIGRATIONS, type Migration } from '@threatline/db';
+import { appError, err, ok, type Result } from '@threatline/shared';
 
 type Runner = { enqueue(name: string, statement: string): Runner; run(): Promise<string[]> };
 

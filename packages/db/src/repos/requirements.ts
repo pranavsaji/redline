@@ -1,5 +1,5 @@
-import { ok, RequirementSchema } from '@redline/shared';
-import type { RequirementRepo } from '@redline/core';
+import { ok, RequirementSchema } from '@threatline/shared';
+import type { RequirementRepo } from '@threatline/core';
 import type { SqlExecutor } from '../executor.js';
 import { collect, parseJson } from '../json.js';
 

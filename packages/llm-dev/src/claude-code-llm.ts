@@ -1,6 +1,6 @@
 import { spawn as nodeSpawn } from 'node:child_process';
-import { appError, err, ok, type Result } from '@redline/shared';
-import type { LlmPort, LlmRequest, LlmResponse } from '@redline/core';
+import { appError, err, ok, type Result } from '@threatline/shared';
+import type { LlmPort, LlmRequest, LlmResponse } from '@threatline/core';
 
 export type SpawnFn = (cmd: string, args: string[], input: string, timeoutMs: number) => Promise<{ code: number | null; stdout: string; stderr: string; timedOut: boolean }>;
 

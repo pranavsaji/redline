@@ -37,8 +37,10 @@ function verifyHead(h, publicKey) {
     const raw = Buffer.from(publicKey, 'base64url');
     if (raw.length !== 32) return false;
     const key = createPublicKey({ key: Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), raw]), format: 'der', type: 'spki' });
-    const msg = Buffer.from(`redline-tree-head-v1\n${h.treeSize}\n${h.rootHash}\n${h.timestamp}`, 'utf8');
-    return verify(null, msg, key, Buffer.from(h.signature, 'base64url'));
+    // redline-tree-head-v1: heads signed before the rename to Threatline.
+    return ['threatline-tree-head-v1', 'redline-tree-head-v1'].some((ctx) =>
+      verify(null, Buffer.from(`${ctx}\n${h.treeSize}\n${h.rootHash}\n${h.timestamp}`, 'utf8'), key, Buffer.from(h.signature, 'base64url')),
+    );
   } catch {
     return false;
   }
@@ -85,7 +87,7 @@ function verifyConsistency(m, n, first, second, proof) {
 
 /** { ok: true, treeSize, seq } or { ok: false, reason }. */
 export function verifyProof(p) {
-  if (p?.format !== 'redline-ledger-proof-v1' || !p.entry || !p.treeHead || !Array.isArray(p.auditPath)) return { ok: false, reason: 'format' };
+  if (!['threatline-ledger-proof-v1', 'redline-ledger-proof-v1'].includes(p?.format) || !p.entry || !p.treeHead || !Array.isArray(p.auditPath)) return { ok: false, reason: 'format' };
   const e = p.entry;
   let h;
   try {
