@@ -88,6 +88,19 @@ export async function authorise(deps: CoreDeps, v: Viewer, need: 'browse' | 'edi
   return allowed.value ? { issueKey: issue.value.key, issue: issue.value } : { error: 'not_found' };
 }
 
+/**
+ * The threats the panel lists, in its order (most severe first). A covered rule-based threat is named on the threat
+ * covering it, not listed. Every T-n ref (get-review, explain-threat, the panel) numbers this list: T-1 is its first.
+ */
+export const listedThreats = (sorted: readonly Threat[]): Threat[] => sorted.filter((t) => t.state !== 'covered');
+export const threatRef = (index: number): string => `T-${index + 1}`;
+/** A threat by id (any the viewer may see) or by T-n ref (into listedThreats). */
+export function findThreat(sorted: readonly Threat[], idOrRef: string): Threat | undefined {
+  const ref = /^T-(\d+)$/i.exec(idOrRef);
+  if (ref) return listedThreats(sorted)[Number(ref[1]) - 1];
+  return sorted.find((t) => t.id === idOrRef.toLowerCase());
+}
+
 /** Threats and facts the viewer may see, most severe first. */
 export async function scopedReview(deps: CoreDeps, v: Viewer, reviewId: string, cache: ScopeCache = newScopeCache()) {
   const [facts, threats] = await Promise.all([deps.reviews.facts(reviewId), deps.reviews.threats(reviewId)]);
@@ -128,7 +141,7 @@ export async function panelGet(deps: CoreDeps, v: Viewer): Promise<PanelDto | De
   if (review) {
     const scoped = await scopedReview(deps, v, review.id, cache);
     if (!scoped) return { error: 'unavailable' };
-    threats = scoped.threats.filter((t) => t.state !== 'covered');
+    threats = listedThreats(scoped.threats);
     covered = scoped.threats.flatMap((t) => (t.state === 'covered' && t.coveredBy ? [{ title: t.title, coveredBy: t.coveredBy }] : []));
     facts = scoped.facts.map(toFactDto);
     hiddenThreats = scoped.hiddenThreats;
@@ -197,7 +210,7 @@ export async function panelThreats(deps: CoreDeps, v: Viewer, p: { cursor?: unkn
   const scoped = await scopedReview(deps, v, latest.value.id);
   if (!scoped) return { error: 'unavailable' };
   const from = Number.isInteger(p.cursor) && (p.cursor as number) >= 0 ? (p.cursor as number) : 0;
-  const listed = scoped.threats.filter((t) => t.state !== 'covered');
+  const listed = listedThreats(scoped.threats);
   const page = listed.slice(from, from + PAGE_SIZE);
   return { threats: page, cursor: from + PAGE_SIZE < listed.length ? from + PAGE_SIZE : null };
 }

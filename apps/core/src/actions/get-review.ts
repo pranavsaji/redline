@@ -1,7 +1,7 @@
 import type { Review, Severity, Stride, Verdict } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
-import { panelGet } from '../resolvers/panel.js';
+import { panelGet, threatRef } from '../resolvers/panel.js';
 import type { ActionPayload } from './common.js';
 import { callerOnIssue, fitJson, issueUrl, parseInput, SCHEMAS, type ActionError } from './schemas.js';
 
@@ -42,7 +42,7 @@ export async function getReview(payload: ActionPayload & Record<string, unknown>
   if ('error' in panel) return { error: panel.error };
   const facts = new Map(panel.facts.map((f) => [f.id, f]));
   const threats: ReviewThreatDto[] = panel.threats.map((t, i) => ({
-    ref: `T-${i + 1}`,
+    ref: threatRef(i),
     id: t.id,
     title: t.title,
     stride: t.stride,

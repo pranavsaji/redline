@@ -258,6 +258,24 @@ describe('explain-threat', () => {
     expect(byId).toEqual(byRef);
     expect(await explainThreat({ issueKey: 'PAY-7', threatId: 'T-99', ...ctx(ME) }, t.deps)).toEqual({ error: 'not_found' });
   });
+
+  it('T-n means the same threat in get-review and explain-threat when a covered threat sorts first', async () => {
+    const { t } = await reviewed();
+    const latest = (await t.deps.reviews.latest(ISSUE)) as { ok: true; value: { id: string } };
+    const all = (await t.deps.reviews.threats(latest.value.id)) as { ok: true; value: Array<{ id: string; severity: string }> };
+    expect(all.value.length).toBeGreaterThan(1);
+    // The most severe threat becomes covered: get-review drops it, so its T-1 is the next one.
+    const [first, other] = all.value;
+    await t.deps.reviews.updateThreat(first!.id, { state: 'covered', coveredBy: other!.id, severity: 'Critical' });
+    const review = await getReview({ issueKey: 'PAY-7', ...ctx(ME) }, t.deps);
+    if ('error' in review) throw new Error(review.error);
+    expect(review.threats.map((x) => x.id)).not.toContain(first!.id);
+    for (const listed of review.threats) {
+      const e = await explainThreat({ issueKey: 'PAY-7', threatId: listed.ref, ...ctx(ME) }, t.deps);
+      expect('error' in e ? e.error : e.threatId).toBe(listed.id);
+    }
+    expect(await explainThreat({ issueKey: 'PAY-7', threatId: `T-${review.threats.length + 1}`, ...ctx(ME) }, t.deps)).toEqual({ error: 'not_found' });
+  });
 });
 
 describe('release-readiness', () => {
