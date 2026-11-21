@@ -80,3 +80,27 @@ Marketplace listing, Jira Service Management incident feedback into reviews, and
 6. **2:15 Fix and merge (30 s).** Verify a requirement with a PR link, accept one risk; Done passes. Copy the merge
    attestation into the pull request: the check passes; change one character in the commit and it fails.
 7. **2:45 Audit (15 s).** Admin → Risk ledger → Verify the ledger; download an inclusion proof.
+
+## Additional info (judges only): ready-to-paste answers
+
+Fields not listed here (submitter type, country, age, eligibility, employment, survey questions) are yours to answer.
+
+- **Is your project new?** New (started 2026-11-14).
+- **Installation link:** the "Install Threatline for Jira" link in `docs/JUDGE_GUIDE.md` (Jira + Confluence). Also give the
+  Bitbucket link from the same file in the testing instructions.
+- **Testing instructions:** "Follow https://github.com/pranavsaji/threatline/blob/main/docs/JUDGE_GUIDE.md: open
+  Jira settings → Apps → Threatline, save the first-run wizard, click Add the gate for me, load demo data (project
+  key + any Confluence space key), then open the epic 'Add AI support agent' a few minutes later. No Rovo or Automation
+  setup is needed; Threatline Engine runs the reviews on Forge LLMs."
+- **App ID:** `13898a7c-6897-48d3-a512-079d9f9f5f00` (Threatline for Jira). Threatline for Bitbucket:
+  `53a2efe5-9150-4e9a-b869-8bd2605d64e0`.
+- **How it meets the technology requirement:** Built entirely on Forge. Jira: issue panel, workflow validator (the
+  Done gate), admin and global pages, dashboard gadget, entity properties for JQL, issue events. Confluence: design
+  pages read as review context, threat-model pages and signed ledger heads published. Bitbucket: a merge check that
+  verifies signed attestations. Forge LLMs: Threatline Engine (Claude models hosted by Atlassian). Rovo: an agent with
+  actions and an MCP server for coding agents. Forge SQL, KVS, secret storage and queues hold state; nothing egresses.
+- **Category:** Apps for Software Teams. **Why:** it changes how software teams ship: security requirements become part
+  of Done and of the merge, in Jira and Bitbucket, where developers already work.
+- **Bonus prize:** Best app with Atlassian MCP (Threatline's MCP tools give Claude Code or Cursor the same requirements
+  the gate checks; the Rovo agent also qualifies it for Best Agents).
+- **AI tools used:** Claude Code (Claude) for pair programming and the eval harness; Forge LLMs (Claude) inside the app.
