@@ -36,8 +36,14 @@ describe('validateAcceptanceRequest', () => {
     expect(ask('Low', 10, ['developer'], '   ').ok).toBe(false);
     expect(ask('Low', 10, ['developer'], 'ok').ok).toBe(false);
   });
+  it('requires compensating controls, not a blank or a token word', () => {
+    const asking = (controls: string) => validateAcceptanceRequest({ requirement: req('Low'), reason: 'Shipping for the launch; fix next sprint.', controls, expiryDays: 10, requester: 'dev1', requesterRoles: ['developer'] }, DEFAULT_SITE_POLICY, now);
+    for (const blank of ['', '   ', 'none', '  n/a  '])
+      expect(asking(blank)).toMatchObject({ ok: false, error: { code: 'validation', message: 'Describe the compensating controls (what reduces the risk meanwhile) in at least 8 characters.' } });
+    expect(asking('Feature flag off for EU merchants').ok).toBe(true);
+  });
   it('rejects requirements that are already verified or not applicable', () => {
-    const r = validateAcceptanceRequest({ requirement: req('Low', 'Verified'), reason: 'A good long reason.', controls: '', expiryDays: 5, requester: 'dev1', requesterRoles: ['developer'] }, DEFAULT_SITE_POLICY, now);
+    const r = validateAcceptanceRequest({ requirement: req('Low', 'Verified'), reason: 'A good long reason.', controls: 'Feature flag off', expiryDays: 5, requester: 'dev1', requesterRoles: ['developer'] }, DEFAULT_SITE_POLICY, now);
     expect(!r.ok && r.error.code).toBe('validation');
   });
 });

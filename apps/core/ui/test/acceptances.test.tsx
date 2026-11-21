@@ -57,10 +57,13 @@ describe('Accept risk (RL-1, RL-2)', () => {
 
     await userEvent.click(within(form).getByRole('textbox', { name: 'Reason' }));
     await userEvent.paste('Flag is off.');
-    await userEvent.click(within(form).getByRole('textbox', { name: 'Compensating controls' }));
-    await userEvent.paste('WAF');
     await userEvent.click(within(form).getByRole('button', { name: 'Request acceptance' }));
-    expect(request).toHaveBeenCalledWith({ requirementId: 'req_1', reason: 'Flag is off.', controls: 'WAF', expiryDays: 30 });
+    expect(within(form).getByRole('alert').textContent).toMatch(/compensating controls.*at least 8 characters/i);
+    expect(request).not.toHaveBeenCalled();
+    await userEvent.click(within(form).getByRole('textbox', { name: 'Compensating controls' }));
+    await userEvent.paste('WAF rule on /refunds');
+    await userEvent.click(within(form).getByRole('button', { name: 'Request acceptance' }));
+    expect(request).toHaveBeenCalledWith({ requirementId: 'req_1', reason: 'Flag is off.', controls: 'WAF rule on /refunds', expiryDays: 30 });
     expect(await screen.findByText(/Ledger entry/)).toBeTruthy();
     expect(screen.getByText('abc123def456')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Copy ledger entry hash' })).toBeTruthy();

@@ -1,4 +1,5 @@
 import {
+  ACCEPTANCE_MIN_CONTROLS,
   AcceptanceRequestSchema,
   appError,
   err,
@@ -24,7 +25,11 @@ export function validateAcceptanceRequest(
   now: Date,
 ): Result<{ expiresAt: string; needsApprover: ApproverNeeded }> {
   const parsed = AcceptanceRequestSchema.safeParse({ requirementId: req.requirement.id, reason: req.reason, controls: req.controls, expiryDays: req.expiryDays });
-  if (!parsed.success) return err(appError('validation', 'a reason of at least 10 characters and an expiry in days are required'));
+  if (!parsed.success) {
+    const field = parsed.error.issues[0]?.path[0];
+    if (field === 'controls') return err(appError('validation', `Describe the compensating controls (what reduces the risk meanwhile) in at least ${ACCEPTANCE_MIN_CONTROLS} characters.`));
+    return err(appError('validation', 'a reason of at least 10 characters and an expiry in days are required'));
+  }
   if (!['Open', 'InProgress'].includes(req.requirement.status))
     return err(appError('validation', `requirement is ${req.requirement.status}; only Open or In progress requirements can be accepted`));
   const sev = req.requirement.severity;

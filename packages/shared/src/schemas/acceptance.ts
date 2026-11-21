@@ -4,11 +4,14 @@ import { SeveritySchema } from './enums.js';
 export const AcceptanceStateSchema = z.enum(['pending', 'active', 'expired', 'revoked', 'rejected']);
 export type AcceptanceState = z.infer<typeof AcceptanceStateSchema>;
 
+/** A risk acceptance says what reduces the risk meanwhile; a blank or a token word ("none") is not that. */
+export const ACCEPTANCE_MIN_CONTROLS = 8;
+
 export const AcceptanceRequestSchema = z
   .object({
     requirementId: z.string().min(1),
     reason: z.string().trim().min(10).max(2000),
-    controls: z.string().max(2000),
+    controls: z.string().trim().min(ACCEPTANCE_MIN_CONTROLS).max(2000),
     expiryDays: z.number().int().min(1).max(365),
   })
   .strict();

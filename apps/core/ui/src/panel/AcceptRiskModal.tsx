@@ -10,6 +10,8 @@ import { useInlineForm } from '../components/inline-form.js';
 const RANK: Record<Severity, number> = { Low: 1, Medium: 2, High: 3, Critical: 4 };
 const EXPIRY_CHOICES = [7, 14, 30, 60, 90];
 const MIN_REASON = 10;
+/** Mirrors the server's ACCEPTANCE_MIN_CONTROLS: an acceptance must say what reduces the risk meanwhile. */
+const MIN_CONTROLS = 8;
 
 /** Short form of a ledger entry hash, with a copy button (the full hash is what gets copied). */
 export function LedgerHash({ hash }: { hash: string }) {
@@ -59,6 +61,7 @@ export function AcceptRiskModal({ requirement, dto, api, onDone, onCancel }: { r
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (reason.trim().length < MIN_REASON) return setError(`Write a reason of at least ${MIN_REASON} characters.`);
+    if (controls.trim().length < MIN_CONTROLS) return setError(`Describe the compensating controls (what reduces the risk meanwhile) in at least ${MIN_CONTROLS} characters.`);
     setSaving(true);
     const r = await api.requestAcceptance({ requirementId: requirement.id, reason: reason.trim(), controls: controls.trim(), expiryDays: days }).catch((): ApiError => ({ error: 'unavailable' }));
     setSaving(false);
@@ -92,7 +95,7 @@ export function AcceptRiskModal({ requirement, dto, api, onDone, onCancel }: { r
       <label style={label} htmlFor={`${id}-controls`}>
         Compensating controls
       </label>
-      <textarea id={`${id}-controls`} value={controls} onChange={(e) => setControls(e.target.value)} rows={2} maxLength={2000} style={field} placeholder="What reduces the risk meanwhile (feature flag, monitoring, WAF rule)" />
+      <textarea id={`${id}-controls`} value={controls} onChange={(e) => setControls(e.target.value)} rows={2} maxLength={2000} aria-required="true" style={field} placeholder="What reduces the risk meanwhile (feature flag, monitoring, WAF rule)" />
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <label style={label} htmlFor={`${id}-days`}>
           Expires after
