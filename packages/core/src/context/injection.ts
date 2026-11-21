@@ -1,8 +1,19 @@
 import type { InjectionReason } from '@threatline/shared';
 
+// "Ignore / disregard / forget" aimed at instructions. Ordinary prose ("ignore the previous design") names something
+// other than instructions, so these need an instruction noun, or "everything above" ending the clause.
+const DROP = String.raw`\b(?:ignore|disregard|forget)\s+(?:(?:all|any|every)\s+)?(?:of\s+)?(?:(?:the|your|my|these|those)\s+)?`;
+const ORDER = String.raw`(?:previous|prior|above|earlier|preceding|foregoing|original)`;
+const ORDERS = String.raw`(?:instructions?|prompts?|directions?|directives?|guidelines?|rules|commands?|messages|context)\b`;
 const AI_DIRECTIVES: RegExp[] = [
-  /\bignore\s+(?:all\s+|any\s+|the\s+)?(?:previous|prior|above|earlier)\s+(?:instructions|prompts|messages|rules)/i,
-  /\bdisregard\s+(?:all\s+|any\s+|the\s+)?(?:previous|prior|above|earlier)\s+(?:instructions|prompts|rules)/i,
+  // "Ignore (all of) (the|your) previous (system) instructions"
+  new RegExp(String.raw`${DROP}${ORDER}\s+(?:\w+\s+)?${ORDERS}`, 'i'),
+  // "Ignore the instructions above / you were given"
+  new RegExp(String.raw`${DROP}${ORDERS}\s+(?:above|before|so\s+far|until\s+now|you\s+(?:were|have\s+been)\s+given)\b`, 'i'),
+  // "Ignore your instructions / your system prompt"
+  /\b(?:ignore|disregard|forget)\s+(?:(?:all|any)\s+)?(?:of\s+)?your\s+(?:\w+\s+)?(?:instructions|prompt|guidelines|rules|programming|training)\b/i,
+  // "Disregard everything above." (the clause ends there, unlike "ignore everything above the fold")
+  /\b(?:ignore|disregard|forget)\s+(?:everything|anything|all\s+of\s+(?:this|that|it))\s+(?:(?:that\s+)?(?:was\s+)?(?:said|written|stated)\s+)?(?:above|before|so\s+far|until\s+now|previously)(?=\s*(?:[.,;:!)]|and\b|then\b|$))/im,
   /\byou\s+are\s+now\b/i,
   /\bsystem\s+prompt\b/i,
   /\bmark\s+(?:all\s+)?(?:the\s+)?(?:threats|issues|findings|risks)\s+(?:as\s+)?(?:resolved|fixed|safe|mitigated|accepted)/i,

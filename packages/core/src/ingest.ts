@@ -22,7 +22,7 @@ import { sha256Hex } from '@threatline/crypto';
 import { extractSignals, type Signals } from './context/signals.js';
 import { htmlToText } from './context/normalize.js';
 import { baselineThreats, coveredByText } from './baseline/rules.js';
-import { clusterSamples, consensus, similar } from './threats/cluster.js';
+import { clusterSamples, consensus, similar, voteThreshold } from './threats/cluster.js';
 import { groundQuote } from './threats/grounding.js';
 import { mapThreat } from './threats/mapping.js';
 import { plainLanguageFor } from './threats/plain-language.js';
@@ -149,6 +149,8 @@ export interface AssembleOutput {
   discarded: DiscardedThreat[];
   riskScore: number;
   status: ReviewStatus;
+  /** Why a review with some valid runs still did not settle (e.g. "only 1 of 3 analyses completed"). */
+  failureReason?: string;
   injectionSuspected: boolean;
   signals: Signals;
 }
@@ -175,8 +177,24 @@ export function reviewSignals(facts: readonly ContextFact[], samples: readonly S
   return raiseSignals(extractSignals([...facts]), samples.filter((s): s is AgentThreatModel => !isFailedSample(s)));
 }
 
-const threatId = (reviewId: string, origin: string, stride: string, title: string): string =>
-  `thr_${sha256Hex(`${reviewId}|${origin}|${stride}|${normalizeText(title)}`).slice(0, 16)}`;
+const threatId = (reviewId: string, origin: string, stride: string, title: string, extra?: string): string =>
+  `thr_${sha256Hex(`${reviewId}|${origin}|${stride}|${normalizeText(title)}${extra === undefined ? '' : `|${extra}`}`).slice(0, 16)}`;
+
+/**
+ * Threat ids are unique within a review (they are the threats table's primary key). The first threat of a kind and
+ * title keeps the plain id; a distinct one with the same kind and title (another component) gets its component, then a
+ * counter, in its id. Deterministic, so re-assembling the same samples gives the same ids.
+ */
+function claimId(taken: ReadonlySet<string>, reviewId: string, origin: string, t: Pick<Threat, 'stride' | 'title' | 'component'>): string {
+  const plain = threatId(reviewId, origin, t.stride, t.title);
+  if (!taken.has(plain)) return plain;
+  const component = normalizeText(t.component);
+  for (let n = 1; ; n++) {
+    const id = threatId(reviewId, origin, t.stride, t.title, n === 1 ? component : `${component}|${n}`);
+    if (!taken.has(id)) return id;
+  }
+}
+const idsOf = (threats: readonly Threat[], except?: number) => new Set(threats.filter((_, n) => n !== except).map((t) => t.id));
 
 const maxSeverity = <T extends { severity: Threat['severity'] }>(a: T, b: T) => (severityRank(a.severity) >= severityRank(b.severity) ? a : b);
 
@@ -222,7 +240,7 @@ export function assembleReview(i: AssembleInput): AssembleOutput {
     });
     if (citations.length === 0) continue;
     threats.push({
-      id: threatId(i.review.id, 'baseline', b.stride, b.title),
+      id: claimId(idsOf(threats), i.review.id, 'baseline', b),
       reviewId: i.review.id,
       stride: b.stride,
       title: b.title,
@@ -295,7 +313,7 @@ export function assembleReview(i: AssembleInput): AssembleOutput {
     }
 
     threats.push({
-      id: threatId(i.review.id, 'agent', rep.stride, rep.title),
+      id: claimId(idsOf(threats), i.review.id, 'agent', rep),
       reviewId: i.review.id,
       stride: rep.stride,
       title: rep.title,
@@ -340,16 +358,22 @@ export function assembleReview(i: AssembleInput): AssembleOutput {
   threats.sort((a, b) => severityRank(b.severity) - severityRank(a.severity) || b.votes - a.votes || a.title.localeCompare(b.title));
 
   const received = i.samples.length;
+  // Fail closed: a review settles only when a majority of the expected runs produced a valid analysis (2 of 3), so one
+  // unchecked run never decides. Failed runs (AI errors) count as missing, like runs that never arrived.
+  const enough = valid.length > 0 && valid.length >= voteThreshold(i.samplesExpected);
+  const shortfall = `only ${valid.length} of ${i.samplesExpected} analyses completed`;
   let status: ReviewStatus;
-  if (i.mode === 'final') status = valid.length > 0 ? 'ready' : 'agent_timeout';
+  if (i.mode === 'final') status = enough ? 'ready' : 'agent_timeout';
   else if (received < i.samplesExpected) status = 'awaiting_agent';
-  else status = valid.length > 0 ? 'ready' : 'failed';
+  else status = enough ? 'ready' : 'failed';
+  const failureReason = (status === 'failed' || status === 'agent_timeout') && valid.length > 0 ? shortfall : undefined;
 
   return {
     threats,
     discarded,
     riskScore: riskScore(threats, signals),
     status,
+    ...(failureReason ? { failureReason } : {}),
     injectionSuspected,
     signals,
   };
@@ -373,22 +397,24 @@ function carryOver(threats: Threat[], prior: NonNullable<AssembleInput['prior']>
     // A covered rule-based threat is not a decision: coverage is worked out afresh for each revision.
     if (old.state === 'covered') continue;
     if (!onlyUnchanged(old)) continue;
-    const id = threatId(reviewId, old.origin, old.stride, old.title);
     const idx = threats.findIndex((t, n) => !matched.has(n) && onlyUnchanged(t) && similar(t, old, { ignoreComponent: true }));
     const fresh = idx >= 0 ? threats[idx] : undefined;
     if (fresh) {
       matched.add(idx);
       // Under injection, the fresh assessment stands: an old dismissal must not be steerable into hiding it.
       if (injectionSuspected && old.state === 'dismissed') continue;
+      const id = claimId(idsOf(threats, idx), reviewId, old.origin, old);
       const { dismissReason: _d, ...rest } = old;
-      const stricter = fresh.state === 'needs_human' && old.state !== 'needs_human';
+      const raised = severityRank(fresh.severity) > severityRank(old.severity);
+      // A dismissal (by a person or the verifier) was made at the old severity. Once the threat is re-raised at a
+      // severity that gates Done, that decision no longer covers it: a champion looks again.
+      const staleDismissal = raised && old.state === 'dismissed' && (!policy || isBlockingSeverity(fresh, policy));
+      const stricter = staleDismissal || (fresh.state === 'needs_human' && old.state !== 'needs_human');
       threats[idx] = {
         ...(stricter ? { ...rest, state: 'needs_human' as const } : old),
         id,
         reviewId,
-        ...(severityRank(fresh.severity) > severityRank(old.severity)
-          ? { severity: fresh.severity, likelihood: Math.max(old.likelihood, fresh.likelihood), impact: Math.max(old.impact, fresh.impact) }
-          : {}),
+        ...(raised ? { severity: fresh.severity, likelihood: Math.max(old.likelihood, fresh.likelihood), impact: Math.max(old.impact, fresh.impact) } : {}),
       };
     } else {
       // Rule-based threats are derived afresh each time from the same facts: one the rules no longer raise (a rule was
@@ -399,8 +425,9 @@ function carryOver(threats: Threat[], prior: NonNullable<AssembleInput['prior']>
       // (the verifier can still fold a carried duplicate under the threat it repeats).
       if (complete && old.state !== 'dismissed' && policy && !isBlockingSeverity(old, policy)) continue;
       // A fresh threat with the same title but new evidence keeps its id; the carried one gets its own.
-      const free = threats.some((t) => t.id === id) ? threatId(reviewId, `${old.origin}+prior`, old.stride, old.title) : id;
-      if (threats.some((t) => t.id === free)) continue;
+      const taken = idsOf(threats);
+      const id = threatId(reviewId, old.origin, old.stride, old.title);
+      const free = taken.has(id) ? claimId(taken, reviewId, `${old.origin}+prior`, old) : id;
       threats.push({ ...old, id: free, reviewId });
       matched.add(threats.length - 1);
     }

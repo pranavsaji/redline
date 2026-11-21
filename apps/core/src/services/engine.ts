@@ -1,10 +1,9 @@
-import { applyVerification, engineAgentRun, engineExtract, engineVerify, requirementsFor, type Extracted, type Usage } from '@threatline/core';
+import { applyVerification, engineAgentRun, engineExtract, engineVerify, requirementsFor, type Extracted, type Sample, type Usage } from '@threatline/core';
 import { appError, err, ok, type ContextBundle, type Result, type Review } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import type { ReviewJob } from '../jobs/types.js';
 import { monthOf } from './budget.js';
-import { storeSample } from './samples.js';
 import { refreshVerdict } from './verdict-service.js';
 
 type EngineJob = Extract<ReviewJob, { kind: 'engine' }>;
@@ -45,6 +44,13 @@ export async function engineJob(deps: CoreDeps, job: EngineJob): Promise<Result<
   if (!got.ok) return got;
   const review = got.value;
   if (!review) return err(appError('not_found', `review ${job.reviewId}`));
+  // A job of a superseded revision does nothing (it would re-point or remove the newer revision's requirement rows).
+  const current = await deps.reviews.latest(review.issueId);
+  if (!current.ok) return current;
+  if (current.value && current.value.id !== review.id) {
+    log('engine.superseded', { reviewId: review.id, stage: job.stage });
+    return voidOk();
+  }
   const policy = await deps.config.site();
   if (!policy.ok) return policy;
   const usage: Usage = { tokensIn: review.tokensIn, tokensOut: review.tokensOut, modelIds: new Set() };
@@ -79,17 +85,32 @@ export async function engineJob(deps: CoreDeps, job: EngineJob): Promise<Result<
     return deps.queue.push(Array.from({ length: review.samplesExpected }, (_, n) => ({ kind: 'engine' as const, reviewId: review.id, stage: 'propose' as const, n })));
   }
 
+  // Run n is stored as sample n + 1 (insert-only), and marked done only after that: a redelivered job (a failed save, or
+  // a failed push of the assembly) never calls the model again, never stores a second sample, and still queues assembly.
   const n = job.n ?? 0;
-  const done = await deps.reviews.stage(review.id, `run:${n}`);
-  if (done.ok && done.value) return voidOk(); // redelivered: this run is already in
-  const r = await engineAgentRun(stageDeps, review, bundle.value, usage);
-  await record(deps, review, before, usage);
-  const sample = r.ok ? r.value : { failed: r.error.code };
-  await deps.reviews.saveStage(review.id, `run:${n}`, 'failed' in sample ? 'failed' : 'done', undefined, 'failed' in sample ? sample.failed : undefined);
-  await trace(deps, review.id, `run_${n + 1}`, 'failed' in sample ? 'failed' : 'done', 'failed' in sample ? sample.failed : undefined);
-  const s = await storeSample(deps, review, sample);
-  if (!s.ok && s.error.message !== 'complete') return s;
-  log('engine.run', { reviewId: review.id, n, valid: !('failed' in sample) });
+  const slot = n + 1;
+  if (slot > review.samplesExpected) return voidOk();
+  const marker = await deps.reviews.stage(review.id, `run:${n}`);
+  if (!marker.ok) return marker;
+  if (marker.value?.status !== 'done' && marker.value?.status !== 'failed') {
+    // A delivery that got the model's answer but failed to store it resumes from the checkpoint, without paying again.
+    let sample = marker.value?.status === 'running' ? (marker.value.checkpoint as { sample?: Sample } | undefined)?.sample : undefined;
+    if (!sample) {
+      const r = await engineAgentRun(stageDeps, review, bundle.value, usage);
+      await record(deps, review, before, usage);
+      sample = r.ok ? r.value : { failed: r.error.code };
+      const c = await deps.reviews.saveStage(review.id, `run:${n}`, 'running', { sample });
+      if (!c.ok) log('engine.checkpoint_failed', { reviewId: review.id, n, code: c.error.code });
+    }
+    const s = await deps.reviews.saveSample(review.id, slot, sample);
+    // A conflict is this run stored by an earlier delivery: done, not an error.
+    if (!s.ok && s.error.code !== 'conflict') return s;
+    const failed = 'failed' in sample ? sample.failed : undefined;
+    const m = await deps.reviews.saveStage(review.id, `run:${n}`, failed ? 'failed' : 'done', undefined, failed);
+    if (!m.ok) return m;
+    await trace(deps, review.id, `run_${slot}`, failed ? 'failed' : 'done', failed);
+    log('engine.run', { reviewId: review.id, n, valid: !failed });
+  }
   return deps.queue.push([{ kind: 'assemble', reviewId: review.id }]);
 }
 

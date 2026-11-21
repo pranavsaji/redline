@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { appError, AgentThreatModelSchema, ContextFactSchema, err, ok, ReviewSchema, ThreatSchema, type Review } from '@threatline/shared';
+import { appError, AgentThreatModelSchema, ContextFactSchema, err, ok, ReviewSchema, ThreatSchema, type Result, type Review } from '@threatline/shared';
 import type { DiscardedThreat, ReviewRepo, Sample } from '@threatline/core';
 import type { SqlExecutor } from '../executor.js';
 import { collect, parseJson } from '../json.js';
@@ -31,6 +31,7 @@ const values = (v: Review) => [
 const DiscardedSchema = z.array(
   z.object({ title: z.string(), stride: z.string().optional(), reason: z.enum(['low_votes', 'unsupported_citation', 'duplicate_of_dismissed', 'schema']) }).strict(),
 ) as unknown as z.ZodType<DiscardedThreat[]>;
+const THREAT_BATCH = 20;
 const SampleSchema = z.union([AgentThreatModelSchema, z.object({ failed: z.string() }).strict()]) as z.ZodType<Sample>;
 
 export function sqlReviewRepo(x: SqlExecutor): ReviewRepo {
@@ -42,6 +43,24 @@ export function sqlReviewRepo(x: SqlExecutor): ReviewRepo {
   const many = async (sql: string, params: unknown[]) => {
     const r = await x.query<Row>(sql, params);
     return r.ok ? collect(r.value.map(toReview)) : r;
+  };
+  /** The SET clause for the fields in the patch, validated against the stored row. Null when the patch writes nothing. */
+  const patchWrite = async (id: string, patch: Partial<Review>): Promise<Result<{ set: string; params: unknown[] } | null>> => {
+    const cur = await one(`SELECT ${COLS} FROM reviews WHERE id = ?`, [id]);
+    if (!cur.ok) return cur;
+    if (!cur.value) return err(appError('not_found', `review ${id}`));
+    const next = ReviewSchema.safeParse({ ...cur.value, ...patch });
+    if (!next.success) return err(appError('validation', 'invalid review update'));
+    const v = values(next.data);
+    // Only the fields in the patch are written, so a concurrent addUsage increment is never overwritten by a stale read.
+    const cols: Array<[keyof Review, string, unknown]> = [
+      ['status', 'status', v[4]], ['contextHash', 'context_hash', v[5]], ['riskScore', 'risk_score', v[6]], ['partial', 'partial_bundle', v[7]],
+      ['promptVersion', 'prompt_version', v[8]], ['modelIds', 'model_ids', v[9]], ['samplesExpected', 'samples_expected', v[10]],
+      ['samplesReceived', 'samples_received', v[11]], ['tokensIn', 'tokens_in', v[12]], ['tokensOut', 'tokens_out', v[13]],
+      ['failureReason', 'failure_reason', v[14]], ['updatedAt', 'updated_at', v[16]],
+    ];
+    const set = cols.filter(([k]) => k in patch);
+    return ok(set.length === 0 ? null : { set: set.map(([, c]) => `${c} = ?`).join(', '), params: set.map(([, , val]) => val) });
   };
   return {
     latest: (issueId) => one(`SELECT ${COLS} FROM reviews WHERE issue_id = ? ORDER BY revision DESC LIMIT 1`, [issueId]),
@@ -56,24 +75,29 @@ export function sqlReviewRepo(x: SqlExecutor): ReviewRepo {
       return r.ok ? ok(v) : r;
     },
     async update(id, patch) {
-      const cur = await one(`SELECT ${COLS} FROM reviews WHERE id = ?`, [id]);
-      if (!cur.ok) return cur;
-      if (!cur.value) return err(appError('not_found', `review ${id}`));
-      const next = ReviewSchema.safeParse({ ...cur.value, ...patch });
-      if (!next.success) return err(appError('validation', 'invalid review update'));
-      const v = values(next.data);
-      // Only the fields in the patch are written, so a concurrent addUsage increment is never overwritten by a stale read.
-      const cols: Array<[keyof Review, string, unknown]> = [
-        ['status', 'status', v[4]], ['contextHash', 'context_hash', v[5]], ['riskScore', 'risk_score', v[6]], ['partial', 'partial_bundle', v[7]],
-        ['promptVersion', 'prompt_version', v[8]], ['modelIds', 'model_ids', v[9]], ['samplesExpected', 'samples_expected', v[10]],
-        ['samplesReceived', 'samples_received', v[11]], ['tokensIn', 'tokens_in', v[12]], ['tokensOut', 'tokens_out', v[13]],
-        ['failureReason', 'failure_reason', v[14]], ['updatedAt', 'updated_at', v[16]],
-      ];
-      const set = cols.filter(([k]) => k in patch);
-      if (set.length === 0) return ok(undefined);
-      const r = await x.exec(`UPDATE reviews SET ${set.map(([, c]) => `${c} = ?`).join(', ')} WHERE id = ?`, [...set.map(([, , val]) => val), id]);
+      const w = await patchWrite(id, patch);
+      if (!w.ok) return w;
+      if (!w.value) return ok(undefined);
+      const r = await x.exec(`UPDATE reviews SET ${w.value.set} WHERE id = ?`, [...w.value.params, id]);
       return r.ok ? ok(undefined) : r;
     },
+    async updateWhere(id, expect, patch) {
+      const w = await patchWrite(id, patch);
+      if (!w.ok) return w.error.code === 'not_found' ? ok(false) : w;
+      const cond: Array<[string, unknown]> = [];
+      if (expect.status !== undefined) cond.push(['status = ?', expect.status]);
+      if (expect.samplesReceivedAtMost !== undefined) cond.push(['samples_received <= ?', expect.samplesReceivedAtMost]);
+      const where = `WHERE id = ?${cond.map(([c]) => ` AND ${c}`).join('')}`;
+      const params = [id, ...cond.map(([, v]) => v)];
+      if (!w.value) {
+        const m = await x.query<Row>(`SELECT id FROM reviews ${where}`, params);
+        return m.ok ? ok(m.value.length > 0) : m;
+      }
+      const r = await x.exec(`UPDATE reviews SET ${w.value.set} ${where}`, [...w.value.params, ...params]);
+      return r.ok ? ok(r.value.affectedRows > 0) : r;
+    },
+    updatedSince: (status, since, limit) =>
+      many(`SELECT ${COLS} FROM reviews WHERE status = ? AND updated_at >= ? ORDER BY updated_at DESC LIMIT ${Math.max(1, Math.min(500, Math.floor(limit)))}`, [status, since]),
     async reserveUsage(id, est, cap) {
       const i = Math.max(0, Math.round(est.tokensIn));
       const o = Math.max(0, Math.round(est.tokensOut));
@@ -109,12 +133,20 @@ export function sqlReviewRepo(x: SqlExecutor): ReviewRepo {
       return r.ok ? collect(r.value.map((row) => parseJson(ContextFactSchema, row.fact_json, 'context_facts'))) : r;
     },
     async saveThreats(reviewId, threats, discarded) {
-      const d = await x.exec('DELETE FROM threats WHERE review_id = ?', [reviewId]);
-      if (!d.ok) return d;
-      for (const [i, t] of threats.entries()) {
-        const r = await x.exec('INSERT INTO threats (id, review_id, position, state, severity, threat_json) VALUES (?, ?, ?, ?, ?, ?)', [t.id, reviewId, i, t.state, t.severity, JSON.stringify(t)]);
+      if (new Set(threats.map((t) => t.id)).size !== threats.length) return err(appError('conflict', 'duplicate threat id'));
+      // Forge SQL has no multi-statement transactions. Upsert the new set first (one statement per batch), then remove
+      // the rows it no longer has: a failure part-way leaves the old set plus some new rows, never a partial set.
+      for (let i = 0; i < threats.length; i += THREAT_BATCH) {
+        const batch = threats.slice(i, i + THREAT_BATCH);
+        const r = await x.exec(
+          `REPLACE INTO threats (id, review_id, position, state, severity, threat_json) VALUES ${batch.map(() => '(?, ?, ?, ?, ?, ?)').join(', ')}`,
+          batch.flatMap((t, n) => [t.id, reviewId, i + n, t.state, t.severity, JSON.stringify(t)]),
+        );
         if (!r.ok) return r;
       }
+      const ids = threats.map((t) => t.id);
+      const d = await x.exec(`DELETE FROM threats WHERE review_id = ?${ids.length ? ` AND id NOT IN (${ids.map(() => '?').join(', ')})` : ''}`, [reviewId, ...ids]);
+      if (!d.ok) return d;
       const r = await x.exec('REPLACE INTO review_discarded (review_id, discarded_json) VALUES (?, ?)', [reviewId, JSON.stringify(discarded)]);
       return r.ok ? ok(undefined) : r;
     },
