@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ok } from '@threatline/shared';
 import { handleJob } from '../../src/consumers/review-consumer.js';
 import { acceptanceDecide, acceptanceRequest, breakGlassOverride } from '../../src/resolvers/acceptances.js';
-import { adminWarnOnly } from '../../src/resolvers/admin.js';
+import { adminSetPolicy, adminWarnOnly } from '../../src/resolvers/admin.js';
 import { refreshVerdict, verdictKey } from '../../src/services/verdict-service.js';
 import { validateTransition } from '../../src/validators/validate-transition.js';
 import type { JiraIssue } from '../../src/adapters/jira.js';
@@ -140,5 +140,28 @@ describe('warn-only lasts at most 14 days from when it was switched on', () => {
     expect(fresh).not.toHaveProperty('message');
     const all = await t.deps.ledger.all();
     expect(all.ok && all.value.filter((r) => r.eventType === 'policy.warn_only')).toHaveLength(2);
+  });
+});
+
+describe('the tech lead acceptance cap', () => {
+  it('cannot be set above Medium: High and above always need a security champion', async () => {
+    const { t } = await reviewed();
+    const p = await t.deps.config.site();
+    if (!p.ok) throw new Error('policy');
+    for (const cap of ['High', 'Critical'] as const)
+      expect(await adminSetPolicy(t.deps, { accountId: ADMIN }, { policy: { ...p.value, techLeadMaxSeverity: cap } })).toEqual({
+        error: 'validation',
+        message: 'Tech leads can accept at most Medium risks: High and Critical always need a security champion.',
+      });
+    expect(await adminSetPolicy(t.deps, { accountId: ADMIN }, { policy: { ...p.value, techLeadMaxSeverity: 'Low' } })).toMatchObject({ policy: { techLeadMaxSeverity: 'Low' } });
+  });
+
+  it('a site that already holds a higher cap can still save other settings (the cap is carried as Medium)', async () => {
+    const { t } = await reviewed();
+    const p = await t.deps.config.site();
+    if (!p.ok) throw new Error('policy');
+    await t.deps.config.setSite({ ...p.value, techLeadMaxSeverity: 'Critical' });
+    const saved = await adminSetPolicy(t.deps, { accountId: ADMIN }, { policy: { ...p.value, techLeadMaxSeverity: 'Critical', attestationTtlHours: 12 } });
+    expect(saved).toMatchObject({ policy: { techLeadMaxSeverity: 'Medium', attestationTtlHours: 12 } });
   });
 });

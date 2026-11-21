@@ -119,6 +119,9 @@ const AdminPolicySchema = SitePolicySchema.superRefine((p, ctx) => {
   if (badAuthor !== undefined) ctx.addIssue({ code: 'custom', path: ['reviewAuthors'], message: `"${badAuthor.slice(0, 40)}" is not an Atlassian account ID.` });
   for (const g of ['techLeadGroup', 'championGroup'] as const)
     if (!name.safeParse(p[g]).success) ctx.addIssue({ code: 'custom', path: [g], message: g === 'championGroup' ? 'Name the security champions group.' : 'Name the tech leads group.' });
+  // canApprove needs a champion for High and above whatever this says; refuse a cap that would claim otherwise.
+  if (p.techLeadMaxSeverity === 'High' || p.techLeadMaxSeverity === 'Critical')
+    ctx.addIssue({ code: 'custom', path: ['techLeadMaxSeverity'], message: 'Tech leads can accept at most Medium risks: High and Critical always need a security champion.' });
   if (p.sensitivePaths.length > 200 || p.sensitivePaths.some((s) => !s.trim() || s.length > 300))
     ctx.addIssue({ code: 'custom', path: ['sensitivePaths'], message: 'Sensitive paths are up to 200 non-empty patterns.' });
 });
@@ -185,7 +188,10 @@ export async function adminSetPolicy(deps: CoreDeps, a: Admin, payload: unknown)
   const raw = (payload as { policy?: unknown } | null)?.policy;
   const current = await deps.config.site();
   if (!current.ok) return apiError(current.error);
-  const parsed = AdminPolicySchema.safeParse(raw && typeof raw === 'object' ? { ...raw, warnOnly: current.value.warnOnly } : raw);
+  // A site saved before the cap was limited may still hold High or Critical (which always acted as Medium): saving
+  // another section carries it as Medium rather than refusing the save. Only a new High or Critical is refused.
+  const legacyCap = (raw as { techLeadMaxSeverity?: unknown } | null)?.techLeadMaxSeverity === current.value.techLeadMaxSeverity && ['High', 'Critical'].includes(current.value.techLeadMaxSeverity);
+  const parsed = AdminPolicySchema.safeParse(raw && typeof raw === 'object' ? { ...raw, warnOnly: current.value.warnOnly, ...(legacyCap ? { techLeadMaxSeverity: 'Medium' } : {}) } : raw);
   if (!parsed.success) return { error: 'validation', message: firstIssue(parsed.error) };
   const next: SitePolicy = { ...parsed.data, enabledProjects: [...new Set(parsed.data.enabledProjects)] };
   for (const key of next.enabledProjects.filter((k) => !current.value.enabledProjects.includes(k))) {

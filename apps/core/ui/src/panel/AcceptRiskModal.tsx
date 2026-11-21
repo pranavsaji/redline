@@ -34,11 +34,17 @@ export function LedgerHash({ hash }: { hash: string }) {
   );
 }
 
-/** Who must approve, worded for the requester (the server decides; this is only a preview). */
+/**
+ * Who must approve, worded for the requester (the server decides; this is only a preview). High and above always need
+ * a security champion, whatever the tech lead cap says, and nobody approves their own request.
+ */
 export function approverPreview(severity: Severity, roles: PanelDto['roles'], policy: PanelDto['acceptancePolicy']): string {
-  const champion = RANK[severity] >= RANK.High || RANK[severity] > RANK[policy.techLeadMaxSeverity];
-  if (champion) return `Needs a security champion (${policy.championGroup}) to approve.`;
-  if (roles.includes('tech_lead') || roles.includes('champion') || roles.includes('admin')) return `No second approval needed: you can accept up to ${policy.techLeadMaxSeverity}.`;
+  const own: Severity = RANK[policy.techLeadMaxSeverity] < RANK.High ? policy.techLeadMaxSeverity : 'Medium';
+  const champion = RANK[severity] > RANK[own];
+  if (champion)
+    return roles.includes('champion') ? `Needs another security champion (${policy.championGroup}) to approve: you cannot approve your own request.` : `Needs a security champion (${policy.championGroup}) to approve.`;
+  if (roles.includes('tech_lead') || roles.includes('champion') || roles.includes('admin'))
+    return `No second approval needed: you can accept ${own === 'Low' ? 'Low risks' : 'Medium and lower risks'} yourself. High and Critical always need a security champion.`;
   return `Needs a tech lead (${policy.techLeadGroup}) or security champion to approve.`;
 }
 

@@ -5,6 +5,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEventLib from '@testing-library/user-event';
 import axe from 'axe-core';
 import { IssuePanel } from '../src/panel/IssuePanel.js';
+import { approverPreview } from '../src/panel/AcceptRiskModal.js';
 import { AdminPage } from '../src/admin/AdminPage.js';
 import { mockAdminApi, mockApi } from '../src/mock-bridge.js';
 import { FIXTURES } from '../src/fixtures.js';
@@ -76,8 +77,16 @@ describe('Accept risk (RL-1, RL-2)', () => {
     const item = screen.getByText('Magic links expire after 15 minutes').closest('li')!;
     await userEvent.click(within(item).getByRole('button', { name: 'Accept risk' }));
     const form = screen.getByRole('form', { name: 'Accept risk' });
-    expect(within(form).getByText(/No second approval needed/)).toBeTruthy();
+    expect(within(form).getByText(/No second approval needed: you can accept Medium and lower risks yourself\. High and Critical always need a security champion\./)).toBeTruthy();
     expect([...(within(form).getByRole('combobox', { name: 'Expires after' }) as HTMLSelectElement).options].map((o) => o.value)).toEqual(['7', '14', '30', '60', '90']);
+  });
+
+  it('the approver preview never promises a tech lead more than the server allows (High and above need a champion)', () => {
+    const policy = { ...FIXTURES.ready!.acceptancePolicy, techLeadMaxSeverity: 'Critical' as const };
+    expect(approverPreview('Medium', ['developer', 'tech_lead'], policy)).toBe('No second approval needed: you can accept Medium and lower risks yourself. High and Critical always need a security champion.');
+    expect(approverPreview('High', ['developer', 'tech_lead'], policy)).toBe(`Needs a security champion (${policy.championGroup}) to approve.`);
+    expect(approverPreview('High', ['developer', 'champion'], policy)).toBe(`Needs another security champion (${policy.championGroup}) to approve: you cannot approve your own request.`);
+    expect(approverPreview('Low', ['developer', 'tech_lead'], { ...policy, techLeadMaxSeverity: 'Low' })).toMatch(/^No second approval needed: you can accept Low risks yourself\./);
   });
 
   it('a viewer who cannot edit sees no Accept risk button', async () => {

@@ -1,7 +1,10 @@
 import { useId, useState } from 'react';
 import type { Severity } from '../types.js';
 import { field } from '../panel/form-styles.js';
-import { grid2, Labeled, hint, h2, PolicyForm, sectionStyle, SEVERITY_OPTIONS, usePolicySave, type PolicySectionProps } from './policy-editor.js';
+import { grid2, Labeled, hint, h2, PolicyForm, sectionStyle, usePolicySave, type PolicySectionProps } from './policy-editor.js';
+
+/** High and Critical always need a security champion (the server refuses a higher cap). */
+const TECH_LEAD_CAPS: Severity[] = ['Low', 'Medium'];
 
 /** The Jira groups that make someone a security champion or a tech lead, and how much risk a tech lead may accept. */
 export function Roles(props: PolicySectionProps) {
@@ -9,7 +12,8 @@ export function Roles(props: PolicySectionProps) {
   const { policy } = props;
   const [champions, setChampions] = useState(policy.championGroup);
   const [leads, setLeads] = useState(policy.techLeadGroup);
-  const [cap, setCap] = useState<Severity>(policy.techLeadMaxSeverity);
+  // A site saved before the cap was limited may hold High or Critical; the server treats that as Medium.
+  const [cap, setCap] = useState<Severity>(TECH_LEAD_CAPS.includes(policy.techLeadMaxSeverity) ? policy.techLeadMaxSeverity : 'Medium');
   const s = usePolicySave(props);
 
   const submit = () => {
@@ -24,7 +28,7 @@ export function Roles(props: PolicySectionProps) {
         Roles
       </h2>
       <p style={hint}>
-        Security champions triage threats, approve High and Critical risk acceptances and confirm paused reviews. Tech leads may accept lower risks themselves. Jira administrators can do everything, including break-glass overrides.
+        Security champions triage threats, approve High and Critical risk acceptances and confirm paused reviews. Tech leads may accept Low or Medium risks themselves, up to the cap below; High and Critical always need a security champion. Jira administrators can do everything, including break-glass overrides.
       </p>
       <PolicyForm label="Roles" submitLabel="Save roles" onSubmit={submit} {...s}>
         <div style={grid2}>
@@ -41,7 +45,7 @@ export function Roles(props: PolicySectionProps) {
           <Labeled text="Tech leads may accept risk up to">
             {(fid) => (
               <select id={fid} value={cap} onChange={(e) => setCap(e.target.value as Severity)} style={field}>
-              {SEVERITY_OPTIONS.map((v) => (
+              {TECH_LEAD_CAPS.map((v) => (
                 <option key={v} value={v}>
                   {v}
                 </option>
