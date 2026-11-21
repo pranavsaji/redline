@@ -6,6 +6,7 @@ import { SeverityLozenge } from '../components/SeverityLozenge.js';
 import type { ApiError, PanelDto, Requirement, Severity } from '../types.js';
 import { box, errorText, field, label } from './form-styles.js';
 import { useInlineForm } from '../components/inline-form.js';
+import { useInFlight } from '../components/in-flight.js';
 
 const RANK: Record<Severity, number> = { Low: 1, Medium: 2, High: 3, Critical: 4 };
 const EXPIRY_CHOICES = [7, 14, 30, 60, 90];
@@ -60,7 +61,7 @@ export function AcceptRiskModal({ requirement, dto, api, onDone, onCancel }: { r
   const [controls, setControls] = useState('');
   const [days, setDays] = useState(cap);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const { busy: saving, run } = useInFlight();
   const [entry, setEntry] = useState<{ hash: string; needsApprover: string } | null>(null);
   const id = useId();
   const form = useInlineForm(onCancel);
@@ -69,9 +70,9 @@ export function AcceptRiskModal({ requirement, dto, api, onDone, onCancel }: { r
     e.preventDefault();
     if (reason.trim().length < MIN_REASON) return setError(`Write a reason of at least ${MIN_REASON} characters.`);
     if (controls.trim().length < MIN_CONTROLS) return setError(`Describe the compensating controls (what reduces the risk meanwhile) in at least ${MIN_CONTROLS} characters.`);
-    setSaving(true);
-    const r = await api.requestAcceptance({ requirementId: requirement.id, reason: reason.trim(), controls: controls.trim(), expiryDays: days }).catch((): ApiError => ({ error: 'unavailable' }));
-    setSaving(false);
+    // One request at a time: a double click or a second Enter must not file two acceptances.
+    const r = await run(() => api.requestAcceptance({ requirementId: requirement.id, reason: reason.trim(), controls: controls.trim(), expiryDays: days }).catch((): ApiError => ({ error: 'unavailable' })));
+    if (r === undefined) return;
     if (isError(r)) return setError(errorTextOf(r));
     setError(null);
     setEntry({ hash: r.entryHash, needsApprover: r.needsApprover });

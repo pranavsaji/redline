@@ -39,6 +39,16 @@ export function LedgerVerify({ api }: { api: AdminApi }) {
   const [pack, setPack] = useState<{ csv: string; json: string; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+  // A browser or site policy can block downloads from the app's frame: copying is the fallback.
+  const copy = async (text: string, what: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(`Copied the ${what}. Paste it into a file.`);
+    } catch {
+      setCopied('Your browser blocked copying. Use the download links, or ask an admin to allow clipboard access.');
+    }
+  };
 
   const verify = async () => {
     setChecking(true);
@@ -60,6 +70,7 @@ export function LedgerVerify({ api }: { api: AdminApi }) {
       return setError(errorText(r));
     }
     setError(null);
+    setCopied(null);
     setPack({ ...r, name: `threatline-evidence-${key}-${from}-${to}` });
   };
 
@@ -117,6 +128,13 @@ export function LedgerVerify({ api }: { api: AdminApi }) {
               <a href={dataUrl('application/json', pack.json)} download={`${pack.name}.json`} style={{ color: token('color.link') }}>
                 Download JSON
               </a>
+              <Button spacing="compact" onClick={() => void copy(pack.csv, 'CSV')}>
+                Copy CSV
+              </Button>
+              <Button spacing="compact" onClick={() => void copy(pack.json, 'JSON')}>
+                Copy JSON
+              </Button>
+              {copied && <span style={{ font: token('font.body.small') }}>{copied}</span>}
             </>
           )}
         </div>
