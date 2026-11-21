@@ -71,7 +71,7 @@ verbatim quotes, coverage, the verifier) mattered more than adding threat types.
 
 Marketplace listing, Jira Service Management incident feedback into reviews, and per-team policies.
 
-## Demo video (2:51)
+## Demo video (3:08)
 
 A rough cut with synthetic narration is built from real screenshots of a fresh site (outside the repo, in
 `threatline-video/`: `python3 build.py` renders the frames, narration and captions into `threatline-demo.mp4` and
@@ -88,13 +88,15 @@ title, and upload it as public or unlisted.
 | 6 | Move it to Done: blocked, with the reason | Now try to ship it. Done is blocked, and Jira says exactly why: open security requirements at High or above, with a link back to the review. Missing, failed, or out of date reviews block too. The gate fails closed. |
 | 7 | Prompt injection is flagged, never obeyed | Here's the attack that breaks most A.I. reviewers. This epic's design page hides an instruction telling the A.I. to approve the change. Threatline flags the page, treats the text as data, and the threats resting on it wait for a security champion. The model never decides the verdict. Code does. |
 | 8 | Fix it, or accept the risk with teeth | To get to Done, you fix, or you accept. Accepting a risk takes a reason, compensating controls, an expiry, and an approver with the right role, who isn't you. |
-| 9 | Verified with evidence: ready for Done, and a signed attestation | Verify each requirement with a pull request as evidence, and the story is ready for Done. Threatline then signs an attestation for one repository, and one exact commit. |
-| 10 | The merge check verifies the Ed25519 signature | Paste it into the pull request, and the Bitbucket merge check verifies the signature against your repository's trusted key. |
-| 11 | Change one character: rejected | Change one character, and it's rejected. |
-| 12 | Live in Bitbucket: the required check blocks the merge | On a real pull request, the required check stays red, and the merge is blocked. The same gate runs as a GitHub Action. |
-| 13 | An audit trail anyone can verify | Every acceptance, override and refusal lands in a hash-chained ledger, with signed Merkle tree heads. An auditor can download an inclusion proof, and check it offline. |
-| 14 | Coding agent over MCP | And coding agents see the same requirements. Through Threatline's M.C.P. server, Claude Code or Cursor fetch exactly what the gate will check, before they write the fix. |
-| 15 | Results and tagline | Threatline. On our eval with poisoned design docs: ninety-two percent recall on high-severity threats, and every poisoned case held. Build with context. Ship with confidence. |
+| 9 | Each requirement is verified with the pull request as evidence | Here a developer fixed the webhook story. Each requirement is marked verified, with the pull request as its evidence. |
+| 10 | Every blocking requirement handled: Done goes through | Every blocking requirement is handled, so the story is ready for Done, and this time Done goes through. |
+| 11 | A signed attestation for one repository and one exact commit | Threatline then signs an attestation, for one repository, and one exact commit. |
+| 12 | Live in Bitbucket: the required merge check passes | Paste it into the pull request, and the required Bitbucket merge check verifies the signature, and passes: attested by PAY ten, five requirements verified. |
+| 13 | Change one character: the signature fails | Change one character, and the signature no longer verifies. |
+| 14 | Without a valid attestation the required check blocks the merge | Without a valid attestation, the required check stays red, and the merge is blocked. It checks again at merge time, and the same gate runs as a GitHub Action. |
+| 15 | An audit trail anyone can verify | Every acceptance, override and refusal lands in a hash-chained ledger, with signed Merkle tree heads. An auditor can download an inclusion proof, and check it offline. |
+| 16 | Coding agent over MCP | And coding agents see the same requirements. Through Threatline's M.C.P. server, Claude Code or Cursor fetch exactly what the gate will check, write the fix, and mark the requirement verified with their pull request. |
+| 17 | Results and tagline | Threatline. On our eval with poisoned design docs: ninety-two percent recall on high-severity threats, and every poisoned case held. Build with context. Ship with confidence. |
 
 ## Additional info (judges only): ready-to-paste answers
 
@@ -116,6 +118,8 @@ Fields not listed here (submitter type, country, age, eligibility, employment, s
   actions and an MCP server for coding agents. Forge SQL, KVS, secret storage and queues hold state; nothing egresses.
 - **Category:** Apps for Software Teams. **Why:** it changes how software teams ship: security requirements become part
   of Done and of the merge, in Jira and Bitbucket, where developers already work.
-- **Bonus prize:** Best app with Atlassian MCP (Threatline's MCP tools give Claude Code or Cursor the same requirements
-  the gate checks; the Rovo agent also qualifies it for Best Agents).
+- **Bonus prize:** Best app with Atlassian MCP. Threatline's MCP tools close the loop for coding agents: Claude Code or
+  Cursor read the requirements the gate checks, write the fix and its tests, mark each requirement verified with the
+  pull request as evidence (ledgered), and fetch the signed merge attestation. Walkthrough: `docs/MCP.md`. The Rovo agent
+  also qualifies it for Best Agents.
 - **AI tools used:** Claude Code (Claude) for pair programming and the eval harness; Forge LLMs (Claude) inside the app.
