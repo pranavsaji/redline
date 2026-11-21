@@ -36,5 +36,5 @@ export async function requirementsSetStatus(deps: CoreDeps, v: Viewer, payload: 
   const auth = await authorise(deps, v, 'edit');
   if ('error' in auth) return auth;
   const r = await setRequirementStatus(deps, v, { requirementId: p.data.requirementId, status: p.data.status, ...(p.data.evidence ? { evidence: p.data.evidence } : {}) });
-  return r.ok ? r.value : apiError(r.error);
+  return r.ok ? r.value.requirement : apiError(r.error);
 }

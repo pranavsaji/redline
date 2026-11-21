@@ -118,6 +118,7 @@ export type LedgerEventType =
   | 'policy.warn_only'
   | 'policy.changed'
   | 'requirement.verified'
+  | 'requirement.status_changed'
   | 'project.purged'
   | 'reviews.resumed'
   | 'review.sample'

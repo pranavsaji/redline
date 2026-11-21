@@ -3,6 +3,8 @@ import { ok } from '@threatline/shared';
 import { handleJob } from '../../src/consumers/review-consumer.js';
 import { acceptanceDecide, acceptanceRequest, breakGlassOverride } from '../../src/resolvers/acceptances.js';
 import { adminSetPolicy, adminWarnOnly } from '../../src/resolvers/admin.js';
+import { requirementsSetStatus } from '../../src/resolvers/requirements.js';
+import { verifyRequirement } from '../../src/actions/verify-requirement.js';
 import { refreshVerdict, verdictKey } from '../../src/services/verdict-service.js';
 import { validateTransition } from '../../src/validators/validate-transition.js';
 import type { JiraIssue } from '../../src/adapters/jira.js';
@@ -163,5 +165,43 @@ describe('the tech lead acceptance cap', () => {
     await t.deps.config.setSite({ ...p.value, techLeadMaxSeverity: 'Critical' });
     const saved = await adminSetPolicy(t.deps, { accountId: ADMIN }, { policy: { ...p.value, techLeadMaxSeverity: 'Critical', attestationTtlHours: 12 } });
     expect(saved).toMatchObject({ policy: { techLeadMaxSeverity: 'Medium', attestationTtlHours: 12 } });
+  });
+});
+
+describe('requirement status changes are ledgered, from the panel and from agents alike', () => {
+  const statusRows = async (t: ReturnType<typeof coreDeps>) => {
+    const all = await t.deps.ledger.all();
+    return all.ok ? all.value.filter((r) => r.eventType.startsWith('requirement.')) : [];
+  };
+
+  it('a Verified status set in the panel is ledgered (not through an agent), with its evidence', async () => {
+    const { t, req } = await reviewed();
+    const out = await requirementsSetStatus(t.deps, as(DEV), { requirementId: req.id, status: 'Verified', evidence: { kind: 'test', ref: 'test/webhooks/signature.test.ts' } });
+    expect(out).toMatchObject({ id: req.id, status: 'Verified' });
+    expect(await statusRows(t)).toEqual([
+      expect.objectContaining({ eventType: 'requirement.verified', actor: DEV, payload: expect.objectContaining({ requirementId: req.id, issueId: ISSUE, from: 'Open', evidenceKind: 'test', evidence: 'test/webhooks/signature.test.ts', viaAgent: false }) }),
+    ]);
+  });
+
+  it('other status changes are ledgered too', async () => {
+    const { t, req } = await reviewed();
+    await requirementsSetStatus(t.deps, as(DEV), { requirementId: req.id, status: 'InProgress' });
+    expect(await statusRows(t)).toEqual([expect.objectContaining({ eventType: 'requirement.status_changed', actor: DEV, payload: expect.objectContaining({ requirementId: req.id, from: 'Open', to: 'InProgress', viaAgent: false }) })]);
+  });
+
+  it('an agent verification is ledgered once, as made through an agent', async () => {
+    const { t, req } = await reviewed();
+    const r = await verifyRequirement({ requirementId: req.id, prUrl: 'https://bitbucket.org/acme/payments/pull-requests/42', context: { accountId: DEV, agentId: 'agent-1', cloudId: 'c' } }, t.deps);
+    expect(r).toMatchObject({ status: 'Verified', entryHash: expect.stringMatching(/^[0-9a-f]{64}$/) });
+    const rows = await statusRows(t);
+    expect(rows).toEqual([expect.objectContaining({ eventType: 'requirement.verified', payload: expect.objectContaining({ viaAgent: true }) })]);
+    expect('entryHash' in r && r.entryHash).toBe(rows[0]!.entryHash);
+  });
+
+  it('fails closed: when the ledger cannot record it, the status does not change', async () => {
+    const { t, req, reqs } = await reviewed();
+    t.deps.ledger.append = async () => ({ ok: false, error: { code: 'upstream', message: 'sql down' } });
+    expect(await requirementsSetStatus(t.deps, as(DEV), { requirementId: req.id, status: 'Verified', evidence: { kind: 'manual', ref: 'checked by hand' } })).toMatchObject({ error: expect.any(String) });
+    expect((await reqs()).find((r) => r.id === req.id)!.status).toBe('Open');
   });
 });
