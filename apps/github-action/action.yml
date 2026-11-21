@@ -1,15 +1,15 @@
-name: Redline merge gate
-description: Blocks merging a security-sensitive change until it carries a valid Redline attestation from its Jira work item. Run it on pull_request_target so a pull request cannot change its own gate.
-author: Redline
+name: Threatline merge gate
+description: Blocks merging a security-sensitive change until it carries a valid Threatline attestation from its Jira work item. Run it on pull_request_target so a pull request cannot change its own gate.
+author: Threatline
 branding:
   icon: shield
   color: red
 inputs:
   public-keys:
-    description: Redline's public signing keys, one per line (Redline admin → Signing keys → Copy public key). They are public; no secret is needed.
+    description: Threatline's public signing keys, one per line (Threatline admin → Signing keys → Copy public key). They are public; no secret is needed.
     required: true
   sensitive-paths:
-    description: Extra sensitive path globs, one per line, added to Redline's defaults (which include .github/workflows, .github/actions and .redline). The base branch's .redline/policy.yml can add more.
+    description: Extra sensitive path globs, one per line, added to Threatline's defaults (which include .github/workflows, .github/actions and .redline). The base branch's .redline/policy.yml can add more.
     required: false
     default: ''
   diff-score-threshold:

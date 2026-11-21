@@ -22,7 +22,7 @@ import { loadRecording, recordingLlm, replayLlm, saveRecording, type Recording }
 import { JUDGE_VERSION, judgeExtras, parseJudge, type JudgeItem } from './judge.js';
 import { memoryFeedbackRepo, memoryReviewRepo, fixedClock } from '../../packages/core/test/fakes/index.js';
 
-/** `agent`: Rovo agent runs. `engine`: Redline Engine (the same runs on the deep tier, then the verifier). `pipeline`: the earlier extract→propose design. */
+/** `agent`: Rovo agent runs. `engine`: Threatline Engine (the same runs on the deep tier, then the verifier). `pipeline`: the earlier extract→propose design. */
 export type EvalPath = 'agent' | 'engine' | 'pipeline';
 
 export function bundleFor(c: CleanCase): ContextBundle {
@@ -40,7 +40,7 @@ const reviewFor = (b: ContextBundle, samples: number): Review => ({
   promptVersion: PROMPT_VERSION, modelIds: [], samplesExpected: samples, samplesReceived: 0, tokensIn: 0, tokensOut: 0, createdAt: 't', updatedAt: 't',
 });
 
-/** One agent run exactly as production: Redline agent prompt + automation prompt + rendered get-review-context result. */
+/** One agent run exactly as production: Threatline agent prompt + automation prompt + rendered get-review-context result. */
 async function agentSample(llm: LlmPort, b: ContextBundle): Promise<{ sample: Sample; modelId?: string; tokensIn: number; tokensOut: number; quotes: string[] }> {
   const ctx = renderReviewContext(buildReviewContext(b, { revision: 1 }));
   const r = await llm.complete({ system: agentPrompt(), user: `${automationPrompt(b.issueKey)}\n\nResult of get-review-context:\n${ctx}`, tier: 'balanced', maxOutputTokens: 8000, purpose: 'propose' });
@@ -69,7 +69,7 @@ export async function runCase(c: CleanCase, llm: LlmPort | null, samples: number
   const b = bundleFor(c);
   const review = reviewFor(b, samples);
   if (llm && path === 'pipeline') {
-    // Redline Engine exactly as the product runs it: extract → proposals → assembly → verifier (skipped under injection).
+    // Threatline Engine exactly as the product runs it: extract → proposals → assembly → verifier (skipped under injection).
     const reviews = memoryReviewRepo();
     await reviews.create(review);
     const r = await runPipeline({ llm, reviews, feedback: memoryFeedbackRepo(), clock: fixedClock('2026-11-15T00:00:00Z'), policy: DEFAULT_SITE_POLICY }, review, b, { samples });
@@ -95,7 +95,7 @@ export async function runCase(c: CleanCase, llm: LlmPort | null, samples: number
     return err(appError(code === 'timeout' ? 'timeout' : 'upstream', `every sample failed: ${runs.map((x) => (x.sample as { failed: string }).failed).join(', ')}`));
   }
   const out = assembleReview({ review, bundle: b, samples: runs.map((x) => x.sample), samplesExpected: samples, priorDismissed: [], policy: DEFAULT_SITE_POLICY, promptVersion: PROMPT_VERSION, now: new Date('2026-11-15T00:00:00Z'), coverage });
-  // Redline Engine: the verifier runs on the assembled review, exactly as in the product (skipped under injection).
+  // Threatline Engine: the verifier runs on the assembled review, exactly as in the product (skipped under injection).
   let threats = out.threats;
   let score = out.riskScore;
   if (path === 'engine' && verifier && !out.injectionSuspected) {
@@ -363,7 +363,7 @@ export function reportMarkdown(r: EvalReport): string {
   const s = r.summary;
   const judgeFailed = r.failures.filter((f) => f.startsWith('judge ')).length;
   const rows = Object.entries(s.perStride).map(([k, v]) => `| ${k} | ${v.tp} | ${v.fp} | ${v.fn} | ${pct(v.precision)} | ${pct(v.recall)} | ${pct(v.f1)} |`).join('\n');
-  return `# Redline eval — ${r.date}
+  return `# Threatline eval — ${r.date}
 
 _${r.label}; prompt ${r.promptVersion}; path ${r.path}; ${r.samples} sample(s) per case._
 

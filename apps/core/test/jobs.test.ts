@@ -75,7 +75,7 @@ describe('hourly', () => {
     const text = JSON.stringify(t.jira.commented[0]!.adf);
     expect(text).toContain('2 of them got no agent run at all');
     expect(text).toMatch(/Audit log/);
-    expect(text).toMatch(/re-select Redline in each Use agent step/);
+    expect(text).toMatch(/re-select Threatline in each Use agent step/);
     expect(text).toMatch(/Rule-based checks only/);
   });
 

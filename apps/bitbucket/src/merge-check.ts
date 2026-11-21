@@ -30,7 +30,7 @@ export async function runMergeCheck(
   const settings = (await deps.settings(event.repository.uuid).catch(() => null)) ?? DEFAULT_REPO_SETTINGS;
   const warnActive = settings.mode === 'warn' && !!settings.warnUntil && Date.parse(settings.warnUntil) / 1000 > deps.nowSec();
   const unreadable = (why: string) => {
-    const message = `Redline: could not read this pull request from Bitbucket (${why}), so it cannot be checked. Re-run the check in a minute.`;
+    const message = `Threatline: could not read this pull request from Bitbucket (${why}), so it cannot be checked. Re-run the check in a minute.`;
     return warnActive ? { success: true, message: `Warning: ${message}` } : { success: false, message };
   };
   const ws = event.workspace.uuid;

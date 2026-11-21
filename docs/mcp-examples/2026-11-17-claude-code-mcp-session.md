@@ -1,14 +1,14 @@
-# Claude Code + Redline MCP: a recorded session (live, 2026-11-17)
+# Claude Code + Threatline MCP: a recorded session (live, 2026-11-17)
 
-- **Where:** demo site `one-atlas-mefc`, Redline development environment (app 6.x), served through Atlassian's Forge MCP endpoint `https://mcp.atlassian.com/forge/<appId>`. The app has one installation shared by Jira (required) and Confluence (optional).
-- **Client:** Claude Code (`claude -p`, model claude-opus-5-5) with all of its own tools off (`--tools ""`) and only the Redline MCP server allowed (`--allowedTools mcp__redline`). Signed in with OAuth via `claude mcp login redline`; Forge checks the caller's Jira permissions on every call.
+- **Where:** demo site `one-atlas-mefc`, Threatline development environment (app 6.x), served through Atlassian's Forge MCP endpoint `https://mcp.atlassian.com/forge/<appId>`. The app has one installation shared by Jira (required) and Confluence (optional).
+- **Client:** Claude Code (`claude -p`, model claude-opus-5-5) with all of its own tools off (`--tools ""`) and only the Threatline MCP server allowed (`--allowedTools mcp__redline`). Signed in with OAuth via `claude mcp login redline`; Forge checks the caller's Jira permissions on every call.
 - **How to reproduce:** see `mcp-skill/skill.md` for the `claude mcp add` command, then run the prompt below.
 - **Transcript:** tool calls and the agent's final answer are verbatim. Long tool results are cut to their first two items with an "omitted here" marker; nothing else is changed. In Claude Code, tool names show the environment suffix `_development`.
 
 ## Prompt
 
 ```text
-You are a coding agent about to work on Jira work item PAY-7 ("Verify refund webhook signatures") in the Bitbucket repository pranavsaji/redline. Use only the Redline MCP tools, and follow the Redline workflow:
+You are a coding agent about to work on Jira work item PAY-7 ("Verify refund webhook signatures") in the Bitbucket repository pranavsaji/redline. Use only the Threatline MCP tools, and follow the Threatline workflow:
 1. Call get-security-requirements for PAY-7 (status Open) and summarise what must be true before Done.
 2. Call get-review for PAY-7, then explain-threat for the most severe threat (use its T-n ref).
 3. The planned change touches src/auth/webhook.ts and README.md. Call check-change-risk for PAY-7 with those paths and say whether it would pass.
@@ -266,7 +266,7 @@ Do not call request-risk-acceptance. Finish with a short summary for the develop
     "… 3 more omitted here"
   ],
   "reasons": [
-    "Touches security-sensitive paths: src/auth/webhook.ts. The merge check needs a Redline attestation for PAY-7.",
+    "Touches security-sensitive paths: src/auth/webhook.ts. The merge check needs a Threatline attestation for PAY-7.",
     "8 open security requirement(s) at High or above.",
     "Requirement PAY-8 (High, Open) covers src/auth/webhook.ts: \"Mitigate: Account takeover through weak authentication\".",
     "Requirement PAY-9 (High, Open) covers src/auth/webhook.ts: \"Mitigate: Personal data exposed to unauthorised users\".",
@@ -291,7 +291,7 @@ Do not call request-risk-acceptance. Finish with a short summary for the develop
       "message": "8 open security requirement(s) at High or above."
     }
   ],
-  "message": "Redline blocks merging PAY-7: 8 open security requirement(s) at High or above."
+  "message": "Threatline blocks merging PAY-7: 8 open security requirement(s) at High or above."
 }
 ```
 
@@ -307,7 +307,7 @@ Step 5 was not called in this run: the attestation blocked, and the prompt said 
 
 ## The agent's final answer
 
-## PAY-7 Redline workflow results
+## PAY-7 Threatline workflow results
 
 **1. Open security requirements (11 open, 8 at High or above).** All 11 have to be Verified, or have a risk acceptance or Not Applicable status recorded, before PAY-7 can be Done:
 
@@ -328,7 +328,7 @@ Step 5 was not called in this run: the attestation blocked, and the prompt said 
 - **Fix:** the server checks order ownership and refund eligibility itself before calling Stripe (PAY-15). Access must be restricted per function and authorisation enforced at a trusted service layer.
 - **References:** CWE-94, CWE-269, ASVS V8.2.1 / V8.3.1 / V15.1.1, OWASP LLM01 and LLM06, Agentic ASI01 and ASI02.
 
-**3. Change-risk check (`src/auth/webhook.ts`, `README.md`): would not pass.** The diff scores 60, with the signals "sensitive path" and "auth/crypto change". `src/auth/webhook.ts` is a sensitive file, so the merge needs a Redline attestation. The change touches PAY-12, PAY-15, PAY-8, PAY-9 and PAY-11, all still Open.
+**3. Change-risk check (`src/auth/webhook.ts`, `README.md`): would not pass.** The diff scores 60, with the signals "sensitive path" and "auth/crypto change". `src/auth/webhook.ts` is a sensitive file, so the merge needs a Threatline attestation. The change touches PAY-12, PAY-15, PAY-8, PAY-9 and PAY-11, all still Open.
 
 **4. Merge attestation: blocked, no attestation issued.**
 - `open_requirement`: 8 open security requirement(s) at High or above.
@@ -336,7 +336,7 @@ Step 5 was not called in this run: the attestation blocked, and the prompt said 
 I didn't retry. You told me to stop at a block, so I **did not call posture-summary (step 5)**. I didn't call request-risk-acceptance either.
 
 ## Summary for the developer
-You can't merge PAY-7 yet. The webhook change is the right place to close **PAY-12**: verify the `Stripe-Signature` header with the endpoint secret and Stripe's constructEvent, and reject the request if verification fails. Those requirements still won't clear, though, because the Redline gate also counts the open requirements for the AI agent and data (PAY-15, 18, 10, 17, 9, 8, 13). Start with **PAY-15**, the Critical one: server-side ownership and eligibility checks before every refund tool call. Once each requirement is Verified, or a tech lead or security champion approves a risk acceptance in the Redline panel, ask for the attestation again for the new head commit.
+You can't merge PAY-7 yet. The webhook change is the right place to close **PAY-12**: verify the `Stripe-Signature` header with the endpoint secret and Stripe's constructEvent, and reject the request if verification fails. Those requirements still won't clear, though, because the Threatline gate also counts the open requirements for the AI agent and data (PAY-15, 18, 10, 17, 9, 8, 13). Start with **PAY-15**, the Critical one: server-side ownership and eligibility checks before every refund tool call. Once each requirement is Verified, or a tech lead or security champion approves a risk acceptance in the Threatline panel, ask for the attestation again for the new head commit.
 
 ## What this run found (and what was fixed)
 

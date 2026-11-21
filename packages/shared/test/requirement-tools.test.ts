@@ -30,7 +30,7 @@ describe('testScaffold (feature: test skeletons from requirements)', () => {
     const code = testScaffold(req(), 'typescript');
     expect(code).toContain("describe('PAY-101 Mitigate: Forged refund webhooks', () => {");
     expect(code.match(/\bit\('/g)).toHaveLength(2);
-    expect(code).toContain('Redline requirement req_1a2b3c4d5e6f7a8b');
+    expect(code).toContain('Threatline requirement req_1a2b3c4d5e6f7a8b');
     expect(code).toContain('ASVS V6.3.1');
     expect(code).toMatch(/throw new Error\('Write this test/);
     expect(parsesAsTs(code)).toEqual([]);
@@ -83,7 +83,7 @@ describe('testScaffold: Java unicode escapes (commit security review)', () => {
 
 describe('fix-by deadlines (feature: requirement SLAs)', () => {
   const now = new Date('2026-11-20T00:00:00.000Z');
-  it('Critical 7 days, High 30, Medium 90, Low none, counted from when Redline created the requirement', () => {
+  it('Critical 7 days, High 30, Medium 90, Low none, counted from when Threatline created the requirement', () => {
     expect(SLA_DAYS).toEqual({ Critical: 7, High: 30, Medium: 90, Low: null });
     expect(dueDate(req({ severity: 'Critical' }))).toBe('2026-11-08T00:00:00.000Z');
     expect(dueDate(req({ severity: 'High' }))).toBe('2026-12-01T00:00:00.000Z');

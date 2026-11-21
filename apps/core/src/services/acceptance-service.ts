@@ -102,14 +102,14 @@ export async function requestAcceptance(
   if (valid.value.needsApprover === 'none') {
     const s = await setStatus(deps, req.value.id, ['Open', 'InProgress'], 'AcceptedRisk');
     if (!s.ok) log('acceptance.status_failed', { requirementId: req.value.id, code: s.error.code });
-    await notify(deps, v.issueId, [], `Risk accepted for ${label(req.value)} until ${day(valid.value.expiresAt)}. Recorded in the Redline ledger: ${panel}`);
+    await notify(deps, v.issueId, [], `Risk accepted for ${label(req.value)} until ${day(valid.value.expiresAt)}. Recorded in the Threatline ledger: ${panel}`);
     await settle(deps, v.issueId);
   } else {
     await notify(
       deps,
       v.issueId,
       [],
-      `Risk acceptance requested for ${label(req.value)} (${req.value.severity}). It needs ${approverText(valid.value.needsApprover, policy.value)} to approve it in the Redline panel: ${panel}`,
+      `Risk acceptance requested for ${label(req.value)} (${req.value.severity}). It needs ${approverText(valid.value.needsApprover, policy.value)} to approve it in the Threatline panel: ${panel}`,
     );
   }
   return ok({ acceptanceId, needsApprover: valid.value.needsApprover, entryHash: row.value.entryHash });
@@ -159,7 +159,7 @@ export async function decideAcceptance(
     [a.acceptedBy],
     approve
       ? `Your risk acceptance for ${name} was approved. It expires on ${day(a.expiresAt)}, when the requirement opens again.`
-      : `Your risk acceptance for ${name} was rejected. The requirement stays open; see the Redline panel on ${issue.key}.`,
+      : `Your risk acceptance for ${name} was rejected. The requirement stays open; see the Threatline panel on ${issue.key}.`,
   );
   await settle(deps, v.issueId);
   return ok({ state: approve ? 'active' : 'rejected', entryHash: row.value.entryHash });
@@ -200,7 +200,7 @@ export async function breakGlass(deps: CoreDeps, v: Viewer, issue: JiraIssue, in
   const until = new Date(deps.clock.now().getTime() + input.hours * HOUR).toISOString();
   const row = await appendLedger(deps.ledger, deps.clock, 'override.breakglass', { issueId: v.issueId, issueKey: issue.key, reason, hours: input.hours, until }, v.accountId);
   if (!row.ok) return row;
-  await notify(deps, v.issueId, [], `An administrator used a break-glass override on Redline's gate for ${issue.key} until ${until.slice(0, 16).replace('T', ' ')} UTC. The reason is recorded in the Redline ledger.`);
+  await notify(deps, v.issueId, [], `An administrator used a break-glass override on Threatline's gate for ${issue.key} until ${until.slice(0, 16).replace('T', ' ')} UTC. The reason is recorded in the Threatline ledger.`);
   await settle(deps, v.issueId);
   return ok({ entryHash: row.value.entryHash, until });
 }

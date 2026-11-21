@@ -1,6 +1,6 @@
-# Redline judge guide
+# Threatline judge guide
 
-Redline makes security review part of "Done": every Jira work item gets a cited STRIDE threat model, the threats that
+Threatline makes security review part of "Done": every Jira work item gets a cited STRIDE threat model, the threats that
 matter become requirements, and the work item cannot move to Done (nor its pull request merge) until each requirement
 is verified or its risk is accepted by someone allowed to accept it.
 
@@ -8,26 +8,26 @@ is verified or its risk is accepted by someone allowed to accept it.
 
 | App | Install link | Needs |
 | --- | --- | --- |
-| Redline for Jira (with Confluence) | [Install Redline for Jira](https://developer.atlassian.com/console/install/13898a7c-6897-48d3-a512-079d9f9f5f00?signature=AYABeCcfIQJqGrR0SUgfCmoTNmEAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4CxqLTo9l4lqXuFjNim1xJM%2Bp%2F3TVP9xHS2BrU5DRRucB1BD8mEv4t3Ljf3OukSd5eQAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDEh%2BKItDcqUwro%2BHrQIBEIA7MA0KHRf%2BF3YuTEAMovFxVALBMAXOWvXwcePSrlXd8eWbO0Gu4PlzXePH9QGutTzgsBB7obWKVcKw55kAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHi9bVMAkme4qVQX1fQHo6ePw3H40A7cGfz7yrmSfBWMXgHlW5ynSsuhZ7zbqiK2sh%2B2AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMkPcTbpchY2MsayhfAgEQgDuWokoIpYBa88xi5ggk1L1JkcZBleXY2Fhu75VlWDzfTq%2FPjQu2HTJqqUvWAGr3gQmwdhbGrdneGDgHcgAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeDYASx0XCjkny4iLV6vz%2BKtEGSGT6kdt0QRpkn6D%2FlVEAbLrick3%2FS2k9TO8wl7jjBMAAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAwPyU3UXZLk3LyqQEcCARCAO56x65zN0k8TKW9hcCjB8AjClKyO30ptqnOAj2gX5CQsUchhHNyCLeBw5CSlVzbE5lnPkVzoFWWWPI9DAgAAAAAMAAAQAAAAAAAAAAAAAAAAAE5uz5LjAh1FnegGXQysekL%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADJlU7brRNHeEAgdUVuQgPgaQWe2H582mtCI1iAJ%2FP3ZS3ti2WQm0S86s3LQVssf56LpbJ8u0XxBB32s7u970Pyt6So%3D&product=jira&product=confluence) | Any Jira Cloud site (Redline Engine needs no Rovo); Confluence on the same site for published pages |
-| Redline for Bitbucket | [Install Redline for Bitbucket](https://developer.atlassian.com/console/install/53a2efe5-9150-4e9a-b869-8bd2605d64e0?signature=AYABeKFrOdIp4KpSdnKGbGUBSkUAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4CxqLTo9l4lqXuFjNim1xJM%2Bp%2F3TVP9xHS2BrU5DRRucB43xQ8z0a40vUy92qFrbZsgAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDLmyoQqegXqdj1hpawIBEIA7KqL2Jq8dMqSVB%2BqLp%2BqmRoaoxpOLEOxAiir3VTO5e6sSe7s5CXVhfARMsp0c1HUiWcXegZaQ2afBrboAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHi9bVMAkme4qVQX1fQHo6ePw3H40A7cGfz7yrmSfBWMXgEputGsmrOJAk%2FkRTqjeiMVAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMkH7QJyZwcmbpFIVEAgEQgDsHAfyZkW2%2BSGje9GoN3d5v8W%2FjjNH6AZqGtivmtT6mifu72SeLpu3P6CtQdUhCniy4BntFoD0iOIC1nQAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeDYASx0XCjkny4iLV6vz%2BKtEGSGT6kdt0QRpkn6D%2FlVEAZJijhliY2wtihwZxY0ZFg4AAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAw8KYxq%2BOBFrXk5KjwCARCAOxK9or6FQxcLuzPGYQeMECqtNv1j0ZC8u9P0W0GNJVp0yeYt4cHziLHW7O%2BxamFnPnnS13F8bky3lfspAgAAAAAMAAAQAAAAAAAAAAAAAAAAAD5FLYx1pYO%2B%2BHscT5ahDZP%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADLmtENlA5glak6mKZ8RlGFud8haL7JU3yXg40aDBe7s9XGrm0hcfv%2BUa75S%2FBNizLRIC3uIp8m7LVm2W4Gys7NdNrE%3D&product=bitbucket) | A Bitbucket Cloud workspace; Premium to make the check *required* (otherwise it warns) |
+| Threatline for Jira (with Confluence) | [Install Threatline for Jira](https://developer.atlassian.com/console/install/13898a7c-6897-48d3-a512-079d9f9f5f00?signature=AYABeCcfIQJqGrR0SUgfCmoTNmEAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4CxqLTo9l4lqXuFjNim1xJM%2Bp%2F3TVP9xHS2BrU5DRRucB1BD8mEv4t3Ljf3OukSd5eQAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDEh%2BKItDcqUwro%2BHrQIBEIA7MA0KHRf%2BF3YuTEAMovFxVALBMAXOWvXwcePSrlXd8eWbO0Gu4PlzXePH9QGutTzgsBB7obWKVcKw55kAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHi9bVMAkme4qVQX1fQHo6ePw3H40A7cGfz7yrmSfBWMXgHlW5ynSsuhZ7zbqiK2sh%2B2AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMkPcTbpchY2MsayhfAgEQgDuWokoIpYBa88xi5ggk1L1JkcZBleXY2Fhu75VlWDzfTq%2FPjQu2HTJqqUvWAGr3gQmwdhbGrdneGDgHcgAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeDYASx0XCjkny4iLV6vz%2BKtEGSGT6kdt0QRpkn6D%2FlVEAbLrick3%2FS2k9TO8wl7jjBMAAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAwPyU3UXZLk3LyqQEcCARCAO56x65zN0k8TKW9hcCjB8AjClKyO30ptqnOAj2gX5CQsUchhHNyCLeBw5CSlVzbE5lnPkVzoFWWWPI9DAgAAAAAMAAAQAAAAAAAAAAAAAAAAAE5uz5LjAh1FnegGXQysekL%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADJlU7brRNHeEAgdUVuQgPgaQWe2H582mtCI1iAJ%2FP3ZS3ti2WQm0S86s3LQVssf56LpbJ8u0XxBB32s7u970Pyt6So%3D&product=jira&product=confluence) | Any Jira Cloud site (Threatline Engine needs no Rovo); Confluence on the same site for published pages |
+| Threatline for Bitbucket | [Install Threatline for Bitbucket](https://developer.atlassian.com/console/install/53a2efe5-9150-4e9a-b869-8bd2605d64e0?signature=AYABeKFrOdIp4KpSdnKGbGUBSkUAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4CxqLTo9l4lqXuFjNim1xJM%2Bp%2F3TVP9xHS2BrU5DRRucB43xQ8z0a40vUy92qFrbZsgAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDLmyoQqegXqdj1hpawIBEIA7KqL2Jq8dMqSVB%2BqLp%2BqmRoaoxpOLEOxAiir3VTO5e6sSe7s5CXVhfARMsp0c1HUiWcXegZaQ2afBrboAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHi9bVMAkme4qVQX1fQHo6ePw3H40A7cGfz7yrmSfBWMXgEputGsmrOJAk%2FkRTqjeiMVAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMkH7QJyZwcmbpFIVEAgEQgDsHAfyZkW2%2BSGje9GoN3d5v8W%2FjjNH6AZqGtivmtT6mifu72SeLpu3P6CtQdUhCniy4BntFoD0iOIC1nQAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeDYASx0XCjkny4iLV6vz%2BKtEGSGT6kdt0QRpkn6D%2FlVEAZJijhliY2wtihwZxY0ZFg4AAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAw8KYxq%2BOBFrXk5KjwCARCAOxK9or6FQxcLuzPGYQeMECqtNv1j0ZC8u9P0W0GNJVp0yeYt4cHziLHW7O%2BxamFnPnnS13F8bky3lfspAgAAAAAMAAAQAAAAAAAAAAAAAAAAAD5FLYx1pYO%2B%2BHscT5ahDZP%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADLmtENlA5glak6mKZ8RlGFud8haL7JU3yXg40aDBe7s9XGrm0hcfv%2BUa75S%2FBNizLRIC3uIp8m7LVm2W4Gys7NdNrE%3D&product=bitbucket) | A Bitbucket Cloud workspace; Premium to make the check *required* (otherwise it warns) |
 
 Install the Jira app into Jira and Confluence. In **Atlassian Administration → Apps → Rovo MCP**, allow the clients you
-want to use with Redline's MCP tools (optional).
+want to use with Threatline's MCP tools (optional).
 
 ## The 2-minute path
 
-1. **Open the admin page**: Jira settings → Apps → **Redline**. The first-run wizard asks for a project, the transition
+1. **Open the admin page**: Jira settings → Apps → **Threatline**. The first-run wizard asks for a project, the transition
    to guard (for example Done) and the security champion group. Save.
-2. **Add the gate**: in the project's workflow, add the rule **Redline security gate** (Marketplace rules) to the
+2. **Add the gate**: in the project's workflow, add the rule **Threatline security gate** (Marketplace rules) to the
    transition you chose.
 3. **Load the demo data**: admin page → **Demo data** → enter the project and a Confluence space → **Load demo data**.
    It creates an epic "Add AI support agent" with stories (order lookup, refunds), two incidents, and a design page
    with one poisoned paragraph that tells the AI to approve the change.
-4. **Nothing to set up for reviews.** Redline Engine (the default; Redline admin → **Review mode**) reviews every new
+4. **Nothing to set up for reviews.** Threatline Engine (the default; Threatline admin → **Review mode**) reviews every new
    story or epic itself on Atlassian-hosted Claude models. It takes two to four minutes: a quarantined extraction, three
-   independent analyses on the strongest model, then a verifier. To start one by hand: the work item → Redline panel →
+   independent analyses on the strongest model, then a verifier. To start one by hand: the work item → Threatline panel →
    **Run review**. (Prefer your site's Rovo agent? Choose **Rovo agent review** and follow "Rovo agent mode" below.)
-5. **Open the epic "Add AI support agent"**. Loading the demo queues its review; within three to four minutes the Redline panel shows:
+5. **Open the epic "Add AI support agent"**. Loading the demo queues its review; within three to four minutes the Threatline panel shows:
    - the risk score and why Done is blocked;
    - threats in plain language first, each with the quote it rests on and a link to its source;
    - a banner naming the design page as containing instructions aimed at the AI: they were treated as data, and the
@@ -42,33 +42,33 @@ want to use with Redline's MCP tools (optional).
 9. **Audit**: admin page → **Risk ledger** → **Verify the ledger**, and download an inclusion proof; check it offline
    with `node scripts/verify-ledger-proof.mjs proof.json`.
 
-Also worth a look: **Apps → Redline security posture** (and the dashboard gadget), the threat model published to
-Confluence (**History → Publish to Confluence**), and asking the **Redline** agent in Rovo chat "What do I need to fix
+Also worth a look: **Apps → Threatline security posture** (and the dashboard gadget), the threat model published to
+Confluence (**History → Publish to Confluence**), and asking the **Threatline** agent in Rovo chat "What do I need to fix
 before this can merge?".
 
 ## Rovo agent mode (optional)
 
 Create an Automation rule in the project: *Work item created* (condition: type is Story or Epic) → **Use agent:
-Redline** with **Let this agent take actions** on, three times. Connect Automation to Rovo when asked. Then, under
+Threatline** with **Let this agent take actions** on, three times. Connect Automation to Rovo when asked. Then, under
 **Review mode → Who can submit AI review runs**, choose **Only these accounts** and click **Use** next to the account
 that ran the rule.
 
 ## If a review never arrives
 
-- **The site has no Rovo** (for example a free developer site): Redline admin → **Review mode** → **Rule-based checks
-  only** → Save. Every review then completes at once from Redline's built-in checks (no Rovo, no Automation rules), the
+- **The site has no Rovo** (for example a free developer site): Threatline admin → **Review mode** → **Rule-based checks
+  only** → Save. Every review then completes at once from Threatline's built-in checks (no Rovo, no Automation rules), the
   panel says "Rule-based review", and the Done gate, requirements, acceptances and merge attestations work the same.
   Then click **Run review on this work item** in the panel.
 - **Automation audit log says "The agent selected for this rule has been deactivated"**: an app update replaced the
-  Redline agent. Open the rule, and in each **Use agent** step choose **⋯ → Switch agent → Redline**, then save.
+  Threatline agent. Open the rule, and in each **Use agent** step choose **⋯ → Switch agent → Threatline**, then save.
 - **Reviews time out and the risk ledger shows `review.sample_rejected`**: the Automation rule runs as an account that
-  is not a review author. Add it under Redline admin → **Review mode → Who can submit AI review runs**.
-- **The Redline panel is not on a work item**: add it once from the apps button under the work item title
-  (**Redline security review**).
+  is not a review author. Add it under Threatline admin → **Review mode → Who can submit AI review runs**.
+- **The Threatline panel is not on a work item**: add it once from the apps button under the work item title
+  (**Threatline security review**).
 - **Load demo data says the Confluence space was not found**: create a space (any name) and enter its key.
 - **Run review on this work item does nothing for a long time**: the re-run needs a second Automation rule with the
   trigger *Field value changed → Labels → Value added*, condition `{{issue.labels}}` contains `redline-review`, and the
-  same three **Use agent: Redline** steps.
+  same three **Use agent: Threatline** steps.
 
 ## Without a Jira site
 
@@ -83,4 +83,4 @@ pnpm redline eval --llm recorded --subset 30     # replay the recorded eval offl
 ```
 
 Screenshots of every surface are in [screenshots/](screenshots/README.md); the design in [ARCHITECTURE.md](ARCHITECTURE.md);
-Redline's own threat model in [SECURITY_REVIEW.md](SECURITY_REVIEW.md).
+Threatline's own threat model in [SECURITY_REVIEW.md](SECURITY_REVIEW.md).

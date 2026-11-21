@@ -133,11 +133,11 @@ describe('admin.getPolicy / admin.setPolicy', () => {
 });
 
 describe('admin.warnOnly (ledgered, at most 14 days)', () => {
-  it('rejects 20 days, and a project Redline is not enabled for', async () => {
+  it('rejects 20 days, and a project Threatline is not enabled for', async () => {
     const r = await reviewed();
     expect(await adminWarnOnly(r.t.deps, A, { projectKey: 'PAY', days: 20 })).toEqual({ error: 'validation', message: 'Warn-only lasts 1 to 14 days.' });
     expect(await adminWarnOnly(r.t.deps, A, { projectKey: 'PAY', days: 0 })).toMatchObject({ error: 'validation' });
-    expect(await adminWarnOnly(r.t.deps, A, { projectKey: 'OPS', days: 3 })).toEqual({ error: 'validation', message: 'Redline is not turned on for OPS.' });
+    expect(await adminWarnOnly(r.t.deps, A, { projectKey: 'OPS', days: 3 })).toEqual({ error: 'validation', message: 'Threatline is not turned on for OPS.' });
     expect((await policyOf(r)).warnOnly).toEqual([]);
   });
 
@@ -310,10 +310,10 @@ describe('admin.purgeProject (privacy: delete a project’s reviews)', () => {
     expect(await adminPurgeProject(r.t.deps, A, { projectKey: 'OLD', confirm: 'old' })).toEqual({ error: 'validation', message: 'Type OLD to confirm. This cannot be undone.' });
     expect(r.t.purgedProjects).toEqual([]);
   });
-  it('refuses a project Redline still reviews, because its gate would then block every work item', async () => {
+  it('refuses a project Threatline still reviews, because its gate would then block every work item', async () => {
     const r = await reviewed();
     const res = await adminPurgeProject(r.t.deps, A, { projectKey: 'PAY', confirm: 'PAY' });
-    expect(res).toEqual({ error: 'validation', message: 'Redline still reviews PAY. Turn it off under Projects and transitions first, then purge.' });
+    expect(res).toEqual({ error: 'validation', message: 'Threatline still reviews PAY. Turn it off under Projects and transitions first, then purge.' });
     expect(r.t.purgedProjects).toEqual([]);
   });
   it('ledgers the purge first, then deletes, and reports the counts', async () => {

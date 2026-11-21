@@ -43,14 +43,14 @@ export function IssuePanel({ api }: { api: PanelApi }) {
         setError(
           r.error === 'not_found'
             ? 'You do not have access to this work item.'
-            : 'Redline is unavailable right now. Try again in a minute.',
+            : 'Threatline is unavailable right now. Try again in a minute.',
         );
       else {
         setDto(r);
         setError(null);
       }
     } catch {
-      setError('Redline is unavailable right now. Try again in a minute.');
+      setError('Threatline is unavailable right now. Try again in a minute.');
     }
   }, [api]);
 
@@ -100,7 +100,7 @@ export function IssuePanel({ api }: { api: PanelApi }) {
 
   if (error)
     return (
-      <SectionMessage appearance="error" title="Redline">
+      <SectionMessage appearance="error" title="Threatline">
         {error}
       </SectionMessage>
     );
@@ -138,14 +138,14 @@ export function IssuePanel({ api }: { api: PanelApi }) {
         <>
           <Header dto={dto} {...(canRun ? { onRerun: () => void rerun() } : {})} busy={busy} />
           {dto.review && dto.review.modelIds.some((m) => m.startsWith('claude')) && (
-            <SectionMessage appearance="discovery" title="Redline Engine review">
-              Redline ran this review itself: independent analyses of the work item and its pages that must agree and quote their evidence word for word,
+            <SectionMessage appearance="discovery" title="Threatline Engine review">
+              Threatline ran this review itself: independent analyses of the work item and its pages that must agree and quote their evidence word for word,
               and a verifier that checks each threat against those quotes. Models: {dto.review.modelIds.join(', ')}.
             </SectionMessage>
           )}
           {dto.review?.modelIds.includes('redline-rules') && (
             <SectionMessage appearance="information" title="Rule-based review">
-              AI review is off on this site, so these threats come from Redline's built-in checks only. An admin can turn on AI review under Redline admin → Review mode once Rovo is available.
+              AI review is off on this site, so these threats come from Threatline's built-in checks only. An admin can turn on AI review under Threatline admin → Review mode once Rovo is available.
             </SectionMessage>
           )}
           {dto.review && <WhatIf api={api} />}
@@ -164,7 +164,7 @@ export function IssuePanel({ api }: { api: PanelApi }) {
                 </SectionMessageAction>,
               ]}
             >
-              Redline could not finish this review, so Done and merge stay blocked until it runs again.
+              Threatline could not finish this review, so Done and merge stay blocked until it runs again.
             </SectionMessage>
           )}
           {view.state === 'timeout' && (
@@ -235,7 +235,7 @@ export function IssuePanel({ api }: { api: PanelApi }) {
             </SectionMessage>
           )}
           {injected.length > 0 && (
-            <SectionMessage appearance="warning" title="Redline ignored instructions found in this page">
+            <SectionMessage appearance="warning" title="Threatline ignored instructions found in this page">
               <p style={{ margin: '0 0 6px' }}>
                 These sources contain text aimed at the AI. It was treated as data, and threats based on it need a
                 security champion.

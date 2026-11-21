@@ -98,7 +98,7 @@ export function Budgets(props: PolicySectionProps) {
           <Labeled text="Input tokens per review">{(fid) => <input id={fid} type="number" min={1} value={tokensIn} onChange={(e) => setTokensIn(e.target.value)} style={field} />}</Labeled>
           <Labeled text="Output tokens per review">{(fid) => <input id={fid} type="number" min={1} value={tokensOut} onChange={(e) => setTokensOut(e.target.value)} style={field} />}</Labeled>
         </div>
-        <span style={hint}>Token caps limit each Redline Engine review (its Forge LLM calls are billed to the app's developer). Rovo agent reviews run on the site's Rovo credits.</span>
+        <span style={hint}>Token caps limit each Threatline Engine review (its Forge LLM calls are billed to the app's developer). Rovo agent reviews run on the site's Rovo credits.</span>
       </PolicyForm>
     </section>
   );

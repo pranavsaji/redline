@@ -2,7 +2,7 @@ import { kvs } from '@forge/kvs';
 import { DEFAULT_SITE_POLICY } from '@redline/core';
 import { appError, err, ok, SitePolicySchema, type Result, type SitePolicy } from '@redline/shared';
 
-/** The subset of `@forge/kvs` Redline uses. Injected so tests run against an in-memory map. */
+/** The subset of `@forge/kvs` Threatline uses. Injected so tests run against an in-memory map. */
 export interface KvsPort {
   get<T>(key: string): Promise<T | undefined>;
   set<T>(key: string, value: T): Promise<void>;

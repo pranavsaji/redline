@@ -43,11 +43,11 @@ export async function requestAttestation(deps: CoreDeps, i: { issueKey: string; 
   const refreshed = await refreshVerdict(deps, issue.value.id);
   if (!refreshed.ok && refreshed.error.code === 'not_found') return refreshed;
   const verdict = await storedVerdict(deps, issue.value.id);
-  if (!verdict) return ok({ blocking: [{ code: 'review_failed', message: 'Redline could not read this work item’s security verdict. Re-run the review from the Redline panel.' }] });
+  if (!verdict) return ok({ blocking: [{ code: 'review_failed', message: 'Threatline could not read this work item’s security verdict. Re-run the review from the Threatline panel.' }] });
   if (verdict.state === 'block') return ok({ blocking: verdict.reasons });
   // Final review C1: an unreviewed item's free pass must not become a merge attestation for sensitive changes.
   if (verdict.unreviewed)
-    return ok({ blocking: [{ code: 'no_review', message: `Redline does not review ${issue.value.key} (its project or issue type is not enabled), so it cannot attest a merge. Name the reviewed story or epic in the pull request and request the attestation there.` }] });
+    return ok({ blocking: [{ code: 'no_review', message: `Threatline does not review ${issue.value.key} (its project or issue type is not enabled), so it cannot attest a merge. Name the reviewed story or epic in the pull request and request the attestation there.` }] });
 
   const [policy, requirements, key, latest] = await Promise.all([deps.config.site(), deps.requirements.forIssue(issue.value.id), deps.keys.active(), deps.reviews.latest(issue.value.id)]);
   if (!policy.ok) return policy;
@@ -79,5 +79,5 @@ export async function requestAttestation(deps: CoreDeps, i: { issueKey: string; 
   if (!row.ok) return row;
   const rec = await deps.attestations.record({ id: `att_${p.nonce}`, issueKey: p.issueKey, repo: p.repo, commitSha: p.commitSha, kid: p.kid, expiresAt, nonce: p.nonce });
   if (!rec.ok) return rec;
-  return ok({ token: signed.value.token, expiresAt, prDescriptionSnippet: `Redline attestation for ${p.issueKey} (expires ${utcMinute(expiresAt)}):\n${signed.value.token}` });
+  return ok({ token: signed.value.token, expiresAt, prDescriptionSnippet: `Threatline attestation for ${p.issueKey} (expires ${utcMinute(expiresAt)}):\n${signed.value.token}` });
 }

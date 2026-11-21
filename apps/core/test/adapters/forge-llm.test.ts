@@ -5,7 +5,7 @@ const req = { system: 'sys', user: 'usr', tier: 'deep' as const, maxOutputTokens
 const reply = (text: string, usage = { input_tokens: 12, output_tokens: 34 }) => ({ choices: [{ finish_reason: 'stop', message: { role: 'assistant' as const, content: text } }], usage });
 const apiError = (status: number) => Object.assign(new Error('x'), { name: 'ForgeLlmAPIError', status, code: 'MODEL_UNAVAILABLE' });
 
-describe('forgeLlm (Redline Engine on Forge LLMs)', () => {
+describe('forgeLlm (Threatline Engine on Forge LLMs)', () => {
   it('sends the system prompt as a system message, caps output, and reports the model and token counts', async () => {
     const calls: unknown[] = [];
     const llm = forgeLlm({ fast: ['f'], balanced: ['b'], deep: ['opus-x'] }, async (p) => (calls.push(p), reply('{"threats":[]}')));

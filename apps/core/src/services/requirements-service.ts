@@ -30,7 +30,7 @@ const para = (...content: AdfNode[]): AdfNode => ({ type: 'paragraph', content }
  * itself, the body stays neutral (the sub-task is visible to everyone who can see the work item).
  */
 export function requirementDescription(req: Requirement, o: { issueKey: string; revision: number; panelUrl: string; safe: boolean }): AdfDoc {
-  const content: AdfNode[] = [para(text(`Security requirement from the Redline review of ${o.issueKey} (revision ${o.revision}). Severity: ${req.severity}.`))];
+  const content: AdfNode[] = [para(text(`Security requirement from the Threatline review of ${o.issueKey} (revision ${o.revision}). Severity: ${req.severity}.`))];
   if (o.safe) {
     content.push({ type: 'heading', attrs: { level: 3 }, content: [text('Acceptance criteria')] });
     content.push({
@@ -38,13 +38,13 @@ export function requirementDescription(req: Requirement, o: { issueKey: string; 
       content: req.criteria.map((c) => ({ type: 'listItem', content: [para(text(`Given ${c.given}, when ${c.when}, then ${c.then}.`))] })),
     });
   } else {
-    content.push(para(text('This requirement comes from sources that not everyone who can see this work item can open. Read it in the Redline panel.')));
+    content.push(para(text('This requirement comes from sources that not everyone who can see this work item can open. Read it in the Threatline panel.')));
   }
   if (req.asvsIds.length > 0) content.push(para(text(`OWASP ASVS 5.0: ${req.asvsIds.join(', ')}`)));
   content.push(
     para(
       text('Close it in the '),
-      { type: 'text', text: 'Redline panel', marks: [{ type: 'link', attrs: { href: o.panelUrl } }] },
+      { type: 'text', text: 'Threatline panel', marks: [{ type: 'link', attrs: { href: o.panelUrl } }] },
       text(' with evidence: a PR link, a test file path, a Confluence section, or a note.'),
     ),
   );
@@ -113,7 +113,7 @@ export async function createRequirementSubtasks(
       typeId = type.value;
     }
     const safe = citesOnlyTheWorkItem(t, facts.value, issue.id);
-    const summary = safe ? req.title : `Redline ${req.severity} security requirement (${STRIDE_LABEL[t.stride]})`;
+    const summary = safe ? req.title : `Threatline ${req.severity} security requirement (${STRIDE_LABEL[t.stride]})`;
     const sub = await deps.jira.createSubtask(issue.id, {
       summary: summary.slice(0, 255),
       description: requirementDescription(req, { issueKey: issue.key, revision: review.revision, panelUrl, safe }),
@@ -169,7 +169,7 @@ export async function setRequirementStatus(
   v: Viewer,
   input: { requirementId: string; status: RequirementStatus; evidence?: { kind: Evidence['kind']; ref: string } },
 ): Promise<Result<Requirement>> {
-  if (input.status === 'AcceptedRisk') return err(appError('validation', 'Request a risk acceptance in the Redline panel instead.'));
+  if (input.status === 'AcceptedRisk') return err(appError('validation', 'Request a risk acceptance in the Threatline panel instead.'));
   const got = await deps.requirements.get(input.requirementId);
   if (!got.ok) return got;
   const req = got.value;

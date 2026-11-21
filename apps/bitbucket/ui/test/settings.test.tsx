@@ -17,18 +17,18 @@ const api = (over: Partial<SettingsApi> = {}): SettingsApi => ({ get: async () =
 describe('Repository settings (Task 27)', () => {
   it('shows the saved keys, paths, mode and threshold', async () => {
     render(<RepoSettings api={api()} />);
-    const form = await screen.findByRole('form', { name: 'Redline settings' });
+    const form = await screen.findByRole('form', { name: 'Threatline settings' });
     // The form renders (disabled) before the settings arrive; wait for the loaded values.
-    await waitFor(() => expect((within(form).getByRole('textbox', { name: /Redline public keys/ }) as HTMLTextAreaElement).value).toBe(key.publicKey));
+    await waitFor(() => expect((within(form).getByRole('textbox', { name: /Threatline public keys/ }) as HTMLTextAreaElement).value).toBe(key.publicKey));
     expect((within(form).getByRole('textbox', { name: /Extra sensitive paths/ }) as HTMLTextAreaElement).value).toBe('billing/**');
     expect((within(form).getByRole('radio', { name: /Block/ }) as HTMLInputElement).checked).toBe(true);
     expect((within(form).getByRole('spinbutton', { name: /Diff score threshold/ }) as HTMLInputElement).value).toBe('40');
   });
 
   it('saves the form and reports the server’s validation message', async () => {
-    const save = vi.fn().mockResolvedValueOnce({ error: 'validation', message: 'Public key on line 1 is not a Redline public key.' }).mockResolvedValueOnce({ ...saved, mode: 'warn' });
+    const save = vi.fn().mockResolvedValueOnce({ error: 'validation', message: 'Public key on line 1 is not a Threatline public key.' }).mockResolvedValueOnce({ ...saved, mode: 'warn' });
     render(<RepoSettings api={api({ save })} />);
-    const form = await screen.findByRole('form', { name: 'Redline settings' });
+    const form = await screen.findByRole('form', { name: 'Threatline settings' });
     await userEvent.click(within(form).getByRole('radio', { name: /Warn/ }));
     await userEvent.click(within(form).getByRole('button', { name: 'Save' }));
     expect(save).toHaveBeenCalledWith({ publicKeys: key.publicKey, sensitivePaths: 'billing/**', mode: 'warn', diffScoreThreshold: 40 });
@@ -40,20 +40,20 @@ describe('Repository settings (Task 27)', () => {
 
   it('a failed load says so (not "could not save")', async () => {
     render(<RepoSettings api={api({ get: async () => ({ error: 'unavailable' }) })} />);
-    expect(await screen.findByText('Redline could not load this repository’s settings. Reload the page to try again.')).toBeTruthy();
+    expect(await screen.findByText('Threatline could not load this repository’s settings. Reload the page to try again.')).toBeTruthy();
   });
 
   it('a non-admin sees the server’s refusal', async () => {
-    render(<RepoSettings api={api({ save: async () => ({ error: 'forbidden', message: 'Only a repository admin can change Redline settings.' }) })} />);
-    const form = await screen.findByRole('form', { name: 'Redline settings' });
+    render(<RepoSettings api={api({ save: async () => ({ error: 'forbidden', message: 'Only a repository admin can change Threatline settings.' }) })} />);
+    const form = await screen.findByRole('form', { name: 'Threatline settings' });
     await userEvent.click(within(form).getByRole('button', { name: 'Save' }));
-    expect(await within(form).findByText('Only a repository admin can change Redline settings.')).toBeTruthy();
+    expect(await within(form).findByText('Only a repository admin can change Threatline settings.')).toBeTruthy();
   });
 
   it.each(['light', 'dark'])('has no axe violations (%s)', async (mode) => {
     document.documentElement.setAttribute('data-color-mode', mode);
     const { container } = render(<RepoSettings api={api()} />);
-    await screen.findByRole('form', { name: 'Redline settings' });
+    await screen.findByRole('form', { name: 'Threatline settings' });
     const results = await axe.run(container, { rules: { 'color-contrast': { enabled: false } } });
     expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
   });
@@ -70,7 +70,7 @@ describe('Test a pasted attestation (in the browser)', () => {
     render(<RepoSettings api={api()} />);
     const box = await screen.findByRole('form', { name: 'Test an attestation' });
     await userEvent.click(within(box).getByRole('textbox', { name: 'Attestation' }));
-    await userEvent.paste(`Redline attestation for PAY-7:\n${token}`);
+    await userEvent.paste(`Threatline attestation for PAY-7:\n${token}`);
     await userEvent.click(within(box).getByRole('button', { name: 'Test' }));
     expect(within(box).getByRole('status').textContent).toMatch(/Valid: PAY-7 on acme\/payments, commit ccccccc, 1 requirement verified, expires/);
   });

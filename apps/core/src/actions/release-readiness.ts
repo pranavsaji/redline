@@ -58,7 +58,7 @@ export async function getReleaseReadiness(payload: ActionPayload & Record<string
         state: 'block',
         blockingCount: 0,
         maxOpenSeverity: null,
-        reasons: [{ code: 'no_review', message: `${i.key} has no Redline review yet` }],
+        reasons: [{ code: 'no_review', message: `${i.key} has no Threatline review yet` }],
         inheritedFrom: [],
         updatedAt: now.toISOString(),
       };
@@ -74,7 +74,7 @@ export async function getReleaseReadiness(payload: ActionPayload & Record<string
   const notes = [
     ...(hidden > 0 ? [`${hidden} accepted risk${hidden === 1 ? '' : 's'} on a requirement you cannot see`] : []),
     // An empty or misspelt version must not read as "Go".
-    ...(items.length === 0 ? [`No work items you can see in fix version ${fixVersion} are reviewed by Redline; check the version name`] : []),
+    ...(items.length === 0 ? [`No work items you can see in fix version ${fixVersion} are reviewed by Threatline; check the version name`] : []),
   ];
   const r = { ...base, conditions: [...base.conditions, ...notes], call: base.call === 'Go' && notes.length > 0 ? ('Conditional' as const) : base.call };
   const keyOf = new Map(items.map((i) => [i.issueId, i.issueKey]));

@@ -1,5 +1,5 @@
 /**
- * Local end-to-end harness (Task 34). Serves Redline's real resolver table, the real Rovo actions the agent calls and
+ * Local end-to-end harness (Task 34). Serves Threatline's real resolver table, the real Rovo actions the agent calls and
  * the real Done validator over in-memory Atlassian fakes (apps/core/test/support), so the Playwright journeys drive the
  * actual UI against the actual services, verdict logic, ledger and signing. Only Jira, Confluence, Rovo and the clock
  * are simulated. Never deployed; listens on localhost only.
@@ -23,7 +23,7 @@ export const ISSUE_KEY = 'PAY-7';
 /** Signed-in users: a developer who is also a tech lead, a security champion, a Jira admin, and the Rovo agent. */
 export const USERS = { dev: 'acc-dev', champion: 'acc-champ', admin: 'acc-admin', agent: 'acc-agent' } as const;
 
-/** What the Redline agent proposes in each of its three runs (it quotes the work item word for word). */
+/** What the Threatline agent proposes in each of its three runs (it quotes the work item word for word). */
 const AGENT_MODEL = {
   schema: 'redline.threatmodel.v1',
   issueKey: ISSUE_KEY,
@@ -63,7 +63,7 @@ const routes: Record<string, (body: Record<string, unknown>) => Promise<unknown>
     }
     return { saved };
   },
-  /** Redline's own trigger on a new work item (gather), with no agent runs: what a site without Rovo sees. */
+  /** Threatline's own trigger on a new work item (gather), with no agent runs: what a site without Rovo sees. */
   gather: async () => {
     await handleJob(t.deps, { kind: 'gather', issueId: ISSUE_ID, reason: 'created' });
     await settle();
@@ -80,7 +80,7 @@ const routes: Record<string, (body: Record<string, unknown>) => Promise<unknown>
   /** The workflow validator on the guarded transition (Done). */
   transition: async (b) => validateTransition(t.deps, { issue: { key: String(b.issueKey ?? ISSUE_KEY) } }),
   /**
-   * Bitbucket's real merge check on a pull request that changes a payments file, trusting this harness's Redline
+   * Bitbucket's real merge check on a pull request that changes a payments file, trusting this harness's Threatline
    * signing keys (as an admin would paste them into the repository settings).
    */
   'merge-check': async (b) => {
@@ -130,4 +130,4 @@ createServer(async (req, res) => {
   } catch (e) {
     send(res, 500, { error: 'internal', message: e instanceof Error ? e.message : String(e) });
   }
-}).listen(PORT, '127.0.0.1', () => console.log(`Redline e2e harness on http://localhost:${PORT}`));
+}).listen(PORT, '127.0.0.1', () => console.log(`Threatline e2e harness on http://localhost:${PORT}`));

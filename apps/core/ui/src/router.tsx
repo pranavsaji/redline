@@ -3,7 +3,7 @@ import { AdminPage } from './admin/AdminPage.js';
 import { IssuePanel } from './panel/IssuePanel.js';
 import { PostureDashboard } from './posture/PostureDashboard.js';
 
-/** One UI bundle serves every Redline surface; the module key picks the view. */
+/** One UI bundle serves every Threatline surface; the module key picks the view. */
 export function Router({ moduleKey, api, admin, posture }: { moduleKey: string; api: PanelApi; admin: AdminApi; posture: PostureApi }) {
   switch (moduleKey) {
     case 'redline-admin':

@@ -41,6 +41,6 @@ export async function requestRiskAcceptance(payload: ActionPayload & Record<stri
     needsApprover,
     approver,
     entryHash: r.value.entryHash,
-    message: `Requested a ${input.value.expiryDays}-day risk acceptance on ${found.value.subtaskKey ?? found.value.id} (${found.value.severity}). It is recorded in Redline's ledger and needs ${approver} to approve it in the Redline panel: ${await issueUrl(deps, who.issue.key)}`,
+    message: `Requested a ${input.value.expiryDays}-day risk acceptance on ${found.value.subtaskKey ?? found.value.id} (${found.value.severity}). It is recorded in Threatline's ledger and needs ${approver} to approve it in the Threatline panel: ${await issueUrl(deps, who.issue.key)}`,
   };
 }

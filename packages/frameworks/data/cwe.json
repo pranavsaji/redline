@@ -1,5 +1,5 @@
 {
-  "source": "https://cwe.mitre.org/ (curated subset: CWE Top 25 plus weaknesses Redline maps to)",
+  "source": "https://cwe.mitre.org/ (curated subset: CWE Top 25 plus weaknesses Threatline maps to)",
   "items": [
     { "id": "CWE-20", "title": "Improper Input Validation" },
     { "id": "CWE-22", "title": "Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')" },

@@ -69,7 +69,7 @@ export interface JiraClient {
   projectStatuses(projectKey: string): Promise<Result<string[]>>;
   ensureComponent(projectKey: string, name: string): Promise<Result<void>>;
   createIssue(f: { projectId: string; issueTypeId: string; summary: string; description: AdfDoc; labels: string[]; components?: string[]; parentId?: string }): Promise<Result<{ id: string; key: string }>>;
-  /** The project's sub-task issue type id (Redline requirements are created as sub-tasks). */
+  /** The project's sub-task issue type id (Threatline requirements are created as sub-tasks). */
   subtaskType(projectId: string): Promise<Result<string>>;
   createSubtask(parentId: string, fields: { summary: string; description: AdfDoc; labels: string[]; issueTypeId: string }): Promise<Result<{ id: string; key: string }>>;
   addLabel(issueId: string, label: string): Promise<Result<void>>;

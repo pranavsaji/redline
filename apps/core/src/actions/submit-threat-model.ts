@@ -101,7 +101,7 @@ export async function submitThreatModel(payload: ActionPayload & { issueKey?: un
   // cannot write their own work item's threat model. The refusal is ledgered with who tried.
   const policy = await deps.config.site();
   if (!policy.ok) return deny('policy_unavailable', 'unavailable');
-  // Redline Engine writes this site's reviews itself; agent runs are not part of them.
+  // Threatline Engine writes this site's reviews itself; agent runs are not part of them.
   if (policy.value.reviewMode === 'engine') return deny('engine_mode', 'engine_mode');
   const authors = policy.value.reviewAuthors ?? [];
   if (authors.length > 0 && !authors.includes(caller)) {

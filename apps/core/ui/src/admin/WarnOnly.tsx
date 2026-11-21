@@ -31,10 +31,10 @@ export function WarnOnly({ api, policy, onChanged }: { api: AdminApi; policy: Si
         Warn-only mode
       </h2>
       <p style={hint}>
-        While a project is in warn-only mode, Redline shows what would block but lets Done and merges through. It ends by itself after at most {MAX_DAYS} days. Every switch is recorded in the risk ledger.
+        While a project is in warn-only mode, Threatline shows what would block but lets Done and merges through. It ends by itself after at most {MAX_DAYS} days. Every switch is recorded in the risk ledger.
       </p>
       {policy.enabledProjects.length === 0 ? (
-        <p style={{ margin: 0 }}>Turn Redline on for a project first.</p>
+        <p style={{ margin: 0 }}>Turn Threatline on for a project first.</p>
       ) : (
         <ul aria-label="Warn-only by project" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
           {policy.enabledProjects.map((p) => (

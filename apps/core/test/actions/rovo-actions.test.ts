@@ -144,7 +144,7 @@ describe('get-security-requirements', () => {
     if ('error' in r) throw new Error(r.error);
     const dto = r.requirements.find((x) => x.id === req.id)!;
     expect(dto.testSkeleton).toMatch(/^def test_/m);
-    expect(dto.testSkeleton).toContain(`Redline requirement ${req.id}`);
+    expect(dto.testSkeleton).toContain(`Threatline requirement ${req.id}`);
     expect(dto).toMatchObject({ dueDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/), overdueDays: 0 });
     const plain = await getSecurityRequirements({ issueKey: 'PAY-7', status: 'Open', ...ctx(ME) }, t.deps);
     if ('error' in plain) throw new Error(plain.error);
@@ -279,7 +279,7 @@ describe('release-readiness', () => {
     if ('error' in r) throw new Error(r.error);
     expect(r.items).toBe(0);
     expect(r.call).toBe('Conditional');
-    expect(r.conditions.join(' ')).toMatch(/No work items you can see in fix version 9\.9 are reviewed by Redline/);
+    expect(r.conditions.join(' ')).toMatch(/No work items you can see in fix version 9\.9 are reviewed by Threatline/);
   });
 
   it('Go when everything passes; an enabled-project item with no review blocks (fail closed)', async () => {

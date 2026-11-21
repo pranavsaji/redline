@@ -14,7 +14,7 @@ describe('Done gate (jira:workflowValidator, EN-2)', () => {
     const t = coreDeps();
     await handleJob(t.deps, { kind: 'gather', issueId: ISSUE, reason: 'created' });
     const out = await validateTransition(t.deps, args());
-    expect(out).toEqual({ result: false, errorMessage: expect.stringMatching(/^Redline blocks Done: .*Open the Redline panel: https:\/\/one-atlas-mefc\.atlassian\.net\/browse\/PAY-7$/) });
+    expect(out).toEqual({ result: false, errorMessage: expect.stringMatching(/^Threatline blocks Done: .*Open the Threatline panel: https:\/\/one-atlas-mefc\.atlassian\.net\/browse\/PAY-7$/) });
   });
 
   it('records the project it ran on, for the setup checklist', async () => {
@@ -33,13 +33,13 @@ describe('Done gate (jira:workflowValidator, EN-2)', () => {
   });
 
   it.each([
-    ['break-glass override', { state: 'pass', overridden: true, validUntil: '2026-11-15T11:00:00Z', message: 'Redline: no security requirements block this work item (break-glass override until 2026-11-15).' }],
+    ['break-glass override', { state: 'pass', overridden: true, validUntil: '2026-11-15T11:00:00Z', message: 'Threatline: no security requirements block this work item (break-glass override until 2026-11-15).' }],
     ['warn-only window', { state: 'warn', validUntil: '2026-11-15T11:00:00Z', message: 'warn' }],
   ])('security: a %s that has ended is recomputed and blocks (it does not stay open)', async (_name, stored) => {
     const t = coreDeps();
     await handleJob(t.deps, { kind: 'gather', issueId: ISSUE, reason: 'created' });
     t.kv.data.set(verdictKey(ISSUE), { blockingCount: 1, maxOpenSeverity: 'High', reasons: [], inheritedFrom: [], updatedAt: '2026-11-15T00:00:00Z', ...stored });
-    expect(await validateTransition(t.deps, args())).toEqual({ result: false, errorMessage: expect.stringMatching(/^Redline blocks Done: /) });
+    expect(await validateTransition(t.deps, args())).toEqual({ result: false, errorMessage: expect.stringMatching(/^Threatline blocks Done: /) });
     expect((t.kv.data.get(verdictKey(ISSUE)) as { state: string }).state).toBe('block');
   });
 
@@ -70,7 +70,7 @@ describe('Done gate (jira:workflowValidator, EN-2)', () => {
     const t = coreDeps();
     await handleJob(t.deps, { kind: 'gather', issueId: ISSUE, reason: 'created' });
     t.kv.data.set(verdictKey(ISSUE), { state: 'block', blockingCount: 1, reasons: [] });
-    expect(await validateTransition(t.deps, args())).toEqual({ result: false, errorMessage: expect.stringMatching(/^Redline blocks Done: /) });
+    expect(await validateTransition(t.deps, args())).toEqual({ result: false, errorMessage: expect.stringMatching(/^Threatline blocks Done: /) });
   });
 
   it('a not-applicable issue type passes once its verdict is computed', async () => {
@@ -79,7 +79,7 @@ describe('Done gate (jira:workflowValidator, EN-2)', () => {
     expect(await validateTransition(t.deps, args({ key: 'PAY-9', id: '10050' }))).toEqual({ result: true });
   });
 
-  it('a work item in a project Redline is not enabled for passes (a shared workflow must not block other projects)', async () => {
+  it('a work item in a project Threatline is not enabled for passes (a shared workflow must not block other projects)', async () => {
     const other = jiraIssue({ id: '10060', key: 'OPS-1', project: { id: '10001', key: 'OPS' } });
     const t = coreDeps({ issues: [other] });
     expect(await validateTransition(t.deps, args({ key: 'OPS-1', id: '10060' }))).toEqual({ result: true });

@@ -19,7 +19,7 @@ export function decodeAttestation(
   skewSec = 300,
 ): Result<AttestationPayload, { code: AttestationError; message: string }> {
   const fail = (code: AttestationError, message: string) => err({ code, message });
-  if (!token.startsWith(ATTESTATION_PREFIX)) return fail('malformed', 'not a Redline v1 attestation');
+  if (!token.startsWith(ATTESTATION_PREFIX)) return fail('malformed', 'not a Threatline v1 attestation');
   const parts = token.slice(ATTESTATION_PREFIX.length).split('.');
   if (parts.length !== 2) return fail('malformed', 'expected payload and signature segments');
   const [body, sig] = parts as [string, string];
@@ -32,7 +32,7 @@ export function decodeAttestation(
     return fail('malformed', 'payload is not JSON');
   }
   const kid = typeof raw === 'object' && raw !== null ? (raw as { kid?: unknown }).kid : undefined;
-  if (Object.keys(publicKeys).length === 0) return fail('unknown_key', 'no trusted Redline public keys are configured');
+  if (Object.keys(publicKeys).length === 0) return fail('unknown_key', 'no trusted Threatline public keys are configured');
   const pub = typeof kid === 'string' ? publicKeys[kid] : undefined;
   // An unrecognised key id is indistinguishable from a tampered kid field, so it is reported as an invalid signature.
   if (!pub) return fail('bad_signature', 'signature invalid (signing key not trusted)');

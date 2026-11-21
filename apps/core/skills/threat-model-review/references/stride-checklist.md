@@ -44,4 +44,4 @@ Use these questions to read a design or a change the way an attacker would. A th
 
 ## Severity
 
-Score likelihood and impact from 1 to 5 each. Redline derives severity from both. Prefer a few concrete, well-cited threats over many vague ones.
+Score likelihood and impact from 1 to 5 each. Threatline derives severity from both. Prefer a few concrete, well-cited threats over many vague ones.

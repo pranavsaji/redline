@@ -7,7 +7,7 @@ import { box, errorText as errorStyle, field } from '../panel/form-styles.js';
 import { count } from '../text.js';
 import { h2, hint, Labeled, sectionStyle } from './policy-editor.js';
 
-/** Privacy: what Redline keeps and for how long, and a purge for a project Redline no longer reviews. */
+/** Privacy: what Threatline keeps and for how long, and a purge for a project Threatline no longer reviews. */
 export function DataRetention({ api }: { api: AdminApi }) {
   const id = useId();
   const [key, setKey] = useState('');
@@ -38,7 +38,7 @@ export function DataRetention({ api }: { api: AdminApi }) {
         Data retention
       </h2>
       <p style={hint}>
-        Redline keeps reviews and the work item and page text they quote for 400 days, then deletes them. The risk ledger and attestations are kept for the life of the app, because they are the audit trail. To delete a project's reviews sooner, turn Redline off for it, then purge it here.
+        Threatline keeps reviews and the work item and page text they quote for 400 days, then deletes them. The risk ledger and attestations are kept for the life of the app, because they are the audit trail. To delete a project's reviews sooner, turn Threatline off for it, then purge it here.
       </p>
       <form aria-label="Purge a project" onSubmit={purge} style={box}>
         <Labeled text="Project key">{(fid) => <input id={fid} value={key} onChange={(e) => setKey(e.target.value)} placeholder="OLD" style={{ ...field, maxWidth: 200 }} />}</Labeled>

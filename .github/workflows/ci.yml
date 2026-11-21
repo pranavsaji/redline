@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      # Runs the committed bundle against this pull request through GitHub's API. Redline's own pull requests are not
+      # Runs the committed bundle against this pull request through GitHub's API. Threatline's own pull requests are not
       # gated (no attestations exist for this repository), so only check that it ran and reported a known outcome.
       - id: gate
         uses: ./apps/github-action
@@ -71,7 +71,7 @@ jobs:
         run: pnpm audit --prod --audit-level high
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with: { python-version: '3.12' }
-      - name: semgrep (Redline rules + registry rulesets; --config auto needs metrics on, so the rulesets are named)
+      - name: semgrep (Threatline rules + registry rulesets; --config auto needs metrics on, so the rulesets are named)
         run: |
           pip install --quiet semgrep
           semgrep scan --config .semgrep.yml --config p/default --config p/typescript --config p/react --config p/secrets \

@@ -10,7 +10,7 @@ const kvs = async (): Promise<SettingsKvs> => {
   return { get: (k) => store.get(k) as never, set: (k, v) => store.set(k, v as never) };
 };
 
-/** bitbucket:mergeCheck handler (EN-5): the Redline attestation check. */
+/** bitbucket:mergeCheck handler (EN-5): the Threatline attestation check. */
 export async function mergeCheck(event: PRCheckEvent): Promise<{ success: boolean; message: string }> {
   const store = kvsSettingsStore(await kvs());
   return runMergeCheck(event, { client: forgeBitbucketClient(), settings: (uuid) => store.get(uuid), nowSec: () => Math.floor(Date.now() / 1000) });

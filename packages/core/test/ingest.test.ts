@@ -228,7 +228,7 @@ describe('assembleReview', () => {
   });
 });
 
-describe('fitAgentModel (Redline Engine: strong models write long)', () => {
+describe('fitAgentModel (Threatline Engine: strong models write long)', () => {
   it('trims wording, shortens quotes from the end only, drops unknown keys, and a sound model then validates', async () => {
     const { fitAgentModel } = await import('../src/index.js');
     const { AgentThreatModelSchema } = await import('@redline/shared');

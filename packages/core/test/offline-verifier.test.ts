@@ -22,8 +22,8 @@ async function proof(): Promise<LedgerProof> {
   return p.value;
 }
 
-describe('offline verifier script (no Redline code, Node built-ins only)', () => {
-  it('agrees with Redline on a valid proof, and on every kind of tampering', async () => {
+describe('offline verifier script (no Threatline code, Node built-ins only)', () => {
+  it('agrees with Threatline on a valid proof, and on every kind of tampering', async () => {
     const { verifyProof } = (await import(SCRIPT)) as { verifyProof: (p: unknown) => unknown };
     const p = await proof();
     expect(verifyProof(p)).toEqual(verifyLedgerProof(p));

@@ -6,7 +6,7 @@ import type { ApiError, Severity, SitePolicy } from '../types.js';
 import { box, errorText as errorStyle, label as labelStyle } from '../panel/form-styles.js';
 
 export const SEVERITY_OPTIONS: Severity[] = ['Low', 'Medium', 'High', 'Critical'];
-export const SAVED = 'Saved. Redline rechecks verdicts against the new policy.';
+export const SAVED = 'Saved. Threatline rechecks verdicts against the new policy.';
 
 /** Each policy section saves the whole policy with its own fields changed (the server keeps warn-only windows as stored). */
 export interface PolicySectionProps {

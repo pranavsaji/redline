@@ -34,7 +34,7 @@ const SECTIONS = [
 ] as const;
 const anchor = (id: string) => `redline-admin-${id}`;
 
-/** Redline's Jira admin page: first-run wizard, policy sections, observability, keys, ledger and demo data. */
+/** Threatline's Jira admin page: first-run wizard, policy sections, observability, keys, ledger and demo data. */
 export function AdminPage({ api }: { api: AdminApi }) {
   const [dto, setDto] = useState<AdminPolicyDto | null>(null);
   const [policyError, setPolicyError] = useState<string | null>(null);

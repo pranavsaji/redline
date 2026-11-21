@@ -6,13 +6,13 @@ import { log } from '../adapters/log.js';
 import { DIGEST_CONFIG_KEY } from './digest.js';
 import { opsAlert } from './ops-alert.js';
 
-export const TREE_HEADS_PAGE_TITLE = 'Redline ledger tree heads';
+export const TREE_HEADS_PAGE_TITLE = 'Threatline ledger tree heads';
 const PAGE_ROWS = 60;
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const mismatch = (deps: CoreDeps, size: number) => {
   log('ledger.tree_mismatch', { treeSize: size });
-  void opsAlert(deps, `alert:tree_mismatch:${size}`, `Redline: the risk ledger no longer matches its signed tree head of size ${size}. Entries may have been changed. Run "Verify the ledger" on the Redline admin page.`);
+  void opsAlert(deps, `alert:tree_mismatch:${size}`, `Threatline: the risk ledger no longer matches its signed tree head of size ${size}. Entries may have been changed. Run "Verify the ledger" on the Threatline admin page.`);
   return err(appError('internal', `the ledger does not match its signed tree head of size ${size}`));
 };
 
@@ -64,8 +64,8 @@ export async function publishTreeHead(deps: CoreDeps): Promise<Result<PublishOut
     .map((h) => `<tr><td>${h.treeSize}</td><td><code>${esc(h.rootHash)}</code></td><td>${esc(h.timestamp)}</td><td><code>${esc(h.kid)}</code></td><td><code>${esc(h.signature)}</code></td></tr>`)
     .join('');
   const storage = [
-    `<p>Signed heads of the Merkle tree over Redline's risk ledger (RFC 9162 hashing; leaves are the ledger entry hashes in order). Each head signs the text <code>redline-tree-head-v1</code>, the tree size, the root hash and the time, one per line, with Ed25519. Keep a copy: a later inclusion proof must be consistent with every head here.</p>`,
-    `<p>Check a proof downloaded from the Redline admin page offline with <code>node scripts/verify-ledger-proof.mjs proof.json</code>, and compare its public key with the one below.</p>`,
+    `<p>Signed heads of the Merkle tree over Threatline's risk ledger (RFC 9162 hashing; leaves are the ledger entry hashes in order). Each head signs the text <code>redline-tree-head-v1</code>, the tree size, the root hash and the time, one per line, with Ed25519. Keep a copy: a later inclusion proof must be consistent with every head here.</p>`,
+    `<p>Check a proof downloaded from the Threatline admin page offline with <code>node scripts/verify-ledger-proof.mjs proof.json</code>, and compare its public key with the one below.</p>`,
     '<h2>Signing keys</h2>',
     `<table><tbody><tr><th>Key id</th><th>Public key (Ed25519, base64url)</th></tr>${keyRows}</tbody></table>`,
     '<h2>Tree heads</h2>',

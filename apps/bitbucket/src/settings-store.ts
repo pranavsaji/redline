@@ -36,7 +36,7 @@ export function parseSettingsInput(input: { publicKeys?: unknown; sensitivePaths
   const publicKeys: Record<string, string> = {};
   for (const [n, k] of keys.entries()) {
     const bytes = fromB64url(k);
-    if (!bytes || bytes.length !== 32) return err(appError('validation', `Public key on line ${n + 1} is not a Redline public key (copy it from Redline's admin page in Jira).`));
+    if (!bytes || bytes.length !== 32) return err(appError('validation', `Public key on line ${n + 1} is not a Threatline public key (copy it from Threatline's admin page in Jira).`));
     publicKeys[kidOf(bytes)] = k;
   }
   const s = Stored.safeParse({ publicKeys, sensitivePaths: lines(input.sensitivePaths), mode: input.mode, diffScoreThreshold: input.diffScoreThreshold });

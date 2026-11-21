@@ -1,10 +1,10 @@
-# Redline security review
+# Threatline security review
 
-A security product is judged by its own security, so this is Redline's own threat model: what could go wrong with
-Redline, how it is prevented, and the test that proves each control. Threats are written as STRIDE categories in
-plain language first, the way Redline writes them for its users.
+A security product is judged by its own security, so this is Threatline's own threat model: what could go wrong with
+Threatline, how it is prevented, and the test that proves each control. Threats are written as STRIDE categories in
+plain language first, the way Threatline writes them for its users.
 
-Scope: Redline for Jira (`apps/core`, with Confluence) and Redline for Bitbucket (`apps/bitbucket`) as built on branch
+Scope: Threatline for Jira (`apps/core`, with Confluence) and Threatline for Bitbucket (`apps/bitbucket`) as built on branch
 `build/redline`. Method: the spec's threat and control table (§ Security, privacy and trust), checked control by control
 against the code, with the defects found during the build and the reviews of each task recorded under "Found and fixed".
 
@@ -18,7 +18,7 @@ against the code, with the defects found during the build and the reviews of eac
 | S-4 | A forged, edited or replayed attestation lets a pull request merge. | Spoofing, Tampering | Ed25519 signature over issue, repository, commit SHA, verdict, requirements, expiry and a nonce; 24 h default lifetime; the merge check requires the commit to equal the pull request head and the key id to be trusted by the repository. One changed character fails verification. | `packages/crypto/test/attestation.test.ts`, `apps/bitbucket/test/merge-check.test.ts`, `apps/core/ui/test/attestations.test.tsx` |
 | S-5 | Someone edits or deletes ledger rows to hide an acceptance. | Tampering, Repudiation | Append-only hash chain (no update or delete code path), admin verification, and a daily RFC 9162 Merkle tree head signed with the attestation key and published to Confluence; downloadable inclusion and consistency proofs checked offline by `scripts/verify-ledger-proof.mjs`. A stored head that no longer matches the ledger raises an ops alert and is never re-signed. | `packages/crypto/test/hashchain.test.ts`, `packages/crypto/test/merkle.test.ts`, `packages/core/test/transparency.test.ts`, `packages/core/test/offline-verifier.test.ts` |
 | S-6 | The signing key leaks. | Information disclosure, Spoofing | The key is generated on install into Forge secret storage, never sent to the UI or logged; rotation creates a new key id and old keys keep verifying for a grace period. | `apps/core/test/services/attestation-service.test.ts`, `apps/core/test/adapters/kvs.test.ts`, `apps/core/ui/test/attestations.test.tsx` |
-| S-7 | Repeated re-runs burn AI usage (Redline Engine's Forge LLM calls, billed to the app's developer, or the site's Rovo credits). | Denial of service | 10 re-runs per person per hour; a monthly review cap and token budgets; triggers debounced by context hash. When paused at the budget or out of Rovo credits, the gate blocks and a champion can confirm (ledgered, admin alerted). | `apps/core/test/triggers.test.ts`, `apps/core/test/consumer.test.ts`, `packages/core/test/verdict.test.ts` |
+| S-7 | Repeated re-runs burn AI usage (Threatline Engine's Forge LLM calls, billed to the app's developer, or the site's Rovo credits). | Denial of service | 10 re-runs per person per hour; a monthly review cap and token budgets; triggers debounced by context hash. When paused at the budget or out of Rovo credits, the gate blocks and a champion can confirm (ledgered, admin alerted). | `apps/core/test/triggers.test.ts`, `apps/core/test/consumer.test.ts`, `packages/core/test/verdict.test.ts` |
 | S-8 | Secrets in a design page end up in an AI prompt or a log. | Information disclosure | Secret patterns are redacted and excerpts capped when facts are normalised; logs carry ids, timings and counts, never content or prompts. | `packages/core/test/context/context.test.ts`, `apps/core/test/services/confluence-page.test.ts` |
 | S-9 | A forged agent submission writes a threat model for a review it did not run. | Spoofing | `get-review-context` issues a single-use submission token bound to the review and context hash; `submit-threat-model` spends it and rejects reuse or a mismatch. | `packages/core/test/review-context.test.ts`, `apps/core/test/actions.test.ts` |
 | S-10 | A user edits the issue property to make the gate pass. | Tampering | The workflow gate reads the verdict from app storage (KVS), never from the user-editable issue property, which is only a searchable copy. | `apps/core/test/validators.test.ts` |
@@ -27,7 +27,7 @@ against the code, with the defects found during the build and the reviews of eac
 
 ## Found and fixed during the build
 
-Defects the per-task reviews found in Redline's own code, each fixed with a test that failed first:
+Defects the per-task reviews found in Threatline's own code, each fixed with a test that failed first:
 
 - **A re-review hid fresh evidence under an old dismissal** (Task 31). Carry-over could fold a threat raised again from
   new, possibly attacker-planted, evidence into an earlier dismissed threat. Now a threat citing changed sources is
@@ -43,13 +43,13 @@ Defects the per-task reviews found in Redline's own code, each fixed with a test
 ## Residual risks
 
 - **The Automation agent runs with the rule actor's permissions.** "Let this agent take actions" lets the agent call
-  Redline's CREATE actions; the submission token limits it to submitting the review it was given.
-- **Merge blocking needs Bitbucket Premium.** Without a required check, a failed Redline check is a warning on the pull
+  Threatline's CREATE actions; the submission token limits it to submitting the review it was given.
+- **Merge blocking needs Bitbucket Premium.** Without a required check, a failed Threatline check is a warning on the pull
   request; the settings page says so.
 - **Severity colour.** Critical and High share a colour; the severity word is always shown.
 - **Carry-over keeps old threats on unchanged sources.** A bad earlier threat stays until someone dismisses it.
 - **What-if understates a real exposure change**: it re-scores but does not add the threats a new exposure would trigger.
-- **Redline Engine's runs read the fenced untrusted text.** Only the injection check is quarantined (no tools, typed
+- **Threatline Engine's runs read the fenced untrusted text.** Only the injection check is quarantined (no tools, typed
   output). The runs see the design text inside nonce-fenced data blocks, like the Rovo agent; the defences are the
   scanner and the injection check (flagged material sends every AI threat to a champion and skips the verifier),
   majority consensus, verbatim-quote grounding, the rule-based floor, and code (never the model) setting the verdict.

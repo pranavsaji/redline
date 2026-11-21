@@ -41,32 +41,32 @@ const run = (description: string, o: { files?: typeof AUTH; yaml?: string | null
 
 describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
   it('changes that touch no sensitive paths merge freely', async () => {
-    expect(await run('', { files: DOCS })).toEqual({ success: true, outcome: 'pass_not_sensitive', message: 'Redline: no security-sensitive changes.' });
+    expect(await run('', { files: DOCS })).toEqual({ success: true, outcome: 'pass_not_sensitive', message: 'Threatline: no security-sensitive changes.' });
   });
 
   it('a sensitive change with no attestation fails and says how to get one', async () => {
     expect(await run('Adds HMAC verification.')).toEqual({
       success: false,
       outcome: 'fail_missing',
-      message: "Redline: this change touches security-sensitive files (src/auth/webhook.ts) and has no attestation. Ask your IDE agent for get-merge-attestation on PAY-7, or click Copy attestation in Jira.",
+      message: "Threatline: this change touches security-sensitive files (src/auth/webhook.ts) and has no attestation. Ask your IDE agent for get-merge-attestation on PAY-7, or click Copy attestation in Jira.",
     });
   });
 
   it('names "the linked issue" when no key is in the title or branch, and at most three files', async () => {
     const files = ['src/auth/a.ts', 'src/auth/b.ts', 'src/auth/c.ts', 'src/auth/d.ts'].map((path) => ({ path, status: 'modified' as const, linesAdded: 1 }));
     const r = await evaluateMergeCheck({ pr: { ...pr(''), title: 'Tidy', branch: 'tidy' }, files, repoPolicyYaml: null, settings: settings(), nowSec: NOW });
-    expect(r.message).toBe("Redline: this change touches security-sensitive files (src/auth/a.ts, src/auth/b.ts, src/auth/c.ts) and has no attestation. Ask your IDE agent for get-merge-attestation on the linked issue, or click Copy attestation in Jira.");
+    expect(r.message).toBe("Threatline: this change touches security-sensitive files (src/auth/a.ts, src/auth/b.ts, src/auth/c.ts) and has no attestation. Ask your IDE agent for get-merge-attestation on the linked issue, or click Copy attestation in Jira.");
   });
 
   it('a valid attestation for the head commit passes', async () => {
-    expect(await run(`Ready.\n${token()}`)).toEqual({ success: true, outcome: 'pass_attested', message: 'Redline: attested by PAY-7, 2 requirements verified.' });
+    expect(await run(`Ready.\n${token()}`)).toEqual({ success: true, outcome: 'pass_attested', message: 'Threatline: attested by PAY-7, 2 requirements verified.' });
   });
 
   it('a token pasted through Bitbucket’s Markdown editor (underscores escaped as \\_) still verifies', async () => {
     let t = token();
     for (let n = 0; !t.includes('_') && n < 50; n++) t = token({ nonce: `nonce${n}` });
     expect(t).toContain('_');
-    const markdown = `Redline attestation for PAY-7 \\(expires soon\\):  \n${t.replace(/_/g, '\\_').replace(/-/g, '\\-')}`;
+    const markdown = `Threatline attestation for PAY-7 \\(expires soon\\):  \n${t.replace(/_/g, '\\_').replace(/-/g, '\\-')}`;
     expect((await run(markdown)).outcome).toBe('pass_attested');
   });
 
@@ -87,7 +87,7 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
     const t = token();
     const i = t.length - 5;
     const edited = t.slice(0, i) + (t[i] === 'A' ? 'B' : 'A') + t.slice(i + 1);
-    expect(await run(edited)).toEqual({ success: false, outcome: 'fail_signature', message: 'Redline: attestation signature invalid. Copy a fresh attestation from the Jira issue panel.' });
+    expect(await run(edited)).toEqual({ success: false, outcome: 'fail_signature', message: 'Threatline: attestation signature invalid. Copy a fresh attestation from the Jira issue panel.' });
     const body = t.split('.')[2]!;
     const garbled = t.replace(body, body.slice(0, 10) + (body[10] === 'x' ? 'y' : 'x') + body.slice(11));
     expect((await run(garbled)).outcome).toBe('fail_signature');
@@ -98,19 +98,19 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
     expect((await run(token({}, other))).outcome).toBe('fail_signature');
     const r = await run(token(), { s: settings({ publicKeys: {} }) });
     expect(r).toMatchObject({ success: false, outcome: 'fail_signature' });
-    expect(r.message).toMatch(/no Redline public key/);
+    expect(r.message).toMatch(/no Threatline public key/);
   });
 
   it('an attestation for an older commit → fail_stale_commit with both short hashes', async () => {
     expect(await run(token({ commitSha: OLD }))).toEqual({
       success: false,
       outcome: 'fail_stale_commit',
-      message: 'Redline: attestation is for commit aaaaaaa but the PR head is bbbbbbb. Request a new attestation for the latest commit.',
+      message: 'Threatline: attestation is for commit aaaaaaa but the PR head is bbbbbbb. Request a new attestation for the latest commit.',
     });
   });
 
   it('an expired attestation → fail_expired with the time', async () => {
-    expect(await run(token({ iat: NOW - 90_000, exp: NOW - 3600 }))).toEqual({ success: false, outcome: 'fail_expired', message: 'Redline: attestation expired at 2025-11-15 11:00 UTC. Request a new one.' });
+    expect(await run(token({ iat: NOW - 90_000, exp: NOW - 3600 }))).toEqual({ success: false, outcome: 'fail_expired', message: 'Threatline: attestation expired at 2025-11-15 11:00 UTC. Request a new one.' });
   });
 
   it('security: an attestation for a different work item than the PR names fails (no borrowing a passing item’s token)', async () => {
@@ -118,7 +118,7 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
     expect(r).toEqual({
       success: false,
       outcome: 'fail_other_issue',
-      message: 'Redline: the attestation is for PAY-99, but this pull request is for PAY-7. Request an attestation from PAY-7.',
+      message: 'Threatline: the attestation is for PAY-99, but this pull request is for PAY-7. Request an attestation from PAY-7.',
     });
   });
 
@@ -128,7 +128,7 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
     expect(await multi(token())).toEqual({
       success: false,
       outcome: 'fail_other_issue',
-      message: 'Redline: this pull request also names PAY-6, which has no valid attestation for this commit. Add one from PAY-6, or remove PAY-6 from the title and branch name.',
+      message: 'Threatline: this pull request also names PAY-6, which has no valid attestation for this commit. Add one from PAY-6, or remove PAY-6 from the title and branch name.',
     });
     expect(await multi(`${token()}\n${token({ issueKey: 'PAY-6', nonce: 'n0nce2', iat: NOW - 30 })}`)).toMatchObject({ success: true, outcome: 'pass_attested' });
     // A second token that is for another commit does not count.
@@ -151,18 +151,18 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
 
   it('final review I2: warn mode ends at warnUntil (at most 14 days); an ended or undated warn mode blocks again', async () => {
     const ended = await run('', { s: settings({ mode: 'warn', warnUntil: new Date((NOW - 60) * 1000).toISOString() }) });
-    expect(ended).toMatchObject({ success: false, outcome: 'fail_missing', message: expect.stringMatching(/^Redline: warn-only mode ended 2025-11-15 11:59 UTC, so this check blocks again\. /) });
+    expect(ended).toMatchObject({ success: false, outcome: 'fail_missing', message: expect.stringMatching(/^Threatline: warn-only mode ended 2025-11-15 11:59 UTC, so this check blocks again\. /) });
     expect(await run('', { s: settings({ mode: 'warn' }) })).toMatchObject({ success: false, outcome: 'fail_missing' });
   });
 
   it('warn mode turns a failure into success with a Warning: prefix', async () => {
     const r = await run('', { s: settings({ mode: 'warn', warnUntil: new Date((NOW + 86_400) * 1000).toISOString() }) });
     expect(r).toMatchObject({ success: true, outcome: 'warn' });
-    expect(r.message).toMatch(/^Warning: Redline: this change touches security-sensitive files/);
+    expect(r.message).toMatch(/^Warning: Threatline: this change touches security-sensitive files/);
   });
 
   it('an attestation issued under warn-only or break-glass passes but says so', async () => {
-    expect((await run(token({ override: 'break_glass' }))).message).toBe('Warning: attested under a break-glass override. Redline: attested by PAY-7, 2 requirements verified.');
+    expect((await run(token({ override: 'break_glass' }))).message).toBe('Warning: attested under a break-glass override. Threatline: attested by PAY-7, 2 requirements verified.');
   });
 
   it('policy.yml adds sensitive paths and can only lower the threshold (it never weakens the gate)', async () => {
@@ -203,13 +203,13 @@ describe('runMergeCheck: reads the PR, its diffstat, the destination policy and 
   it('passes with a valid attestation and reads policy.yml from the destination commit', async () => {
     const { c, calls } = client({ description: token({ commitSha: 'b'.repeat(40) }) });
     const r = await runMergeCheck(event, { client: c, settings: async () => settings(), nowSec: () => NOW });
-    expect(r).toEqual({ success: true, message: 'Redline: attested by PAY-7, 2 requirements verified.' });
+    expect(r).toEqual({ success: true, message: 'Threatline: attested by PAY-7, 2 requirements verified.' });
     expect(calls).toContain('file:dddddddddddd:.redline/policy.yml');
   });
 
   it('a docs-only PR passes without an attestation', async () => {
     const { c } = client({ description: '', diff: fixture('diffstat/docs-only.json') });
-    expect(await runMergeCheck(event, { client: c, settings: async () => settings(), nowSec: () => NOW })).toEqual({ success: true, message: 'Redline: no security-sensitive changes.' });
+    expect(await runMergeCheck(event, { client: c, settings: async () => settings(), nowSec: () => NOW })).toEqual({ success: true, message: 'Threatline: no security-sensitive changes.' });
   });
 
   it('fails closed when Bitbucket cannot be read (and warns in warn mode)', async () => {
@@ -235,7 +235,7 @@ describe('runMergeCheck: reads the PR, its diffstat, the destination policy and 
     expect(calls).toContain('patch:7');
     // Fail closed: diff text that cannot be read is treated as sensitive, like a file list that is too long to read.
     const { c: c2 } = client({ description: '', diff: fixture('diffstat/docs-only.json'), patch: null });
-    expect(await runMergeCheck(event, { client: c2, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: false, message: expect.stringMatching(/diff text Redline could not read/) });
+    expect(await runMergeCheck(event, { client: c2, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: false, message: expect.stringMatching(/diff text Threatline could not read/) });
   });
 
   it('security review: a fake file header inside a hunk cannot hide a secret from the scan, and a truncated diff is sensitive', async () => {
@@ -263,6 +263,6 @@ describe('runMergeCheck: reads the PR, its diffstat, the destination policy and 
 
   it('a repository with no settings yet uses the defaults: block mode and the built-in sensitive paths', async () => {
     const { c } = client({ description: '' });
-    expect(await runMergeCheck(event, { client: c, settings: async () => null, nowSec: () => NOW })).toMatchObject({ success: false, message: expect.stringMatching(/no Redline public key|has no attestation/) });
+    expect(await runMergeCheck(event, { client: c, settings: async () => null, nowSec: () => NOW })).toMatchObject({ success: false, message: expect.stringMatching(/no Threatline public key|has no attestation/) });
   });
 });

@@ -94,7 +94,7 @@ describe('demo seeder (Task 24)', () => {
     expect(s.pages).toHaveLength(1);
   });
 
-  it('the design page carries one poisoned paragraph that Redline detects as an injection attempt', () => {
+  it('the design page carries one poisoned paragraph that Threatline detects as an injection attempt', () => {
     const storage = designPageStorage();
     expect(storage).toContain(HIDDEN_DIRECTIVE);
     expect(storage.match(/ignore previous instructions/gi)).toHaveLength(1);
@@ -120,7 +120,7 @@ describe('admin.seed / admin.setupStatus', () => {
     expect(await adminSeed(s.t.deps, admin, { projectKey: 'PAY', spaceKey: 'PAY' })).toMatchObject({ epicKey: 'PAY-100' });
   });
 
-  it('reports the setup checklist from what Redline has seen', async () => {
+  it('reports the setup checklist from what Threatline has seen', async () => {
     const s = site();
     s.t.jira.isAdmin = async () => ok(true);
     s.t.kv.data.set('schema:version', 3);

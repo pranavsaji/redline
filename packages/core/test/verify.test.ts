@@ -15,7 +15,7 @@ const loud = threat({ id: 'thr_loud', title: 'Admin takeover', severity: 'Critic
 const base = threat({ id: 'thr_base', origin: 'baseline', title: 'Tool misuse by an over-privileged agent', state: 'covered', coveredBy: 'thr_generic' });
 const human = threat({ id: 'thr_human', title: 'Weakly grounded', state: 'needs_human', grounding: 'weak' });
 
-describe('engineVerify (Redline Engine stage 4)', () => {
+describe('engineVerify (Threatline Engine stage 4)', () => {
   it('asks once about every accepted AI threat (never rule-based ones), with its quotes, and maps verdicts back to threat ids', async () => {
     const llm = new FakeLlm({
       verify: [JSON.stringify({ verdicts: [{ id: 'T1', keep: true, reason: 'quotes show refunds' }, { id: 'T2', keep: false, reason: 'generic hygiene' }, { id: 'T3', keep: false, reason: 'not in design' }] })],

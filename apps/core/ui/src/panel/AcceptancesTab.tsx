@@ -71,7 +71,7 @@ function BreakGlass({ api, onChanged }: { api: PanelApi; onChanged: () => void }
   return (
     <form aria-label="Break-glass override" onSubmit={submit} style={{ ...box, borderColor: token('color.border.danger') }}>
       <strong>Break-glass override</strong>
-      <span style={small}>Jira administrators only. Lets this work item pass Redline's gates for a few hours. Every use is recorded in the ledger with your reason.</span>
+      <span style={small}>Jira administrators only. Lets this work item pass Threatline's gates for a few hours. Every use is recorded in the ledger with your reason.</span>
       <label style={label} htmlFor={`${id}-reason`}>
         Reason (recorded in the ledger)
       </label>

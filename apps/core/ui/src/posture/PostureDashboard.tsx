@@ -67,7 +67,7 @@ export function PostureDashboard({ api, compact = false }: { api: PostureApi; co
           <label style={{ display: 'flex', gap: 8, alignItems: 'center', font: token('font.body.small') }}>
             Project
             <select value={project} onChange={(e) => setProject(e.target.value)} style={{ font: 'inherit', padding: 4 }}>
-              <option value="">All Redline projects</option>
+              <option value="">All Threatline projects</option>
               {projects.map((p) => (
                 <option key={p} value={p}>
                   {p}

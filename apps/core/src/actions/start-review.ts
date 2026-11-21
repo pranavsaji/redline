@@ -28,6 +28,6 @@ export async function startReview(payload: ActionPayload & Record<string, unknow
     queued: true,
     issueKey: who.issue.key,
     nextRevision,
-    message: `Queued review revision ${nextRevision} of ${who.issue.key}. It usually takes a minute or two; the result appears in the Redline panel: ${await issueUrl(deps, who.issue.key)}`,
+    message: `Queued review revision ${nextRevision} of ${who.issue.key}. It usually takes a minute or two; the result appears in the Threatline panel: ${await issueUrl(deps, who.issue.key)}`,
   };
 }

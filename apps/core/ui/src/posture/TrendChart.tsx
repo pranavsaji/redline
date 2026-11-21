@@ -33,8 +33,8 @@ export function TrendChart({ trend, shown }: { trend: Point[]; shown: boolean })
     return () => ro.disconnect();
   }, [shown, trend.length]);
   const title = 'Open Critical and High requirements, last 30 days';
-  if (!shown) return <p style={{ margin: 0 }}>The 30-day trend counts every Redline work item on the site, so it is shown to security champions and Jira admins only.</p>;
-  if (trend.length < 2) return <p style={{ margin: 0 }}>The trend appears once Redline has taken two daily snapshots.</p>;
+  if (!shown) return <p style={{ margin: 0 }}>The 30-day trend counts every Threatline work item on the site, so it is shown to security champions and Jira admins only.</p>;
+  if (trend.length < 2) return <p style={{ margin: 0 }}>The trend appears once Threatline has taken two daily snapshots.</p>;
 
   const max = Math.max(1, ...trend.flatMap((p) => [p.openCritical, p.openHigh]));
   const yMax = Math.ceil(max / 5) * 5;

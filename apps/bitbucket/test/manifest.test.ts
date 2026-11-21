@@ -9,7 +9,7 @@ const section = (name: string) => {
   return [...body.matchAll(/^ {2}([\w:-]+):/gm)].map((x) => x[1]!);
 };
 
-describe('Redline for Bitbucket: Marketplace readiness (Task 33)', () => {
+describe('Threatline for Bitbucket: Marketplace readiness (Task 33)', () => {
   // bitbucket:mergeCheck and bitbucket:repoSettingsMenuPage carry no EAP or Preview banner (checked 2026-11-18).
   const NOT_EAP = new Set(['bitbucket:mergeCheck', 'bitbucket:repoSettingsMenuPage', 'function']);
   it('uses no EAP module', () => {

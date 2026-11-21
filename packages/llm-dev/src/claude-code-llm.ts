@@ -36,7 +36,7 @@ interface Envelope {
 
 /**
  * Dev-only LLM adapter for prompt tuning and evals: runs prompts through the local `claude` CLI under Pranav's own
- * subscription with every tool disabled and Redline's prompt as the system prompt. Never bundled into a Forge app.
+ * subscription with every tool disabled and Threatline's prompt as the system prompt. Never bundled into a Forge app.
  * Never logs prompt text.
  */
 export function claudeCodeLlm(opts: { model?: string; timeoutMs?: number; spawn?: SpawnFn } = {}): LlmPort {

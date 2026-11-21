@@ -55,7 +55,7 @@ export function computeVerdict(i: VerdictInput): Verdict {
 
   const r = i.review;
   if (!r) {
-    reasons.push({ code: 'no_review', message: 'Redline has not reviewed this work item yet.', action: { label: 'Run review', href: `${i.panelUrl}?rerun=1` } });
+    reasons.push({ code: 'no_review', message: 'Threatline has not reviewed this work item yet.', action: { label: 'Run review', href: `${i.panelUrl}?rerun=1` } });
   } else {
     // A review that never ran because reviews were paused is the budget case (a champion can confirm it), not a failure.
     const pausedReview = r.status === 'failed' && r.failureReason === 'budget';
@@ -65,7 +65,7 @@ export function computeVerdict(i: VerdictInput): Verdict {
       reasons.push({ code: 'agent_missing', message: `Review in progress (${r.samplesReceived} of ${r.samplesExpected} agent runs received).` });
 
     if (i.currentContextHash === null)
-      reasons.push({ code: 'review_stale', message: 'Redline could not confirm the current design and linked work, so the review may be out of date.', action: rerun });
+      reasons.push({ code: 'review_stale', message: 'Threatline could not confirm the current design and linked work, so the review may be out of date.', action: rerun });
     else if (i.currentContextHash !== r.contextHash)
       reasons.push({ code: 'review_stale', message: 'The design or linked work changed since the last review.', action: rerun });
 

@@ -1,6 +1,6 @@
-# OWASP ASVS 5.0 map for Redline requirements
+# OWASP ASVS 5.0 map for Threatline requirements
 
-Redline maps every requirement to OWASP Application Security Verification Standard 5.0 ids (format `V<chapter>.<section>.<n>`). Use only ids listed here or returned by Redline; never invent one.
+Threatline maps every requirement to OWASP Application Security Verification Standard 5.0 ids (format `V<chapter>.<section>.<n>`). Use only ids listed here or returned by Threatline; never invent one.
 
 Source: https://github.com/OWASP/ASVS/releases/download/v5.0.0_release/OWASP_Application_Security_Verification_Standard_5.0.0_en.flat.json (OWASP, CC BY-SA 4.0). 345 requirements.
 

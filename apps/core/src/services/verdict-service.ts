@@ -15,7 +15,7 @@ export const verdictKey = (issueId: string) => `verdict:${issueId}`;
 const MAX_ANCESTORS = 5;
 
 /**
- * `unreviewed`: Redline does not review this item (project or issue type not enabled) and no ancestor has a review, so
+ * `unreviewed`: Threatline does not review this item (project or issue type not enabled) and no ancestor has a review, so
  * Done passes freely but nothing may be attested on its behalf (a merge needs a reviewed item).
  */
 export type StoredVerdict = Verdict & { panelUrl?: string; message?: string; riskScore?: number; notApplicable?: boolean; unreviewed?: boolean; policyVersion?: number; recheckAt?: string };
@@ -27,7 +27,7 @@ export type StoredVerdict = Verdict & { panelUrl?: string; message?: string; ris
 export const POLICY_VERSION_KEY = 'config:site:version';
 
 export const POLICY_CHANGED_MESSAGE =
-  'Redline blocks Done: the Redline policy changed since this work item was checked, and it could not be rechecked. Open the Redline panel to retry.';
+  'Threatline blocks Done: the Threatline policy changed since this work item was checked, and it could not be rechecked. Open the Threatline panel to retry.';
 
 /** The current policy version; null when it cannot be read (callers treat that as changed). */
 export async function policyVersion(deps: Pick<CoreDeps, 'state'>): Promise<number | null> {
@@ -45,7 +45,7 @@ const storedVersion = (v: object) => {
 };
 
 export const LAPSED_MESSAGE =
-  'Redline blocks Done: the break-glass override or warn-only window for this work item has ended, and its verdict could not be recomputed. Open the Redline panel to retry.';
+  'Threatline blocks Done: the break-glass override or warn-only window for this work item has ended, and its verdict could not be recomputed. Open the Threatline panel to retry.';
 
 const lenient = (v: unknown): v is StoredVerdict =>
   typeof v === 'object' && v !== null && ((v as { state?: unknown }).state === 'warn' || (v as { overridden?: unknown }).overridden === true);
@@ -116,7 +116,7 @@ function reasonText(r: BlockReason, keys: ReadonlyMap<string, string>): string {
   const ids = r.requirementIds ?? [];
   if (r.code === 'open_requirement' && ids.length > 0) {
     const named = ids.map((id) => keys.get(id)).filter((k): k is string => typeof k === 'string');
-    if (named.length === 0) text += ' (create the subtasks in the Redline panel)';
+    if (named.length === 0) text += ' (create the subtasks in the Threatline panel)';
     else {
       const shown = named.slice(0, KEYS_LISTED);
       const more = ids.length - shown.length;
@@ -124,7 +124,7 @@ function reasonText(r: BlockReason, keys: ReadonlyMap<string, string>): string {
     }
   }
   // The validator dialog cannot run anything, so a re-run action points at the panel's one-click re-run (final review I4).
-  if (r.action) text += /[?&]rerun=1\b/.test(r.action.href) ? ' (re-run it from the Redline panel)' : ` (${r.action.label}: ${r.action.href})`;
+  if (r.action) text += /[?&]rerun=1\b/.test(r.action.href) ? ' (re-run it from the Threatline panel)' : ` (${r.action.label}: ${r.action.href})`;
   return text;
 }
 
@@ -133,12 +133,12 @@ function reasonText(r: BlockReason, keys: ReadonlyMap<string, string>): string {
  * link. Requirements are named by their sub-task keys only: titles can come from sources some viewers cannot open.
  */
 export function gateMessage(v: Verdict, keys: ReadonlyMap<string, string>, panelUrl: string, guarded: readonly string[]): string {
-  const tail = ` Open the Redline panel: ${panelUrl}`;
+  const tail = ` Open the Threatline panel: ${panelUrl}`;
   if (v.state === 'pass') {
     const why = v.overridden ? ` (break-glass override until ${day(v.validUntil)})` : '';
-    return `Redline: no security requirements block this work item${why}.${tail}`;
+    return `Threatline: no security requirements block this work item${why}.${tail}`;
   }
-  const lead = v.state === 'warn' ? `Redline warns (warn-only until ${day(v.validUntil)}): ` : `Redline blocks ${guarded.length > 0 ? guarded.join(' and ') : 'Done'}: `;
+  const lead = v.state === 'warn' ? `Threatline warns (warn-only until ${day(v.validUntil)}): ` : `Threatline blocks ${guarded.length > 0 ? guarded.join(' and ') : 'Done'}: `;
   let head = `${lead}${v.reasons.map((r) => reasonText(r, keys)).join('; ')}.`;
   if (head.length + tail.length > MESSAGE_MAX) head = `${head.slice(0, MESSAGE_MAX - tail.length - 1)}…`;
   return head + tail;
@@ -213,7 +213,7 @@ async function writeFailClosed(deps: CoreDeps, issueId: string, panelUrl: string
     state: 'block',
     blockingCount: 0,
     maxOpenSeverity: null,
-    reasons: [{ code: 'review_failed', message: `Redline could not check this work item (${why}).`, action: { label: 'Re-run review', href: `${panelUrl}?rerun=1` } }],
+    reasons: [{ code: 'review_failed', message: `Threatline could not check this work item (${why}).`, action: { label: 'Re-run review', href: `${panelUrl}?rerun=1` } }],
     inheritedFrom: [],
     updatedAt: deps.clock.now().toISOString(),
   };
@@ -222,14 +222,14 @@ async function writeFailClosed(deps: CoreDeps, issueId: string, panelUrl: string
 }
 
 /**
- * A Redline requirement sub-task follows its own requirement rather than inheriting the whole story's block: it blocks
+ * A Threatline requirement sub-task follows its own requirement rather than inheriting the whole story's block: it blocks
  * only while the story's verdict lists that requirement as open (and is lenient when the story is).
  */
 function requirementSubtaskVerdict(req: Requirement, story: Verdict, storyKey: string, now: Date): Verdict {
   const open = story.reasons.some((r) => r.code === 'open_requirement' && (r.requirementIds ?? []).includes(req.id));
   const base = { reviewId: story.reviewId, revision: story.revision, inheritedFrom: [], updatedAt: now.toISOString() };
   if (!open || story.state === 'pass') return { state: 'pass', blockingCount: 0, maxOpenSeverity: null, reasons: [], ...base };
-  const reasons: BlockReason[] = [{ code: 'open_requirement', message: `This security requirement is not verified yet. Add evidence on ${storyKey} in the Redline panel.` }];
+  const reasons: BlockReason[] = [{ code: 'open_requirement', message: `This security requirement is not verified yet. Add evidence on ${storyKey} in the Threatline panel.` }];
   return { state: story.state, ...(story.validUntil ? { validUntil: story.validUntil } : {}), blockingCount: 1, maxOpenSeverity: req.severity, reasons, ...base };
 }
 

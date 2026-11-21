@@ -1,5 +1,5 @@
 /**
- * Registers Redline's Teamwork Graph persisted Cypher queries and writes their keys to apps/core/graph/query-keys.json
+ * Registers Threatline's Teamwork Graph persisted Cypher queries and writes their keys to apps/core/graph/query-keys.json
  * (bundled into the app; keys are not secret). Run by an app contributor:
  *
  *   pnpm tsx apps/core/scripts/register-graph-queries.ts

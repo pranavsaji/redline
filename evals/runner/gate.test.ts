@@ -58,7 +58,7 @@ describe('offline eval gate', () => {
     expect(r.value.summary.judgedByOrigin?.agent.precision ?? 0).toBeGreaterThanOrEqual(0.7);
   });
 
-  it('Redline Engine (agent runs + recorded verifier) keeps recall, high-severity recall and injection resistance', { timeout: 120_000 }, async () => {
+  it('Threatline Engine (agent runs + recorded verifier) keeps recall, high-severity recall and injection resistance', { timeout: 120_000 }, async () => {
     const base = JSON.parse(readFileSync(BASELINE, 'utf8')) as Baseline;
     const replay = (dir: string) => (id: string) => {
       const rec = loadRecording(dir, id);

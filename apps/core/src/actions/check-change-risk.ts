@@ -6,13 +6,13 @@ import { panelGet } from '../resolvers/panel.js';
 import type { ActionPayload } from './common.js';
 import { callerOnIssue, fitJson, parseInput, SCHEMAS, type ActionError } from './schemas.js';
 
-/** The Bitbucket merge check's default diff-score threshold (a repository can lower it in its Redline settings). */
+/** The Bitbucket merge check's default diff-score threshold (a repository can lower it in its Threatline settings). */
 export const DEFAULT_DIFF_THRESHOLD = 40;
 
 export interface ChangeRiskResult {
   issueKey: string;
   wouldPass: boolean;
-  /** Whether the merge check will ask for a Redline attestation for this change. */
+  /** Whether the merge check will ask for a Threatline attestation for this change. */
   needsAttestation: boolean;
   diffScore: number;
   signals: DiffSignal[];
@@ -60,18 +60,18 @@ export async function checkChangeRisk(payload: ActionPayload & Record<string, un
   } else {
     reasons.push(
       diff.sensitiveFiles.length > 0
-        ? `Touches security-sensitive paths: ${[...new Set(diff.sensitiveFiles)].join(', ')}. The merge check needs a Redline attestation for ${panel.issueKey}.`
-        : `The change scores ${diff.score} (threshold ${DEFAULT_DIFF_THRESHOLD}), so the merge check needs a Redline attestation for ${panel.issueKey}.`,
+        ? `Touches security-sensitive paths: ${[...new Set(diff.sensitiveFiles)].join(', ')}. The merge check needs a Threatline attestation for ${panel.issueKey}.`
+        : `The change scores ${diff.score} (threshold ${DEFAULT_DIFF_THRESHOLD}), so the merge check needs a Threatline attestation for ${panel.issueKey}.`,
     );
     if (!v) {
       wouldPass = false;
-      reasons.push(`${panel.issueKey} has no Redline review yet, so no attestation can be issued. Start one with start-review.`);
+      reasons.push(`${panel.issueKey} has no Threatline review yet, so no attestation can be issued. Start one with start-review.`);
     } else if (v.state === 'block') {
       wouldPass = false;
       reasons.push(...v.reasons.map((r) => r.message));
     } else {
       wouldPass = true;
-      reasons.push(v.state === 'warn' ? `${panel.issueKey} is in warn-only mode: an attestation can be issued, and the merge check will show a warning.` : `${panel.issueKey} passes Redline's gate: request an attestation with get-merge-attestation.`);
+      reasons.push(v.state === 'warn' ? `${panel.issueKey} is in warn-only mode: an attestation can be issued, and the merge check will show a warning.` : `${panel.issueKey} passes Threatline's gate: request an attestation with get-merge-attestation.`);
     }
   }
   for (const t of touched.filter((x) => OPEN.has(x.status)))

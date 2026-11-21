@@ -60,8 +60,8 @@ export function ReleaseReport({ api }: { api: PostureApi }) {
             </span>
           </div>
           <p style={{ margin: 0, color: token('color.text.subtle') }}>
-            {report.items} reviewed work item{report.items === 1 ? '' : 's'} checked{report.outOfScope ? `; ${report.outOfScope} not reviewed by Redline` : ''}
-            {report.truncated ? '; the release is larger than Redline checks at once' : ''}.
+            {report.items} reviewed work item{report.items === 1 ? '' : 's'} checked{report.outOfScope ? `; ${report.outOfScope} not reviewed by Threatline` : ''}
+            {report.truncated ? '; the release is larger than Threatline checks at once' : ''}.
           </p>
           {report.blockers.length > 0 && (
             <ul aria-label="Blockers" style={{ margin: 0, paddingLeft: 20 }}>

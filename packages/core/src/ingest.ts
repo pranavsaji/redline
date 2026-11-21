@@ -411,7 +411,7 @@ const toScore = (v: unknown) => {
 };
 
 /**
- * Redline Engine: fits a strong model's threat model to the contract before validation. The model's own wording is
+ * Threatline Engine: fits a strong model's threat model to the contract before validation. The model's own wording is
  * trimmed to the length limits, lists are capped and unknown keys dropped. A quote is only shortened from the end (no
  * ellipsis), so it stays a verbatim substring of its source and still has to be found there. Substance is not invented:
  * a threat without evidence still fails.

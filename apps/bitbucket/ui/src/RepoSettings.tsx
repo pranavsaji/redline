@@ -7,7 +7,7 @@ import { TestAttestation } from './TestAttestation.js';
 
 const DEFAULT_PATHS = 'src/auth/**, **/auth/**, **/payments/**, **/crypto/**, infra/**, .github/workflows/**, **/*.pem';
 
-/** Repository settings → Redline: trusted public keys, extra sensitive paths, mode and diff-score threshold. */
+/** Repository settings → Threatline: trusted public keys, extra sensitive paths, mode and diff-score threshold. */
 export function RepoSettings({ api }: { api: SettingsApi }) {
   const id = useId();
   const [loaded, setLoaded] = useState(false);
@@ -25,7 +25,7 @@ export function RepoSettings({ api }: { api: SettingsApi }) {
       .get()
       .catch((): ApiError => ({ error: 'unavailable' }))
       .then((r) => {
-        if (isError(r)) return setError(r.message ?? 'Redline could not load this repository’s settings. Reload the page to try again.');
+        if (isError(r)) return setError(r.message ?? 'Threatline could not load this repository’s settings. Reload the page to try again.');
         setKeys(Object.values(r.publicKeys).join('\n'));
         setPaths(r.sensitivePaths.join('\n'));
         setMode(r.mode);
@@ -49,13 +49,13 @@ export function RepoSettings({ api }: { api: SettingsApi }) {
 
   return (
     <main style={{ display: 'grid', gap: 16, padding: 16, maxWidth: 720, minWidth: 0, color: token('color.text') }}>
-      <h1 style={{ font: token('font.heading.medium'), margin: 0 }}>Redline</h1>
+      <h1 style={{ font: token('font.heading.medium'), margin: 0 }}>Threatline</h1>
       <p style={{ margin: 0, color: token('color.text.subtle') }}>
-        Pull requests that touch security-sensitive files need a Redline attestation from the linked Jira work item. To block merges, make the Redline check required in the branch restrictions (Bitbucket Premium); without that, failures show as warnings on the pull request.
+        Pull requests that touch security-sensitive files need a Threatline attestation from the linked Jira work item. To block merges, make the Threatline check required in the branch restrictions (Bitbucket Premium); without that, failures show as warnings on the pull request.
       </p>
-      <form aria-label="Redline settings" onSubmit={save} style={box}>
+      <form aria-label="Threatline settings" onSubmit={save} style={box}>
         <label style={label} htmlFor={`${id}-keys`}>
-          Redline public keys (one per line, from Redline's admin page in Jira)
+          Threatline public keys (one per line, from Threatline's admin page in Jira)
         </label>
         <textarea id={`${id}-keys`} value={keys} onChange={(e) => setKeys(e.target.value)} rows={3} style={{ ...field, fontFamily: token('font.family.code') }} disabled={!loaded} />
         <label style={label} htmlFor={`${id}-paths`}>

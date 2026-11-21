@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// Verifies a Redline ledger proof offline, with no dependencies beyond Node.js (18+):
+// Verifies a Threatline ledger proof offline, with no dependencies beyond Node.js (18+):
 //   node scripts/verify-ledger-proof.mjs proof.json
 // Checks, in order: the entry's own hash, the Ed25519 signature on the tree head, the RFC 9162 inclusion proof, and
 // (when present) the consistency proof from an earlier published head. Compare the printed key id and public key with
-// the ones on the "Redline ledger tree heads" Confluence page before trusting the result.
+// the ones on the "Threatline ledger tree heads" Confluence page before trusting the result.
 import { createHash, createPublicKey, verify } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +18,7 @@ const fromHex = (s) => Buffer.from(s, 'hex');
 const isHash = (s) => typeof s === 'string' && /^[0-9a-f]{64}$/.test(s);
 const node = (l, r) => sha256(Buffer.from([1]), l, r);
 
-/** Same canonical JSON as Redline: keys sorted, no whitespace. */
+/** Same canonical JSON as Threatline: keys sorted, no whitespace. */
 export function canonicalJson(v) {
   if (v === null) return 'null';
   if (typeof v === 'string' || typeof v === 'number') return JSON.stringify(v);
@@ -116,7 +116,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     console.log(`OK: ledger entry ${r.seq} (${proof.entry.eventType}) is in the signed tree of ${r.treeSize} entries.`);
     console.log(`Root ${proof.treeHead.rootHash}, signed ${proof.treeHead.timestamp} by key ${proof.treeHead.kid}.`);
     if (proof.consistency) console.log(`Consistent with the earlier head of ${proof.consistency.fromTreeHead.treeSize} entries (nothing before it was rewritten).`);
-    console.log(`Public key ${proof.publicKey}: check it matches the "Redline ledger tree heads" page.`);
+    console.log(`Public key ${proof.publicKey}: check it matches the "Threatline ledger tree heads" page.`);
   } else {
     console.error(`FAILED: ${r.reason}`);
     process.exit(1);

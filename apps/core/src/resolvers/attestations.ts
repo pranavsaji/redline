@@ -46,7 +46,7 @@ export async function keysRotate(deps: CoreDeps, a: Admin): Promise<{ kid: strin
   return { kid: k.value.kid };
 }
 
-/** `keys.copied`: the admin copied the public key for Redline for Bitbucket (ticks the setup checklist). */
+/** `keys.copied`: the admin copied the public key for Threatline for Bitbucket (ticks the setup checklist). */
 export async function keysCopied(deps: CoreDeps, a: Admin): Promise<{ ok: true } | ApiError> {
   const denied = await requireAdmin(deps, a);
   if (denied) return denied;

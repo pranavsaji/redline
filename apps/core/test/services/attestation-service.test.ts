@@ -26,7 +26,7 @@ describe('requestAttestation (AT-1)', () => {
     expect(await ledgerTypes(t)).toEqual([]);
   });
 
-  it('final review C1: an item Redline does not review (a Task, or a project not enabled) gets no attestation', async () => {
+  it('final review C1: an item Threatline does not review (a Task, or a project not enabled) gets no attestation', async () => {
     const { t } = await reviewed({ allVerified: true });
     const extra = [
       jiraIssue({ id: '10099', key: 'PAY-99', issueType: { id: '10003', name: 'Task', subtask: false } }),
@@ -70,7 +70,7 @@ describe('requestAttestation (AT-1)', () => {
     const { token, expiresAt, prDescriptionSnippet } = r.value;
     expect(token).toMatch(/^redline-att\.v1\./);
     expect(expiresAt).toBe('2026-11-16T12:00:00.000Z');
-    expect(prDescriptionSnippet).toBe(`Redline attestation for PAY-7 (expires 2026-11-16 12:00 UTC):\n${token}`);
+    expect(prDescriptionSnippet).toBe(`Threatline attestation for PAY-7 (expires 2026-11-16 12:00 UTC):\n${token}`);
     const rows = await ledgerTypes(t);
     expect(rows).toHaveLength(1);
     const keys = await keysPublic(t.deps, { accountId: ADMIN });

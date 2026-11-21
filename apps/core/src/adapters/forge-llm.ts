@@ -4,7 +4,7 @@ import { appError, err, ok, type Result } from '@redline/shared';
 import { log } from './log.js';
 
 /**
- * Redline Engine's models per tier, newest first. A model the platform refuses (retired, not yet enabled for this app,
+ * Threatline Engine's models per tier, newest first. A model the platform refuses (retired, not yet enabled for this app,
  * overloaded) falls through to the next one, so a review still runs on the best model available.
  */
 export const ENGINE_MODELS: Readonly<Record<ModelTier, readonly string[]>> = {

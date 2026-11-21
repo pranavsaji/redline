@@ -14,7 +14,7 @@ const itemsOf = (s: SetupStatus, mode: 'engine' | 'agent' | 'rules_only', author
       done: s.keys,
       text: s.keys
         ? 'Signing keys created'
-        : 'Signing keys not created yet (Redline creates them with the first merge-gate attestation)',
+        : 'Signing keys not created yet (Threatline creates them with the first merge-gate attestation)',
     },
     {
       done: s.sqlVersion > 0,
@@ -25,23 +25,23 @@ const itemsOf = (s: SetupStatus, mode: 'engine' | 'agent' | 'rules_only', author
       text:
         s.validatorSeenOn.length > 0
           ? `Done gate seen on ${s.validatorSeenOn.join(', ')}`
-          : 'Done gate not seen yet: add "Redline security gate" to the Done transition',
+          : 'Done gate not seen yet: add "Threatline security gate" to the Done transition',
     },
     engine
-      ? { done: true, text: 'Redline Engine runs every review itself: no Rovo agent or Automation rule needed' }
+      ? { done: true, text: 'Threatline Engine runs every review itself: no Rovo agent or Automation rule needed' }
       : rulesOnly
         ? { done: true, text: 'Rule-based checks only: no Rovo or Automation rule needed' }
         : {
             done: s.automationRuleSeen,
             text: s.automationRuleSeen
               ? 'Automation agent runs arriving'
-              : 'No Automation agent run in the last 7 days: check the Redline review rule. No Rovo on this site? Choose rule-based checks under Review mode.',
+              : 'No Automation agent run in the last 7 days: check the Threatline review rule. No Rovo on this site? Choose rule-based checks under Review mode.',
           },
     engine || rulesOnly
       ? {
           done: true,
           text: engine
-            ? 'Redline Engine writes reviews itself: no one can submit review runs'
+            ? 'Threatline Engine writes reviews itself: no one can submit review runs'
             : 'Rule-based checks only: no AI review runs to lock',
         }
       : authors > 0
@@ -52,13 +52,13 @@ const itemsOf = (s: SetupStatus, mode: 'engine' | 'agent' | 'rules_only', author
           },
     {
       done: s.bitbucketKeyCopied,
-      text: s.bitbucketKeyCopied ? 'Public key copied to Bitbucket' : 'Copy the public key to Redline for Bitbucket',
+      text: s.bitbucketKeyCopied ? 'Public key copied to Bitbucket' : 'Copy the public key to Threatline for Bitbucket',
     },
     { done: null, text: s.mcpEnabledHint },
   ];
 };
 
-/** Task 24: what Redline has seen working on this site. */
+/** Task 24: what Threatline has seen working on this site. */
 export function SetupChecklist({
   api,
   reviewMode = 'agent',
