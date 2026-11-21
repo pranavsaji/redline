@@ -28,7 +28,12 @@ export async function engineVerify(deps: Pick<PipelineDeps, 'llm' | 'policy'>, t
   if (!r.ok) return r;
   const byId = new Map(r.value.verdicts.map((v) => [v.id, v]));
   if (byId.size !== ids.length || ids.some((id) => !byId.has(id))) return err(appError('schema', 'verifier must give one verdict per threat'));
-  return ok(items.map((t, n) => ({ threatId: t.id, keep: byId.get(ids[n]!)!.keep, reason: byId.get(ids[n]!)!.reason })));
+  // The verifier refers to threats by its own ids ("repeats T1"): people see the threat's title instead.
+  const named = (reason: string) => reason.replace(/\bT(\d{1,3})\b/g, (m, d: string) => {
+    const t = items[Number(d) - 1];
+    return t ? `“${t.title}”` : m;
+  });
+  return ok(items.map((t, n) => ({ threatId: t.id, keep: byId.get(ids[n]!)!.keep, reason: named(byId.get(ids[n]!)!.reason) })));
 }
 
 /**
