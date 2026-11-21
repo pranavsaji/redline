@@ -2,8 +2,8 @@
 
 ![tests](https://img.shields.io/badge/tests-1050%2B%20passing-brightgreen)
 ![coverage](https://img.shields.io/badge/line%20coverage-92.9%25-brightgreen)
-![high-severity recall](https://img.shields.io/badge/high--severity%20recall-91.9%25-blue)
-![injection resistance](https://img.shields.io/badge/injection%20resistance-6%2F6-blue)
+![high-severity recall](https://img.shields.io/badge/high--severity%20recall%20%2855%20cases%29-90.0%25-blue)
+![injection resistance](https://img.shields.io/badge/injection%20resistance%20%2855%20cases%29-14%2F15-blue)
 ![runs on Atlassian](https://img.shields.io/badge/egress-none-informational)
 
 **Security review that gates Done and merge.** Security review is advisory, so it loses to the deadline. Threatline
@@ -31,7 +31,8 @@ someone allowed to accept it.
 
 **And the AI cannot be talked into approving.** Text that tries to instruct the model is flagged in the panel, the
 threats resting on it wait for a security champion, and the verdict is always computed by code, never by the model.
-Measured: 6 of 6 poisoned cases held, high-severity recall 91.9% ([eval](#eval), [how the engine works](docs/ENGINE.md)).
+Measured offline on `claude-sonnet-4-5`: 14 of 15 poisoned cases held and high-severity recall 90.0% on the full 55-case
+set; 6 of 6 and 91.9% on the 30-case subset CI replays ([eval](#eval), [how the engine works](docs/ENGINE.md)).
 
 ## Also in the box
 
@@ -53,7 +54,11 @@ Forge SQL. No egress: nothing leaves Atlassian.
 
 ## Eval
 
-_Scored offline with Claude Code on claude-sonnet-4-5 (tools and MCP off, Threatline's prompt as the system prompt), 30 cases (24 clean, 6 poisoned), 3 samples each, 2026-11-19, prompt v1.3.0._
+_Recorded Claude Code outputs on claude-sonnet-4-5 (tools and MCP off, Threatline's prompt as the system prompt), replayed
+offline on 2026-11-20: 30 cases (24 clean, 6 poisoned), 3 samples each, prompt v1.3.0
+(`evals/results/2026-11-20-recorded-30.md`). The "was" figures are the 2026-11-19 replay of the same recordings, before coverage
+(`evals/results/2026-11-19-recorded-30.md`). The product runs Threatline Engine on `claude-opus-5`
+(`apps/core/src/adapters/forge-llm.ts`); these figures were not measured on that model._
 
 | Metric | Value | Target |
 | --- | --- | --- |
@@ -66,7 +71,7 @@ _Scored offline with Claude Code on claude-sonnet-4-5 (tools and MCP off, Threat
 | Precision, strict (vs the must-find list only) | 35.9% (was 29.5%) | lower bound |
 | F1 (strict) | 50.5% (was 43.8%) | |
 
-Each case lists only 2 to 3 must-find threats, while Threatline shows about 6 per case, so strict precision counts every
+Each case lists only 1 to 3 must-find threats (most list 2), while Threatline shows about 5 per case, so strict precision counts every
 other threat as wrong. A separate `claude -p` call (same model, tools off, a strict rubric: follows from the design,
 specific, not a duplicate) graded each threat outside the list: 45 of the 73 the model proposed are valid.
 
@@ -117,6 +122,10 @@ pnpm threatline eval --llm fake                             # deterministic base
   `pnpm e2e` drives the real UI against Threatline's real resolvers, agent actions, Done validator and signing, with
   only Jira, Confluence, Rovo and the clock simulated (`e2e/local/server.ts`). CI also runs semgrep (Threatline's own
   rules in `.semgrep.yml` plus the registry rulesets), `pnpm audit`, gitleaks and knip, and fails on any high finding.
+
+  The line-coverage badge comes from `pnpm test:cov` (92.85% of lines, 1,084 tests on 2026-11-21). It counts only the
+  TypeScript under `packages/*/src` and `apps/*/src` (`vitest.config.ts`). The Custom UI (`apps/core/ui`,
+  `apps/bitbucket/ui`), the eval runner, `scripts/` and `e2e/` are not part of that figure.
 
 ## Docs
 

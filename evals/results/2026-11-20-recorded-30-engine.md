@@ -1,4 +1,4 @@
-# Redline eval — 2026-11-20
+# Threatline eval — 2026-11-20
 
 _replayed offline from recorded Claude Code outputs (claude-sonnet-4-5), 30 cases, 2026-11-20; prompt v1.3.0; path engine; 3 sample(s) per case._
 

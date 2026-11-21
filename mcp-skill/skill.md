@@ -10,7 +10,7 @@ Threatline is a Jira app that threat-models work items and blocks Done and merge
 
 ## Connect
 
-1. A site or org admin enables external MCP access for Threatline. In Atlassian Administration, go to Apps > Sites > your site > Connected apps > Threatline.
+1. A site or org admin enables external MCP access for Threatline. It is off by default. In Atlassian Administration, go to Apps > Sites > your site > Connected apps, open View app details for Threatline, and turn on its tools under Tools.
 2. Add the MCP server to your client. The URL is `https://mcp.atlassian.com/forge/<appId>`, where `<appId>` is the UUID at the end of Threatline's app id. With Claude Code:
 
    ```sh
