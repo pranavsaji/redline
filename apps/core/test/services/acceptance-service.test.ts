@@ -121,6 +121,28 @@ describe('Journey B: risk accepted under time pressure (RL-1, RL-2, RL-5)', () =
   });
 });
 
+describe('approvers must be able to see the requirement’s threat (viewer scope)', () => {
+  async function hideThreat(t: Awaited<ReturnType<typeof reviewed>>['t'], threatId: string) {
+    const latest = (await t.deps.reviews.latest(ISSUE)) as { ok: true; value: { id: string } };
+    const facts = (await t.deps.reviews.facts(latest.value.id)) as { ok: true; value: Array<Record<string, unknown>> };
+    const secret = { ...facts.value[0]!, id: 'fact_secret', sourceAri: 'ari:cloud:confluence:c:page/77', sourceType: 'confluence_page', title: 'Restricted design' };
+    await t.deps.reviews.saveFacts(latest.value.id, [...facts.value, secret] as never);
+    await t.deps.reviews.updateThreat(threatId, { citations: [{ factId: 'fact_secret', quote: 'secret' }] });
+    t.deps.confluence = { canRead: async () => ok(false) } as never;
+  }
+
+  it('decide and revoke are not_found, and nothing is ledgered, for an approver who cannot see the threat', async () => {
+    const { t, req } = await reviewed();
+    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: '', expiryDays: 30 });
+    if ('error' in asked) throw new Error('request failed');
+    await hideThreat(t, req.threatId);
+    const before = ((await t.deps.ledger.all()) as { ok: true; value: unknown[] }).value.length;
+    expect(await acceptanceDecide(t.deps, as(CHAMP), { acceptanceId: asked.acceptanceId, decision: 'approve' })).toEqual({ error: 'not_found' });
+    expect(await acceptanceRevoke(t.deps, as(DEV), { acceptanceId: asked.acceptanceId, reason: 'HMAC check shipped early' })).toEqual({ error: 'not_found' });
+    expect(((await t.deps.ledger.all()) as { ok: true; value: unknown[] }).value.length).toBe(before);
+  });
+});
+
 describe('panel data for acceptances', () => {
   it('lists the work item’s acceptances with the viewer id and the policy caps the form needs', async () => {
     const { t, req } = await reviewed();

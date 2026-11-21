@@ -168,6 +168,41 @@ describe('panel.get security: discarded threats and history are viewer-scoped', 
     if ('error' in dto) throw new Error(dto.error);
     expect(dto.history).toEqual([expect.objectContaining({ revision: 1, added: 1, removed: 0 })]);
   });
+
+  it('the risk score (latest and history) counts only the threats this viewer can see', async () => {
+    const { t, reviewId, secret, visibleFactId } = await withSecretPage();
+    await t.deps.reviews.saveThreats(reviewId, [threat(reviewId, 1, secret.id, 'Critical'), threat(reviewId, 2, visibleFactId, 'Low')], []);
+    await t.deps.reviews.update(reviewId, { riskScore: 97 });
+    t.deps.confluence = { canRead: async () => ok(false) } as never;
+    const dto = await panelGet(t.deps, viewer());
+    if ('error' in dto) throw new Error(dto.error);
+    expect(dto.review?.riskScore).toBeLessThan(97);
+    expect(dto.history[0]!.riskScore).toBe(dto.review?.riskScore);
+    // A viewer who can see every source gets the stored score.
+    t.deps.confluence = { canRead: async () => ok(true) } as never;
+    const full = await panelGet(t.deps, viewer());
+    if ('error' in full) throw new Error(full.error);
+    expect(full.review?.riskScore).toBe(97);
+    expect(full.history[0]!.riskScore).toBe(97);
+  });
+
+  it('an inherited reason from a parent the viewer cannot browse names "a parent work item", not its key', async () => {
+    const { t } = await reviewed();
+    t.kv.data.set('verdict:10042', {
+      state: 'block', blockingCount: 2, maxOpenSeverity: 'High', inheritedFrom: ['SEC-9', 'PAY-1'], updatedAt: '2026-11-15T12:00:00Z', message: 'Threatline blocks Done: SEC-9: 1 open security requirement: SEC-10.',
+      reasons: [
+        { code: 'open_requirement', message: 'SEC-9: 1 open security requirement at High or above: SEC-10.', requirementIds: ['req_sec'], action: { label: 'Open SEC-9', href: 'https://x/browse/SEC-9' } },
+        { code: 'open_requirement', message: 'PAY-1: 1 open security requirement at High or above.' },
+      ],
+    });
+    t.jira.canBrowse = async (_a, id) => ok(id !== 'SEC-9');
+    const dto = await panelGet(t.deps, viewer());
+    if ('error' in dto) throw new Error(dto.error);
+    expect(JSON.stringify(dto.verdict)).not.toMatch(/SEC-9|SEC-10|req_sec/);
+    expect(dto.verdict?.reasons[0]!.message).toMatch(/^A parent work item/);
+    expect(dto.verdict?.reasons[1]!.message).toBe('PAY-1: 1 open security requirement at High or above.');
+    expect(dto.verdict?.inheritedFrom).toEqual(['a parent work item', 'PAY-1']);
+  });
 });
 
 describe('panel.get requirements', () => {
