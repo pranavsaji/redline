@@ -53,23 +53,27 @@ export async function runMergeCheck(
   const dest = pr.value.destination?.commit?.hash ?? '';
   const fullName = pr.value.destination?.repository?.full_name ?? '';
   if (!shortHead || !dest || !fullName) return unreadable('commits');
-  // The pull request API reports 12-character hashes; the gate matches the attestation's full hash exactly. The full
-  // hash comes from the pull request's own commit list (forks included); anything that does not match fails closed.
-  const resolved = /^[0-9a-f]{40}$/.test(shortHead) ? { ok: true as const, value: shortHead } : await deps.client.headCommit(ws, repo, event.pullrequest.id, shortHead);
-  if (!resolved.ok || !resolved.value.startsWith(shortHead.toLowerCase())) return unreadable('head commit');
-  const head = resolved.value;
   // `.redline/policy.yml`: the name before the rename to Threatline, still read when the new file is absent.
   const current = await deps.client.fileAt(ws, repo, dest, '.threatline/policy.yml');
   const policy = current.ok && current.value === null ? await deps.client.fileAt(ws, repo, dest, '.redline/policy.yml') : current;
   if (!policy.ok) return unreadable('policy file');
-  const r = await evaluateMergeCheck({
-    pr: { description: pr.value.description ?? '', headSha: head, destSha: dest, repoFullName: fullName, title: pr.value.title ?? '', branch: pr.value.source?.branch?.name ?? '' },
+  const input = (headSha: string) => ({
+    pr: { description: pr.value.description ?? '', headSha, destSha: dest, repoFullName: fullName, title: pr.value.title ?? '', branch: pr.value.source?.branch?.name ?? '' },
     // M7: every added line feeds the secret-pattern signal; unreadable or over-long diff text fails closed (sensitive).
     files: withAddedText(toDiffFiles(diff.value), patch),
     repoPolicyYaml: policy.value,
     settings,
     nowSec: deps.nowSec(),
   });
+  // A pull request that touches nothing sensitive passes without looking at its head commit at all.
+  let r = await evaluateMergeCheck(input(shortHead));
+  if (r.outcome !== 'pass_not_sensitive' && !/^[0-9a-f]{40}$/i.test(shortHead)) {
+    // The pull request API reports 12-character hashes; the gate matches the attestation's full hash exactly. The full
+    // hash comes from the pull request's own commit list (forks included); anything that does not match fails closed.
+    const resolved = await deps.client.headCommit(ws, repo, event.pullrequest.id, shortHead);
+    if (!resolved.ok || !resolved.value.startsWith(shortHead.toLowerCase())) return unreadable('head commit');
+    r = await evaluateMergeCheck(input(resolved.value));
+  }
   log('merge_check', { outcome: r.outcome, files: diff.value.length });
   return { success: r.success, message: r.message };
 }

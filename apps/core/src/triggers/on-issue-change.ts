@@ -61,10 +61,14 @@ export async function onIssueChange(deps: CoreDeps, raw: unknown): Promise<void>
   else if (e.eventType === 'avi:jira:created:issue') job = { kind: 'gather', issueId: e.issue.id, reason: 'created', ...actor };
   else {
     const rerun = items.some((i) => names(i).includes('labels') && words(i.to).includes(RERUN_LABEL) && !words(i.from).includes(RERUN_LABEL));
-    // Security: a label re-run creates a revision and spends model calls, so it takes the same per-account limit as
-    // the panel button (per work item when the event names nobody). Over the limit it is an ordinary update.
-    const allowed = rerun && (await checkRerunLimit(deps, e.atlassianId ?? `issue:${e.issue.id}`)).ok;
-    if (rerun && !allowed) log('trigger.issue.rerun_limited', { issueId: e.issue.id });
+    // A label re-run creates a revision and spends model calls, so one work item can be re-run this way 10 times an
+    // hour. The limit is per work item, not per person, so an Automation rule that labels many items at once still
+    // re-runs every one of them; the monthly review budget caps total spend. Over the limit it is an ordinary update.
+    // A limiter that cannot be read (SQL briefly down, or before the migration that adds it has run) does not drop
+    // the re-run: the budget still applies.
+    const limit = rerun ? await checkRerunLimit(deps, `label:${e.issue.id}`) : null;
+    const allowed = rerun && (limit?.ok || limit?.error.code === 'upstream');
+    if (limit && !limit.ok) log(limit.error.code === 'upstream' ? 'trigger.issue.rerun_limit_unavailable' : 'trigger.issue.rerun_limited', { issueId: e.issue.id });
     if (allowed) job = { kind: 'gather', issueId: e.issue.id, reason: 'rerun', ...actor };
     else if (items.some((i) => names(i).some((n) => RELEVANT.has(n)))) job = { kind: 'gather', issueId: e.issue.id, reason: 'updated', ...actor };
   }

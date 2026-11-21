@@ -5,6 +5,7 @@ import { log } from '../adapters/log.js';
 import type { ReviewJob } from '../jobs/types.js';
 import { monthOf } from './budget.js';
 import { refreshVerdict } from './verdict-service.js';
+import { storeSample } from './samples.js';
 
 type EngineJob = Extract<ReviewJob, { kind: 'engine' }>;
 const voidOk = (): Result<void> => ok(undefined);
@@ -103,8 +104,18 @@ export async function engineJob(deps: CoreDeps, job: EngineJob): Promise<Result<
       if (!c.ok) log('engine.checkpoint_failed', { reviewId: review.id, n, code: c.error.code });
     }
     const s = await deps.reviews.saveSample(review.id, slot, sample);
-    // A conflict is this run stored by an earlier delivery: done, not an error.
-    if (!s.ok && s.error.code !== 'conflict') return s;
+    if (!s.ok) {
+      if (s.error.code !== 'conflict') return s;
+      // The slot is taken: by this run from an earlier delivery (done), or by a run stored in arrival order (a review
+      // started before runs had fixed slots, or an agent submission). Then this run goes into the next free slot rather
+      // than being dropped, so the review still gets every run it is waiting for.
+      const stored = await deps.reviews.samples(review.id);
+      if (!stored.ok) return stored;
+      if (JSON.stringify(stored.value[slot - 1]) !== JSON.stringify(sample)) {
+        const next = await storeSample(deps, review, sample);
+        if (!next.ok && next.error.message !== 'complete') return next;
+      }
+    }
     const failed = 'failed' in sample ? sample.failed : undefined;
     const m = await deps.reviews.saveStage(review.id, `run:${n}`, failed ? 'failed' : 'done', undefined, failed);
     if (!m.ok) return m;

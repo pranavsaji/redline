@@ -131,6 +131,7 @@ export type LedgerEventType =
   | 'policy.changed'
   | 'requirement.verified'
   | 'requirement.status_changed'
+  | 'requirement.status_change_failed'
   | 'project.purged'
   | 'reviews.resumed'
   | 'review.sample'

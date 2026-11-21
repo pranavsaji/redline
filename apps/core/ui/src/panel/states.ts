@@ -21,7 +21,10 @@ export function viewOf(dto: PanelDto): PanelView {
   if (!r) return { state: 'not_reviewed', stale: false, partial: false, injection, steps: [] };
 
   let state: PanelState = 'ready';
-  if (r.status === 'failed') state = r.failureReason === 'budget' ? 'budget' : 'failed';
+  // A review that failed at the budget is only shown as paused while the gate still says so: once reviews resume, the
+  // gate asks for a re-run, so the panel offers one instead of a champion confirmation that would be refused.
+  const pausedNow = !dto.verdict || reasons.some((x) => x.code === 'budget_paused');
+  if (r.status === 'failed') state = r.failureReason === 'budget' && pausedNow ? 'budget' : 'failed';
   else if (r.status === 'agent_timeout') state = 'timeout';
   else if (IN_PROGRESS.has(r.status)) state = 'in_progress';
 

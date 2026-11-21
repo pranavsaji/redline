@@ -204,7 +204,13 @@ export async function setRequirementStatus(
   );
   if (!row.ok) return row;
   const u = await deps.requirements.upsert(next);
-  if (!u.ok) return u;
+  if (!u.ok) {
+    // The change is recorded before it is saved, so it is never saved unrecorded. When the save then fails, a second
+    // entry says the recorded change did not take effect, so the ledger never shows a change that never happened.
+    const undo = await appendLedger(deps.ledger, deps.clock, 'requirement.status_change_failed', { requirementId: req.id, issueId: v.issueId, failedEntryHash: row.value.entryHash, code: u.error.code }, v.accountId);
+    if (!undo.ok) log('requirement.status_change_failed_unrecorded', { requirementId: req.id, code: undo.error.code });
+    return u;
+  }
   await refreshVerdict(deps, v.issueId);
   await deps.queue.push([{ kind: 'propagate', issueId: v.issueId }]);
   return ok({ requirement: next, entryHash: row.value.entryHash });

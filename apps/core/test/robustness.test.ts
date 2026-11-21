@@ -87,6 +87,23 @@ describe('engine runs are stored exactly once, and only then marked done (bug 5)
   });
 });
 
+describe('runs stored in arrival order before a deploy (seam review 1)', () => {
+  it('a run whose fixed slot is already taken by another run goes into the next free slot instead of being dropped', async () => {
+    const llm = new FakeLlm({ extract, propose: RUN, verify: keepAll });
+    const t = coreDeps({ policy: enginePolicy, llm });
+    await handleJob(t.deps, { kind: 'gather', issueId: ISSUE, reason: 'created' });
+    const rev = await latest(t);
+    await handleJob(t.deps, { kind: 'engine', reviewId: rev.id, stage: 'extract' });
+    // Runs 1 and 2 finished before the deploy and took slots 1 and 2 in arrival order.
+    await t.deps.reviews.saveSample(rev.id, 1, model(rev.issueKey));
+    await t.deps.reviews.saveSample(rev.id, 2, { failed: 'schema' });
+    t.pushed.length = 0;
+    await handleJob(t.deps, { kind: 'engine', reviewId: rev.id, stage: 'propose', n: 0 });
+    const s = await t.deps.reviews.samples(rev.id);
+    expect(s.ok && s.value).toHaveLength(3);
+  });
+});
+
 describe('too few valid runs fail closed (bug 7)', () => {
   it('two of three engine runs failing settles the review as failed with the reason and a re-run, not ready on one run', async () => {
     let n = 0;
@@ -165,6 +182,31 @@ describe('jobs of a superseded revision exit early (bug 8)', () => {
     expect((await handleJob(t.deps, { kind: 'assemble', reviewId: old.id })).ok).toBe(true);
     expect((await t.deps.reviews.get(old.id)).ok && ((await t.deps.reviews.get(old.id)) as { value: Review }).value.samplesReceived).toBe(0);
     expect(await t.deps.requirements.forIssue(ISSUE)).toEqual(reqsBefore);
+  });
+});
+
+describe('assembly racing the sweeper (seam review 2)', () => {
+  it('an assembly that read the review before the sweeper timed it out does not write it back to waiting', async () => {
+    const t = coreDeps();
+    await handleJob(t.deps, { kind: 'gather', issueId: ISSUE, reason: 'created' });
+    const rev = await latest(t);
+    await t.deps.reviews.saveSample(rev.id, 1, model(rev.issueKey));
+    const real = t.deps.reviews;
+    let swept = false;
+    t.deps.reviews = {
+      ...real,
+      samples: async (id) => {
+        const r = await real.samples(id);
+        // The sweeper runs while this assembly is between reading the review and writing its status.
+        if (!swept) {
+          swept = true;
+          await real.update(id, { status: 'agent_timeout', updatedAt: t.deps.clock.now().toISOString() });
+        }
+        return r;
+      },
+    };
+    expect((await handleJob(t.deps, { kind: 'assemble', reviewId: rev.id })).ok).toBe(true);
+    expect((await latest(t)).status).not.toBe('awaiting_agent');
   });
 });
 

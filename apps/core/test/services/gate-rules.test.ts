@@ -198,6 +198,16 @@ describe('requirement status changes are ledgered, from the panel and from agent
     expect('entryHash' in r && r.entryHash).toBe(rows[0]!.entryHash);
   });
 
+  it('seam review 6: when the save fails after the change was recorded, the ledger also records that it did not take effect', async () => {
+    const { t, req, reqs } = await reviewed();
+    t.deps.requirements.upsert = async () => ({ ok: false, error: { code: 'upstream', message: 'sql down' } });
+    expect(await requirementsSetStatus(t.deps, as(DEV), { requirementId: req.id, status: 'Verified', evidence: { kind: 'manual', ref: 'checked by hand' } })).toMatchObject({ error: expect.any(String) });
+    const rows = await statusRows(t);
+    expect(rows.map((r) => r.eventType)).toEqual(['requirement.verified', 'requirement.status_change_failed']);
+    expect(rows[1]!.payload).toMatchObject({ requirementId: req.id, failedEntryHash: rows[0]!.entryHash });
+    expect((await reqs()).find((r) => r.id === req.id)!.status).toBe('Open');
+  });
+
   it('fails closed: when the ledger cannot record it, the status does not change', async () => {
     const { t, req, reqs } = await reviewed();
     t.deps.ledger.append = async () => ({ ok: false, error: { code: 'upstream', message: 'sql down' } });

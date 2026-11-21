@@ -307,10 +307,11 @@ async function assemble(deps: CoreDeps, reviewId: string, again = 0): Promise<Re
   if (latestSamples.value.length > k && again < MAX_REASSEMBLY) return assemble(deps, reviewId, again + 1);
   const status = review.status === 'failed' ? 'failed' : out.value.status;
   const failureReason = status === 'failed' || status === 'agent_timeout' ? out.value.failureReason : undefined;
-  // Compare-and-set: a stale assembly (fewer runs) never overwrites the status a newer one wrote.
+  // Compare-and-set: a stale assembly (fewer runs, or one that read the status before the sweeper timed the review out)
+  // never overwrites what a newer one wrote; it assembles again from the current row instead.
   const upd = await deps.reviews.updateWhere(
     review.id,
-    { samplesReceivedAtMost: k },
+    { samplesReceivedAtMost: k, status: review.status },
     { status, riskScore: out.value.riskScore, samplesReceived: k, ...(failureReason ? { failureReason } : {}), updatedAt: deps.clock.now().toISOString() },
   );
   if (!upd.ok) return upd;

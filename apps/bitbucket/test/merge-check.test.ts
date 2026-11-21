@@ -283,6 +283,12 @@ describe('runMergeCheck: reads the PR, its diffstat, the destination policy and 
       expect(await runMergeCheck(event, { client: bad, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: false, message: expect.stringMatching(/could not read this pull request from Bitbucket \(head commit\)/) });
   });
 
+  it('seam review 4: a docs-only PR passes even when Bitbucket cannot list its commits (the head is only looked up when needed)', async () => {
+    const { c, calls } = client({ description: '', diff: fixture('diffstat/docs-only.json'), fail: 'commit' });
+    expect(await runMergeCheck(event, { client: c, settings: async () => settings(), nowSec: () => NOW })).toEqual({ success: true, message: 'Threatline: no security-sensitive changes.' });
+    expect(calls.some((x) => x.startsWith('head:'))).toBe(false);
+  });
+
   it('a docs-only PR passes without an attestation', async () => {
     const { c } = client({ description: '', diff: fixture('diffstat/docs-only.json') });
     expect(await runMergeCheck(event, { client: c, settings: async () => settings(), nowSec: () => NOW })).toEqual({ success: true, message: 'Threatline: no security-sensitive changes.' });
