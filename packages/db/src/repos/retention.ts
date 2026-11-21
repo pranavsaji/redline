@@ -69,8 +69,12 @@ export function sqlRetention(x: SqlExecutor): RetentionStore {
     },
 
     async purgeProject(projectKey) {
-      // Reviews by key prefix ("OLD-" never matches "OLDER-1"), plus any issue the project row knows about.
-      const ids = await x.query<{ id: string; issue_id: string }>('SELECT id, issue_id FROM reviews WHERE SUBSTR(issue_key, 1, LENGTH(?) + 1) = ?', [projectKey, `${projectKey}-`]);
+      // By the issue's current project: a move updates only the issues row, so review rows keep the key they were
+      // stored under. The key prefix ("OLD-" never matches "OLDER-1") is used only for issues with no issues row.
+      const ids = await x.query<{ id: string; issue_id: string }>(
+        'SELECT r.id AS id, r.issue_id AS issue_id FROM reviews r LEFT JOIN issues i ON i.issue_id = r.issue_id WHERE i.project_key = ? OR (i.issue_id IS NULL AND SUBSTR(r.issue_key, 1, LENGTH(?) + 1) = ?)',
+        [projectKey, projectKey, `${projectKey}-`],
+      );
       if (!ids.ok) return ids;
       const known = await x.query<{ issue_id: string }>('SELECT issue_id FROM issues WHERE project_key = ?', [projectKey]);
       if (!known.ok) return known;
