@@ -3,6 +3,7 @@ import { RequirementStatusSchema, type AppError, TEST_LANGUAGES, type TestLangua
 import type { JiraIssue } from '../adapters/jira.js';
 import type { CoreDeps } from '../deps.js';
 import { authorise, type Viewer } from '../resolvers/panel.js';
+import { shownMessage } from '../resolvers/errors.js';
 import { callerOf, ISSUE_KEY, type ActionPayload } from './common.js';
 
 /** Rovo's practical response ceiling is about 1 MB and Forge's 5 MB; Threatline keeps every action answer under 256 KB. */
@@ -14,7 +15,7 @@ export type ActionError = { error: 'invalid_input' | 'refused'; message: string 
 export function actionError(e: AppError): ActionError {
   if (e.code === 'not_found') return { error: 'not_found' };
   if (e.code === 'budget') return { error: 'rate_limited' };
-  if (e.code === 'validation' || e.code === 'forbidden' || e.code === 'conflict') return { error: 'refused', message: e.message };
+  if (e.code === 'validation' || e.code === 'forbidden' || e.code === 'conflict') return { error: 'refused', message: shownMessage(e) };
   return { error: 'unavailable' };
 }
 
