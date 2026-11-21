@@ -36,7 +36,8 @@ function token(o: Partial<AttestationPayload> = {}, k: KeyPair = key): string {
 }
 const AUTH = [{ path: 'src/auth/webhook.ts', status: 'modified' as const, linesAdded: 40 }];
 const DOCS = [{ path: 'README.md', status: 'modified' as const, linesAdded: 2 }];
-const pr = (description: string, headSha = HEAD.slice(0, 12)) => ({ description, headSha, repoFullName: REPO, destSha: 'd'.repeat(12), title: 'PAY-7 Verify refund webhook signatures', branch: 'feature/PAY-7-webhook-hmac' });
+// The gate compares full 40-character hashes; runMergeCheck resolves Bitbucket's 12-character ones first (bug 7).
+const pr = (description: string, headSha = HEAD) => ({ description, headSha, repoFullName: REPO, destSha: 'd'.repeat(12), title: 'PAY-7 Verify refund webhook signatures', branch: 'feature/PAY-7-webhook-hmac' });
 const run = (description: string, o: { files?: typeof AUTH; yaml?: string | null; s?: RepoSettings; head?: string } = {}) =>
   evaluateMergeCheck({ pr: pr(description, o.head), files: o.files ?? AUTH, repoPolicyYaml: o.yaml ?? null, settings: o.s ?? settings(), nowSec: NOW });
 
@@ -136,6 +137,26 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
     expect(await multi(`${token()}\n${token({ issueKey: 'PAY-6', nonce: 'n0nce3', commitSha: OLD, iat: NOW - 120 })}`)).toMatchObject({ success: false, outcome: 'fail_other_issue' });
   });
 
+  it('bug 7: the attestation must name exactly the head commit (no prefix match on a short hash)', async () => {
+    const lookalike = `${HEAD.slice(0, 12)}${'c'.repeat(28)}`;
+    expect(await run(token({ commitSha: lookalike }))).toMatchObject({ success: false, outcome: 'fail_stale_commit' });
+    // A short head (what Bitbucket's pull request API reports) is never accepted by the gate itself.
+    expect(await run(token(), { head: HEAD.slice(0, 12) })).toMatchObject({ success: false, outcome: 'fail_stale_commit', message: expect.stringMatching(/full 40-character/) });
+  });
+
+  it('bug 8: a key next to an underscore (PAY-7_fix) is still a named work item that needs its own attestation', async () => {
+    const named = (title: string, branch: string, description = token({ issueKey: 'PAY-6' })) =>
+      evaluateMergeCheck({ pr: { ...pr(description), title, branch }, files: AUTH, repoPolicyYaml: null, settings: settings(), nowSec: NOW });
+    for (const branch of ['PAY-7_fix', 'feature/PAY-7_hotfix', 'fix_PAY-7', 'pay-7-fix', 'feature/pay-7_fix'])
+      expect(await named('PAY-6 harden refunds', branch)).toMatchObject({ success: false, outcome: 'fail_other_issue', message: expect.stringMatching(/also names PAY-7/) });
+    // A lowercase look-alike in another project is not a work item (no false requirement): utf-8, sha-256.
+    expect(await named('PAY-6 parse utf-8 bodies', 'feature/sha-256-hmac')).toMatchObject({ success: true, outcome: 'pass_attested' });
+    // An underscore-adjacent key alone is recognised for the attestation.
+    expect(await named('Harden refunds', 'PAY-6_hotfix')).toMatchObject({ success: true, outcome: 'pass_attested' });
+    // Lowercase only counts next to an uppercase key of the same project: alone it is not a key.
+    expect(await named('Harden refunds', 'pay-6-fix')).toMatchObject({ success: false, outcome: 'fail_other_issue', message: expect.stringMatching(/names no Jira work item/) });
+  });
+
   it('M9: an attestation for a review made with partial context says so in the check message', async () => {
     expect(await run(token({ partial: true }))).toMatchObject({ success: true, outcome: 'pass_attested', message: expect.stringMatching(/reviewed with partial context/) });
   });
@@ -202,7 +223,7 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
 });
 
 describe('runMergeCheck: reads the PR, its diffstat, the destination policy and repo settings', () => {
-  function client(o: { description: string; diff?: string; policy?: string | null; fail?: 'pr' | 'diff'; patch?: string | null }) {
+  function client(o: { description: string; diff?: string; policy?: string | null; fail?: 'pr' | 'diff' | 'commit'; patch?: string | null; fullHead?: string }) {
     const calls: string[] = [];
     const prJson = JSON.parse(fixture('pr/auth-change.json').replace('{{ATTESTATION}}', o.description.replace(/\n/g, '\\n')));
     const c: BitbucketClient = {
@@ -210,6 +231,7 @@ describe('runMergeCheck: reads the PR, its diffstat, the destination policy and 
       diffstat: async (_ws, _repo, id) => (calls.push(`diff:${id}`), o.fail === 'diff' ? { ok: false, error: { code: 'upstream', message: '500' } } : { ok: true, value: JSON.parse(o.diff ?? fixture('diffstat/auth-change.json')).values }),
       fileAt: async (_ws, _repo, commit, path) => (calls.push(`file:${commit}:${path}`), { ok: true, value: o.policy ?? null }),
       diff: async (_ws, _repo, id) => (calls.push(`patch:${id}`), o.patch === null ? { ok: false, error: { code: 'upstream', message: '500' } } : { ok: true, value: o.patch ?? '' }),
+      commitHash: async (_ws, _repo, hash) => (calls.push(`commit:${hash}`), o.fail === 'commit' ? { ok: false, error: { code: 'upstream', message: '500' } } : { ok: true, value: o.fullHead ?? 'b'.repeat(40) }),
     };
     return { c, calls };
   }
@@ -222,6 +244,18 @@ describe('runMergeCheck: reads the PR, its diffstat, the destination policy and 
     expect(calls).toContain('file:dddddddddddd:.threatline/policy.yml');
     // No .threatline/policy.yml: the file's name from before the rename is read instead.
     expect(calls).toContain('file:dddddddddddd:.redline/policy.yml');
+  });
+
+  it('bug 7: resolves Bitbucket’s short head hash to the full commit, and fails closed when it cannot', async () => {
+    const t = token({ commitSha: 'b'.repeat(40) });
+    const { c, calls } = client({ description: t });
+    expect(await runMergeCheck(event, { client: c, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: true });
+    expect(calls).toContain('commit:bbbbbbbbbbbb');
+    // The short hash resolves to a different commit than the attestation names (same 12-character prefix).
+    const { c: other } = client({ description: t, fullHead: `${'b'.repeat(12)}${'e'.repeat(28)}` });
+    expect(await runMergeCheck(event, { client: other, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: false, message: expect.stringMatching(/attestation is for commit/) });
+    for (const bad of [client({ description: t, fail: 'commit' }).c, client({ description: t, fullHead: 'f'.repeat(40) }).c, client({ description: t, fullHead: 'bbbb' }).c])
+      expect(await runMergeCheck(event, { client: bad, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: false, message: expect.stringMatching(/could not read this pull request from Bitbucket \(head commit\)/) });
   });
 
   it('a docs-only PR passes without an attestation', async () => {

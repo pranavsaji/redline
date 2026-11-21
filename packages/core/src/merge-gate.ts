@@ -66,8 +66,35 @@ export interface PrFacts {
   branch?: string;
 }
 
-const ISSUE_KEY = /\b([A-Z][A-Z0-9_]+-\d+)\b/;
-const ISSUE_KEYS = /\b([A-Z][A-Z0-9_]+-\d+)\b/g;
+/**
+ * Work-item keys a pull request names in its title or branch. `\b` cannot bound them: `_` is a word character, so
+ * `PAY-7_fix` and `fix_PAY-7` would hide PAY-7 (and with it the need for PAY-7's own attestation). The rules:
+ * - a key is a project (a letter, then letters, digits or `_`) + `-` + digits, not touching another letter or digit
+ *   before it, nor a digit after it (`_`, `/`, `-`, `.` and the like separate);
+ * - an uppercase key counts (`PAY-7`, `MY_PROJ-12`). In `fix_PAY-7` the longest uppercase `_`-suffix is the project;
+ * - a lowercase or mixed-case key (`pay-7-fix`) counts only when its project, uppercased (or an `_`-suffix of it), is the
+ *   project of an uppercase key named in the title or branch. Alone, `utf-8` or `sha-256` would be a false requirement.
+ */
+const KEY_LIKE = /(?<![A-Za-z0-9])([A-Za-z][A-Za-z0-9_]*)-(\d+)(?![0-9])/g;
+const UPPER_PROJECT = /^[A-Z][A-Z0-9_]+$/;
+/** `fix_PAY` → [`fix_PAY`, `PAY`]: the project with each `_`-separated prefix dropped, longest first. */
+const suffixes = (project: string) => project.split('_').map((_, i, parts) => parts.slice(i).join('_'));
+
+export function namedIssueKeys(...texts: string[]): string[] {
+  const found = texts.flatMap((t) => [...t.matchAll(KEY_LIKE)].map((m) => ({ project: m[1]!, num: m[2]! })));
+  const upper = found.map((f) => {
+    const project = suffixes(f.project).find((p) => UPPER_PROJECT.test(p));
+    return project ? `${project}-${f.num}` : null;
+  });
+  const projects = new Set(upper.flatMap((k) => (k ? [k.slice(0, k.lastIndexOf('-'))] : [])));
+  const keys = found.flatMap((f, i) => {
+    if (upper[i]) return [upper[i]];
+    const project = suffixes(f.project.toUpperCase()).find((p) => projects.has(p));
+    return project ? [`${project}-${f.num}`] : [];
+  });
+  return [...new Set(keys)];
+}
+const FULL_SHA = /^[0-9a-f]{40}$/;
 const MSG_SIGNATURE = 'Threatline: attestation signature invalid. Copy a fresh attestation from the Jira issue panel.';
 /** Bitbucket stores descriptions as Markdown and escapes punctuation (`\_`, `\-`); undo that before looking for tokens. */
 export const unescapeMarkdown = (text: string) => text.replace(/\\([\\`*_{}[\]()#+\-.!|~<>])/g, '$1');
@@ -132,7 +159,8 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
   const sensitive = policy.invalid ? i.files.map((f) => f.path) : truncated ? [...markers, ...score.sensitiveFiles] : score.sensitiveFiles;
   if (sensitive.length === 0 && score.score < policy.threshold) return { success: true, outcome: 'pass_not_sensitive', message: 'Threatline: no security-sensitive changes.' };
 
-  const key = ISSUE_KEY.exec(i.pr.title ?? '')?.[1] ?? ISSUE_KEY.exec(i.pr.branch ?? '')?.[1] ?? 'the linked issue';
+  const named = namedIssueKeys(i.pr.title ?? '', i.pr.branch ?? '');
+  const key = named[0] ?? 'the linked issue';
   const shown = [...new Set(sensitive.length > 0 ? sensitive : i.files.map((f) => f.path))].slice(0, 3).join(', ');
   const missing: CheckResult = {
     success: false,
@@ -171,11 +199,13 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
   }
   const p = v.value;
   const head = i.pr.headSha.toLowerCase();
-  // Bitbucket's pull request API reports 12-character hashes (GitHub's, all 40); the attestation carries all 40.
-  if (head.length < 7 || !p.commitSha.startsWith(head))
+  // The attestation names the full 40-character commit and must match exactly. Bitbucket's pull request API reports
+  // 12-character hashes; Threatline for Bitbucket resolves them to the full hash before calling the gate.
+  if (!FULL_SHA.test(head))
+    return { success: false, outcome: 'fail_stale_commit', message: `Threatline: the PR head commit ${head.slice(0, 12) || '(none)'} is not a full 40-character hash, so the attestation cannot be matched to it. Re-run the check.` };
+  if (p.commitSha !== head)
     return { success: false, outcome: 'fail_stale_commit', message: `Threatline: attestation is for commit ${p.commitSha.slice(0, 7)} but the PR head is ${head.slice(0, 7)}. Request a new attestation for the latest commit.` };
   // The attestation must be for a work item this PR names: otherwise any passing item's token could carry a blocked change.
-  const named = [...new Set([...(i.pr.title ?? '').matchAll(ISSUE_KEYS), ...(i.pr.branch ?? '').matchAll(ISSUE_KEYS)].map((m) => m[1]!))];
   if (named.length === 0)
     return { success: false, outcome: 'fail_other_issue', message: `Threatline: this pull request names no Jira work item. Put the work item key (${p.issueKey}) in the pull request title or branch name, then re-run the check.` };
   if (!named.includes(p.issueKey))
@@ -185,7 +215,7 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
   const attested = (key: string) =>
     mine.some((x) => {
       const d = decodeAttestation(x.t, i.settings.publicKeys, i.nowSec);
-      return d.ok && d.value.issueKey === key && d.value.commitSha.startsWith(head);
+      return d.ok && d.value.issueKey === key && d.value.commitSha === head;
     });
   const unattested = named.find((k) => k !== p.issueKey && !attested(k));
   if (unattested)

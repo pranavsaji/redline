@@ -49,10 +49,14 @@ export async function runMergeCheck(
   ]);
   if (!pr.ok) return unreadable('pull request');
   if (!diff.ok) return unreadable('changed files');
-  const head = pr.value.source?.commit?.hash ?? '';
+  const shortHead = pr.value.source?.commit?.hash ?? '';
   const dest = pr.value.destination?.commit?.hash ?? '';
   const fullName = pr.value.destination?.repository?.full_name ?? '';
-  if (!head || !dest || !fullName) return unreadable('commits');
+  if (!shortHead || !dest || !fullName) return unreadable('commits');
+  // The pull request API reports 12-character hashes; the gate matches the attestation's full hash exactly.
+  const resolved = /^[0-9a-f]{40}$/.test(shortHead) ? { ok: true as const, value: shortHead } : await deps.client.commitHash(ws, repo, shortHead);
+  if (!resolved.ok || !resolved.value.startsWith(shortHead.toLowerCase())) return unreadable('head commit');
+  const head = resolved.value;
   // `.redline/policy.yml`: the name before the rename to Threatline, still read when the new file is absent.
   const current = await deps.client.fileAt(ws, repo, dest, '.threatline/policy.yml');
   const policy = current.ok && current.value === null ? await deps.client.fileAt(ws, repo, dest, '.redline/policy.yml') : current;
