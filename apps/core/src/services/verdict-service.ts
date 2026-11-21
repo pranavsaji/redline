@@ -13,6 +13,7 @@ export const contextKey = (issueId: string) => `ctx:${issueId}`;
 export const verdictKey = (issueId: string) => `verdict:${issueId}`;
 
 const MAX_ANCESTORS = 5;
+const PAUSE_RECHECK_MS = 3_600_000;
 
 /**
  * `unreviewed`: Threatline does not review this item (project or issue type not enabled) and no ancestor has a review, so
@@ -351,15 +352,19 @@ export async function refreshVerdict(deps: CoreDeps, issueId: string): Promise<R
   }
 
   const final = combineVerdicts(own.value.verdict, ancestors);
-  const value = {
+  const value: StoredVerdict = {
     ...final,
     panelUrl,
     message: gateMessage(final, keys, panelUrl, guarded),
     ...(own.value.riskScore !== undefined ? { riskScore: own.value.riskScore } : {}),
     ...(own.value.notApplicable && final.state === 'pass' ? { notApplicable: true } : {}),
     ...(own.value.notApplicable && ancestors.length === 0 ? { unreviewed: true } : {}),
-    ...(recheckAt(ledgered.acceptances, reqIds, now) ? { recheckAt: recheckAt(ledgered.acceptances, reqIds, now)! } : {}),
   };
+  // Re-read at the earliest of an acceptance running out and (while held by a pause) the next pause check: a pause ends
+  // on its own (new month, credits signal timing out), and then the way out is a re-run, not a champion confirmation.
+  const ends = [recheckAt(ledgered.acceptances, reqIds, now), final.reasons.some((r) => r.code === 'budget_paused') ? new Date(now.getTime() + PAUSE_RECHECK_MS).toISOString() : undefined];
+  const due = ends.filter((e): e is string => e !== undefined).sort()[0];
+  if (due) value.recheckAt = due;
   const w = await write(deps, issue.id, value, version);
   return w.ok ? ok(final) : w;
 }

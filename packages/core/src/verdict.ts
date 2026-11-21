@@ -26,6 +26,7 @@ export interface VerdictInput {
   projectKey: string;
   championConfirmations: Array<{ reviewId: string; kind: 'review' | 'budget' }>;
   breakGlass: Array<{ issueId: string; until: string }>;
+  /** Reviews are paused at the AI budget now: a review that could not run then waits for a champion, not a re-run. */
   budgetPaused: boolean;
   injectionSuspected: boolean;
   now: Date;
@@ -75,9 +76,14 @@ export function computeVerdict(i: VerdictInput): Verdict {
       reasons.push({ code: 'review_stale', message: 'The design or linked work changed since the last review.', action: rerun });
 
     const confirmed = (kind: 'review' | 'budget') => i.championConfirmations.some((c) => c.reviewId === r.id && c.kind === kind);
-    // Only work whose review could not run is held by a pause; a review that already ran keeps its own verdict.
+    // Only work whose review could not run is held by a pause; a review that already ran keeps its own verdict. A
+    // champion can confirm only while reviews are paused; once they resume, the way out is to run the review.
     if (pausedReview && !confirmed('budget'))
-      reasons.push({ code: 'budget_paused', message: 'Reviews are paused at the AI budget. A security champion can confirm this work item.' });
+      reasons.push(
+        i.budgetPaused
+          ? { code: 'budget_paused', message: 'Reviews are paused at the AI budget. A security champion can confirm this work item.' }
+          : { code: 'review_failed', message: 'The security review did not run because reviews were paused at the AI budget. Reviews have resumed, so run it again.', action: rerun },
+      );
 
     const atThreshold = (t: Threat) => severityRank(t.severity) >= threshold;
     const humanOpen = i.threats.filter((t) => t.state === 'needs_human' && atThreshold(t));

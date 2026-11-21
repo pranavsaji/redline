@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { ok } from '@threatline/shared';
+import { handleJob } from '../../src/consumers/review-consumer.js';
 import { acceptanceDecide, acceptanceRequest, breakGlassOverride } from '../../src/resolvers/acceptances.js';
 import { refreshVerdict, verdictKey } from '../../src/services/verdict-service.js';
 import { validateTransition } from '../../src/validators/validate-transition.js';
 import type { JiraIssue } from '../../src/adapters/jira.js';
-import { jiraIssue } from '../support/core-deps.js';
+import { coreDeps, jiraIssue } from '../support/core-deps.js';
 import { ADMIN, CHAMP, DEV, ISSUE, reviewed } from '../support/reviewed.js';
 
 const HOUR = 3_600_000;
@@ -91,5 +92,19 @@ describe('a reviewed work item keeps its review when it stops being a reviewed t
   it('a reviewed work item with nothing open passes after the change', async () => {
     const { gate } = await moved({ issueType: { id: '10005', name: 'Task', subtask: false } }, { allVerified: true });
     expect(await gate()).toEqual({ result: true });
+  });
+});
+
+describe('a review that could not run while reviews were paused', () => {
+  it('says to run it again once reviews resume, instead of offering a champion confirmation that is refused', async () => {
+    const t = coreDeps();
+    t.kv.data.set('ingest:recent', [false, false, false]);
+    t.kv.data.set('ingest:recent:at', t.clock.now().toISOString());
+    await handleJob(t.deps, { kind: 'gather', issueId: ISSUE, reason: 'created' });
+    const gate = () => validateTransition(t.deps, { issue: { key: 'PAY-7', id: ISSUE } });
+    expect(await gate()).toMatchObject({ result: false, errorMessage: expect.stringMatching(/paused at the AI budget\. A security champion can confirm/) });
+    // The out-of-credits pause lifts 6 hours after the last agent run; nothing else touches the work item.
+    t.clock.advance(7 * HOUR);
+    expect(await gate()).toMatchObject({ result: false, errorMessage: expect.stringMatching(/Reviews have resumed, so run it again \(re-run it from the Threatline panel\)/) });
   });
 });
