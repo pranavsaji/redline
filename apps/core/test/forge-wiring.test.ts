@@ -14,6 +14,23 @@ describe('forgeQueue', () => {
     expect(concurrencyKeyOf({ kind: 'assemble', reviewId: 'rev_10042_3' })).toBe('issue-10042');
   });
 
+  it("runs one review's model calls side by side (up to 3), and never queues them behind other work items or migrations", async () => {
+    const pushes: Array<Array<{ concurrency?: { key: string; limit: number } }>> = [];
+    const q = forgeQueue({ push: async (e: unknown) => (pushes.push(e as never), { jobId: 'j' }) } as never);
+    await q.push([
+      { kind: 'engine', reviewId: 'rev_10013_1', stage: 'propose', n: 0 },
+      { kind: 'engine', reviewId: 'rev_10014_1', stage: 'propose', n: 0 },
+      { kind: 'migrate' },
+      { kind: 'publish', issueId: '10013' },
+    ]);
+    expect(pushes[0]!.map((e) => e.concurrency)).toEqual([
+      { key: 'engine-10013', limit: 3 },
+      { key: 'engine-10014', limit: 3 },
+      { key: 'migrate', limit: 1 },
+      { key: 'issue-10013', limit: 1 },
+    ]);
+  });
+
   it('a push failure is err(upstream)', async () => {
     const q = forgeQueue({ push: async () => Promise.reject(new Error('rate limited')) } as never);
     const r = await q.push([{ kind: 'migrate' }]);
