@@ -113,6 +113,13 @@ describe('runGitHubCheck (the merge gate on GitHub)', () => {
   });
 });
 
+describe('runtime', () => {
+  it('bug 11: runs on Node 24 (GitHub is retiring Node 20 for actions) and the bundle targets the same version', () => {
+    expect(readFileSync(new URL('../action.yml', import.meta.url), 'utf8')).toMatch(/^runs:\n {2}using: node24\n/m);
+    expect(readFileSync(new URL('../build.mjs', import.meta.url), 'utf8')).toMatch(/target: 'node24'/);
+  });
+});
+
 // The committed bundle (dist/index.mjs) is what GitHub runs: drive it against a stand-in GitHub API.
 describe('the bundled action', () => {
   const dist = new URL('../dist/index.mjs', import.meta.url);

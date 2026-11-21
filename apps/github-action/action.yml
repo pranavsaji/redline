@@ -34,5 +34,5 @@ outputs:
   message:
     description: The message shown on the check.
 runs:
-  using: node20
+  using: node24
   main: dist/index.mjs
