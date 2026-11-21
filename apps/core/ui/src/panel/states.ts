@@ -34,5 +34,30 @@ export function viewOf(dto: PanelDto): PanelView {
   return { state, stale, partial: r.partial, injection, steps };
 }
 
-/** Polling cadence: every 3 s while a review is running, otherwise not at all. */
-export const pollMs = (v: PanelView): number | null => (v.state === 'in_progress' ? 3000 : null);
+/**
+ * Polling cadence: every 3 s while a review is running, or while a re-run the viewer just started has not shown up yet
+ * (a queued job creates the new revision, so the first reload after the re-run still returns the old review).
+ */
+export const pollMs = (v: PanelView, awaitingRerun = false): number | null => (v.state === 'in_progress' || awaitingRerun ? 3000 : null);
+
+/** What the panel showed when a re-run was started, so it can tell when the new revision arrives. */
+export interface RerunWait {
+  reviewId: string | null;
+  revision: number;
+  status: string | null;
+  since: number;
+}
+
+/** How long the panel keeps checking for a re-run before it suggests refreshing. */
+export const RERUN_WAIT_MS = 120_000;
+
+export const rerunWaitOf = (dto: PanelDto | null, now: number): RerunWait => ({
+  reviewId: dto?.review?.id ?? null,
+  revision: dto?.review?.revision ?? 0,
+  status: dto?.review?.status ?? null,
+  since: now,
+});
+
+/** The re-run has landed once the latest review is a newer revision, a different review, or has moved on. */
+export const rerunLanded = (w: RerunWait, dto: PanelDto): boolean =>
+  dto.review !== null && (dto.review.revision > w.revision || dto.review.id !== w.reviewId || dto.review.status !== w.status);

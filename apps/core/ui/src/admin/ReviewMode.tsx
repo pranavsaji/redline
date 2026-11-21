@@ -10,6 +10,7 @@ import {
   sectionStyle,
   splitList,
   usePolicySave,
+  useSynced,
   type PolicySectionProps,
 } from './policy-editor.js';
 
@@ -25,7 +26,7 @@ const ENGINE_BUDGET = { tokensInPerReview: 400_000, tokensOutPerReview: 60_000 }
  */
 export function ReviewMode(props: PolicySectionProps & { recentAuthors?: AdminPolicyDto['recentReviewAuthors'] }) {
   const id = useId();
-  const [mode, setMode] = useState<Mode>(props.policy.reviewMode ?? 'agent');
+  const [mode, setMode] = useSynced<Mode>(props.policy.reviewMode ?? 'agent');
   const s = usePolicySave(props);
   return (
     <section aria-labelledby={`${id}-h`} style={sectionStyle}>

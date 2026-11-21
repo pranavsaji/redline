@@ -4,27 +4,28 @@ import { token } from '@atlaskit/tokens';
 import { errorText, isError, type AdminApi, type SeedResult } from '../bridge.js';
 import type { ApiError } from '../types.js';
 import { box, errorText as errorStyle, field, label } from '../panel/form-styles.js';
+import { useInFlight } from '../components/in-flight.js';
 
 /** Task 24: load the demo (epic, stories, design page with a poisoned paragraph, incidents) into a project and space. */
 export function DemoData({ api }: { api: AdminApi }) {
   const id = useId();
   const [project, setProject] = useState('');
   const [space, setSpace] = useState('');
-  const [busy, setBusy] = useState(false);
+  const { busy, run } = useInFlight();
   const [done, setDone] = useState<SeedResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    setBusy(true);
-    const r = await api.seed(project.trim().toUpperCase(), space.trim()).catch((): ApiError => ({ error: 'unavailable' }));
-    setBusy(false);
-    if (isError(r)) {
-      setDone(null);
-      return setError(errorText(r));
-    }
-    setError(null);
-    setDone(r);
+    await run(async () => {
+      const r = await api.seed(project.trim().toUpperCase(), space.trim()).catch((): ApiError => ({ error: 'unavailable' }));
+      if (isError(r)) {
+        setDone(null);
+        return setError(errorText(r));
+      }
+      setError(null);
+      setDone(r);
+    });
   };
 
   return (

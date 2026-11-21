@@ -7,6 +7,7 @@ import { SeverityLozenge } from '../components/SeverityLozenge.js';
 import type { Acceptance, AcceptanceState, ApiError, PanelDto } from '../types.js';
 import { LedgerHash } from './AcceptRiskModal.js';
 import { box, errorText, field, label } from './form-styles.js';
+import { useInFlight } from '../components/in-flight.js';
 
 const STATE: Record<AcceptanceState, { text: string; appearance: 'inprogress' | 'success' | 'default' | 'removed' }> = {
   pending: { text: 'Waiting for approval', appearance: 'inprogress' },
@@ -23,11 +24,13 @@ const small = { font: token('font.body.small'), color: token('color.text.subtle'
 function RevokeForm({ onRevoke, onCancel }: { onRevoke: (reason: string) => Promise<string | null>; onCancel: () => void }) {
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const { busy, run } = useInFlight();
   const id = useId();
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (busy) return;
     if (reason.trim().length < 5) return setError('Say why, in a few words.');
-    setError(await onRevoke(reason.trim()));
+    await run(async () => setError(await onRevoke(reason.trim())));
   };
   return (
     <form aria-label="Revoke acceptance" onSubmit={submit} style={box}>
@@ -41,7 +44,7 @@ function RevokeForm({ onRevoke, onCancel }: { onRevoke: (reason: string) => Prom
         </p>
       )}
       <div style={{ display: 'flex', gap: 8 }}>
-        <Button type="submit" appearance="warning">
+        <Button type="submit" appearance="warning" isDisabled={busy}>
           Confirm revoke
         </Button>
         <Button onClick={onCancel}>Cancel</Button>
@@ -55,18 +58,19 @@ function BreakGlass({ api, onChanged }: { api: PanelApi; onChanged: () => void }
   const [hours, setHours] = useState(4);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ until: string; hash: string } | null>(null);
-  const [saving, setSaving] = useState(false);
+  const { busy: saving, run } = useInFlight();
   const id = useId();
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (reason.trim().length < BREAK_GLASS_MIN) return setError(`Write a reason of at least ${BREAK_GLASS_MIN} characters. It is recorded in the ledger.`);
-    setSaving(true);
-    const r = await api.breakGlass(reason.trim(), hours).catch((): ApiError => ({ error: 'unavailable' }));
-    setSaving(false);
-    if (isError(r)) return setError(errorTextOf(r));
-    setError(null);
-    setDone({ until: r.until, hash: r.entryHash });
-    onChanged();
+    await run(async () => {
+      const r = await api.breakGlass(reason.trim(), hours).catch((): ApiError => ({ error: 'unavailable' }));
+      if (isError(r)) return setError(errorTextOf(r));
+      setError(null);
+      setDone({ until: r.until, hash: r.entryHash });
+      onChanged();
+    });
   };
   return (
     <form aria-label="Break-glass override" onSubmit={submit} style={{ ...box, borderColor: token('color.border.danger') }}>
@@ -120,16 +124,19 @@ export function AcceptancesTab({ dto, api, onChanged }: { dto: PanelDto; api: Pa
   const canRevoke = (a: Acceptance) =>
     (a.state === 'pending' || a.state === 'active') && (a.acceptedBy === dto.viewerAccountId || a.approvedBy === dto.viewerAccountId || roles.has('champion') || roles.has('admin'));
 
-  const decide = async (a: Acceptance, decision: 'approve' | 'reject') => {
-    const r = await api.decideAcceptance(a.id, decision, undefined).catch((): ApiError => ({ error: 'unavailable' }));
-    if (isError(r)) return setNotice(errorTextOf(r));
-    setNotice(
-      <>
-        {decision === 'approve' ? 'Approved.' : 'Rejected.'} <LedgerHash hash={r.entryHash} />
-      </>,
-    );
-    onChanged();
-  };
+  /** One decision at a time across the list: a second click (or the other button) sends nothing while one is saving. */
+  const deciding = useInFlight();
+  const decide = (a: Acceptance, decision: 'approve' | 'reject') =>
+    deciding.run(async () => {
+      const r = await api.decideAcceptance(a.id, decision, undefined).catch((): ApiError => ({ error: 'unavailable' }));
+      if (isError(r)) return setNotice(errorTextOf(r));
+      setNotice(
+        <>
+          {decision === 'approve' ? 'Approved.' : 'Rejected.'} <LedgerHash hash={r.entryHash} />
+        </>,
+      );
+      onChanged();
+    });
 
   const sorted = [...dto.acceptances].sort((x, y) => y.createdAt.localeCompare(x.createdAt));
   return (
@@ -155,10 +162,10 @@ export function AcceptancesTab({ dto, api, onChanged }: { dto: PanelDto; api: Pa
               <div style={{ display: 'flex', gap: 8 }}>
                 {canDecide(a) && (
                   <>
-                    <Button appearance="primary" spacing="compact" onClick={() => void decide(a, 'approve')}>
+                    <Button appearance="primary" spacing="compact" isDisabled={deciding.busy} onClick={() => void decide(a, 'approve')}>
                       Approve
                     </Button>
-                    <Button spacing="compact" onClick={() => void decide(a, 'reject')}>
+                    <Button spacing="compact" isDisabled={deciding.busy} onClick={() => void decide(a, 'reject')}>
                       Reject
                     </Button>
                   </>

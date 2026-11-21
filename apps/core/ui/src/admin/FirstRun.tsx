@@ -6,6 +6,7 @@ import type { ApiError, SitePolicy } from '../types.js';
 import { box, errorText as errorStyle, field } from '../panel/form-styles.js';
 import { hint, h2, Labeled, sectionStyle } from './policy-editor.js';
 import { AddGate } from './AddGate.js';
+import { useInFlight } from '../components/in-flight.js';
 
 const PROJECT_KEY = /^[A-Z][A-Z0-9_]{0,254}$/;
 
@@ -20,7 +21,7 @@ export function FirstRun({ api, policy, onSaved }: { api: AdminApi; policy: Site
   const [transition, setTransition] = useState(policy.guardedTransitions[0] ?? 'Done');
   const [champions, setChampions] = useState(policy.championGroup);
   const [leads, setLeads] = useState(policy.techLeadGroup);
-  const [busy, setBusy] = useState(false);
+  const { busy, run } = useInFlight();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ project: string; transition: string } | null>(null);
   const key = project.trim().toUpperCase();
@@ -37,14 +38,14 @@ export function FirstRun({ api, policy, onSaved }: { api: AdminApi; policy: Site
   const save = async () => {
     if (!PROJECT_KEY.test(key)) return setError('Give a Jira project key (like PAY).');
     if (!champions.trim() || !leads.trim()) return setError('Name both groups.');
-    setBusy(true);
-    const enabledProjects = [...new Set([...policy.enabledProjects, key])];
-    const r = await api.setPolicy({ ...policy, enabledProjects, guardedTransitions: [transition], championGroup: champions.trim(), techLeadGroup: leads.trim() }).catch((): ApiError => ({ error: 'unavailable' }));
-    setBusy(false);
-    if (isError(r)) return setError(errorText(r));
-    setError(null);
-    setDone({ project: key, transition });
-    onSaved(r.policy);
+    await run(async () => {
+      const enabledProjects = [...new Set([...policy.enabledProjects, key])];
+      const r = await api.setPolicy({ ...policy, enabledProjects, guardedTransitions: [transition], championGroup: champions.trim(), techLeadGroup: leads.trim() }).catch((): ApiError => ({ error: 'unavailable' }));
+      if (isError(r)) return setError(errorText(r));
+      setError(null);
+      setDone({ project: key, transition });
+      onSaved(r.policy);
+    });
   };
 
   return (

@@ -5,6 +5,7 @@ import { errorText as errorTextOf, isError, type PanelApi, type TriageInput } fr
 import type { Threat } from '../types.js';
 import { box, errorText, field, label } from './form-styles.js';
 import { useFocusReturn, useInlineForm } from '../components/inline-form.js';
+import { useInFlight } from '../components/in-flight.js';
 
 type Action = 'accept' | 'dismiss' | 'edit' | 'merge' | 'split';
 const REASONS = [
@@ -27,7 +28,7 @@ export function ThreatEditor({ threat, others, api, onDone, onCancel }: { threat
   const [into, setInto] = useState('');
   const [parts, setParts] = useState(['', '']);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const { busy: saving, run } = useInFlight();
   const form = useInlineForm(onCancel);
 
   const build = (): TriageInput | string => {
@@ -58,12 +59,12 @@ export function ThreatEditor({ threat, others, api, onDone, onCancel }: { threat
     e.preventDefault();
     const input = build();
     if (typeof input === 'string') return setError(input);
-    setSaving(true);
-    const r = await api.triage(input).catch((): ApiError => ({ error: 'unavailable' }));
-    setSaving(false);
-    if (isError(r)) return setError(errorTextOf(r));
-    setError(null);
-    onDone();
+    await run(async () => {
+      const r = await api.triage(input).catch((): ApiError => ({ error: 'unavailable' }));
+      if (isError(r)) return setError(errorTextOf(r));
+      setError(null);
+      onDone();
+    });
   };
 
   const select = (name: string, value: string | number, onChange: (v: string) => void, options: Array<readonly [string | number, string]>) => (

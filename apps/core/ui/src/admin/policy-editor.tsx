@@ -4,6 +4,7 @@ import { token } from '@atlaskit/tokens';
 import { errorText, isError, type AdminApi } from '../bridge.js';
 import type { ApiError, Severity, SitePolicy } from '../types.js';
 import { box, errorText as errorStyle, label as labelStyle } from '../panel/form-styles.js';
+import { useInFlight } from '../components/in-flight.js';
 
 export const SEVERITY_OPTIONS: Severity[] = ['Low', 'Medium', 'High', 'Critical'];
 export const SAVED = 'Saved. Threatline rechecks verdicts against the new policy.';
@@ -16,24 +17,40 @@ export interface PolicySectionProps {
 }
 
 export function usePolicySave({ api, policy, onSaved }: PolicySectionProps) {
-  const [busy, setBusy] = useState(false);
+  const { busy, run } = useInFlight();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
-  const save = async (patch: Partial<SitePolicy>): Promise<SitePolicy | null> => {
-    setBusy(true);
-    setDone(null);
-    const r = await api.setPolicy({ ...policy, ...patch }).catch((): ApiError => ({ error: 'unavailable' }));
-    setBusy(false);
-    if (isError(r)) {
-      setError(errorText(r));
-      return null;
-    }
-    setError(null);
-    setDone(SAVED);
-    onSaved(r.policy);
-    return r.policy;
-  };
+  /** A second submit while one is saving sends nothing (and resolves null). */
+  const save = async (patch: Partial<SitePolicy>): Promise<SitePolicy | null> =>
+    (await run(async () => {
+      setDone(null);
+      const r = await api.setPolicy({ ...policy, ...patch }).catch((): ApiError => ({ error: 'unavailable' }));
+      if (isError(r)) {
+        setError(errorText(r));
+        return null;
+      }
+      setError(null);
+      setDone(SAVED);
+      onSaved(r.policy);
+      return r.policy;
+    })) ?? null;
   return { busy, error, done, save, fail: setError };
+}
+
+/**
+ * A field's local value that follows the saved policy: when another section saves and `source` changes, the field
+ * takes the new value unless the admin has edited it since (an edit in progress is kept). Without this, a section
+ * would keep the value it mounted with and write it back over the other section's change on its next save.
+ */
+export function useSynced<T>(source: T): [T, (v: T) => void] {
+  const [value, setValue] = useState(source);
+  const [seen, setSeen] = useState(source);
+  if (!Object.is(seen, source)) {
+    // Adjusting state while rendering (React's documented pattern for state derived from a changing prop).
+    setSeen(source);
+    if (Object.is(value, seen)) setValue(source);
+  }
+  return [value, setValue];
 }
 
 export const sectionStyle: CSSProperties = { display: 'grid', gap: 8 };
