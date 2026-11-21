@@ -54,10 +54,11 @@ export function approverPreview(severity: Severity, roles: PanelDto['roles'], po
  */
 export function AcceptRiskModal({ requirement, dto, api, onDone, onCancel }: { requirement: Requirement; dto: PanelDto; api: PanelApi; onDone: () => void; onCancel: () => void }) {
   const cap = requirement.severity === 'Critical' ? dto.acceptancePolicy.maxExpiryDays.Critical : dto.acceptancePolicy.maxExpiryDays.default;
-  const choices = EXPIRY_CHOICES.filter((d) => d <= cap);
+  // The cap itself is always a choice (an admin may set any 1 to 30 or 90 days), and the default.
+  const choices = [...EXPIRY_CHOICES.filter((d) => d < cap), cap];
   const [reason, setReason] = useState('');
   const [controls, setControls] = useState('');
-  const [days, setDays] = useState(Math.min(30, cap));
+  const [days, setDays] = useState(cap);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [entry, setEntry] = useState<{ hash: string; needsApprover: string } | null>(null);

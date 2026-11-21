@@ -89,6 +89,21 @@ describe('Accept risk (RL-1, RL-2)', () => {
     expect(approverPreview('Low', ['developer', 'tech_lead'], { ...policy, techLeadMaxSeverity: 'Low' })).toMatch(/^No second approval needed: you can accept Low risks yourself\./);
   });
 
+  it.each([
+    [5, ['5'], '5'],
+    [45, ['7', '14', '30', '45'], '45'],
+  ])('a %i-day cap is itself a choice and the default, so the form never submits a length nobody picked', async (cap, options, chosen) => {
+    const dto: PanelDto = { ...structuredClone(FIXTURES.ready!), roles: ['viewer', 'developer'], viewerAccountId: 'acc-dev' };
+    dto.requirements[1] = { ...dto.requirements[1]!, severity: 'Medium' };
+    dto.acceptancePolicy = { ...dto.acceptancePolicy, maxExpiryDays: { Critical: 30, default: cap } };
+    await open({ ...mockApi('ready'), get: async () => structuredClone(dto) }, /Requirements/);
+    const item = screen.getByText('Magic links expire after 15 minutes').closest('li')!;
+    await userEvent.click(within(item).getByRole('button', { name: 'Accept risk' }));
+    const select = within(screen.getByRole('form', { name: 'Accept risk' })).getByRole('combobox', { name: 'Expires after' }) as HTMLSelectElement;
+    expect([...select.options].map((o) => o.value)).toEqual(options);
+    expect(select.value).toBe(chosen);
+  });
+
   it('a viewer who cannot edit sees no Accept risk button', async () => {
     await open(api({ roles: ['viewer'] }), /Requirements/);
     expect(screen.queryByRole('button', { name: 'Accept risk' })).toBeNull();
