@@ -4,6 +4,7 @@ import { token } from '@atlaskit/tokens';
 import { errorText, isError, type AdminApi, type TreeHeadInfo } from '../bridge.js';
 import type { ApiError } from '../types.js';
 import { box, errorText as errorStyle, field, label } from '../panel/form-styles.js';
+import { useInFlight } from '../components/in-flight.js';
 
 const dataUrl = (body: string) => `data:application/json;charset=utf-8,${encodeURIComponent(body)}`;
 const utc = (iso: string) => `${iso.slice(0, 16).replace('T', ' ')} UTC`;
@@ -17,9 +18,10 @@ export function TransparencyLog({ api }: { api: AdminApi }) {
   const [head, setHead] = useState<TreeHeadInfo | null>(null);
   const [headError, setHeadError] = useState<string | null>(null);
   const [seq, setSeq] = useState('');
-  const [busy, setBusy] = useState(false);
+  const { busy, run } = useInFlight();
   const [error, setError] = useState<string | null>(null);
   const [proof, setProof] = useState<{ seq: number; json: string } | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
     void api
@@ -32,15 +34,25 @@ export function TransparencyLog({ api }: { api: AdminApi }) {
     e.preventDefault();
     const n = /^\d+$/.test(seq.trim()) ? Number(seq.trim()) : 0;
     if (n < 1) return setError('Give a ledger entry number (1 or more).');
-    setBusy(true);
-    const r = await api.ledgerProof(n).catch((): ApiError => ({ error: 'unavailable' }));
-    setBusy(false);
-    if (isError(r)) {
-      setProof(null);
-      return setError(r.error === 'not_found' ? `There is no ledger entry ${n}.` : errorText(r));
+    await run(async () => {
+      const r = await api.ledgerProof(n).catch((): ApiError => ({ error: 'unavailable' }));
+      setCopied(null);
+      if (isError(r)) {
+        setProof(null);
+        return setError(r.error === 'not_found' ? `There is no ledger entry ${n}.` : errorText(r));
+      }
+      setError(null);
+      setProof({ seq: r.seq, json: r.json });
+    });
+  };
+
+  const copy = async (json: string) => {
+    try {
+      await navigator.clipboard.writeText(json);
+      setCopied('Copied the proof. Paste it into a .json file.');
+    } catch {
+      setCopied('Your browser blocked copying. Select the text in the box and copy it by hand.');
     }
-    setError(null);
-    setProof({ seq: r.seq, json: r.json });
   };
 
   return (
@@ -84,6 +96,23 @@ export function TransparencyLog({ api }: { api: AdminApi }) {
             </>
           )}
         </div>
+        {/* Forge's iframe sandbox allows user-started downloads, but a browser or site policy can still block a data: download; copying always works. */}
+        {proof && (
+          <div style={{ display: 'grid', gap: 4 }}>
+            <label style={label} htmlFor={`${id}-json`}>
+              {`Proof for entry ${proof.seq} (JSON)`}
+            </label>
+            <textarea id={`${id}-json`} readOnly value={proof.json} rows={6} onFocus={(e) => e.currentTarget.select()} style={{ ...field, fontFamily: token('font.family.code'), font: token('font.body.small') }} />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Button spacing="compact" onClick={() => void copy(proof.json)}>
+                Copy proof
+              </Button>
+              <span role="status" style={{ font: token('font.body.small') }}>
+                {copied}
+              </span>
+            </div>
+          </div>
+        )}
       </form>
     </div>
   );

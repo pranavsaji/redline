@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ApiError } from '../types.js';
 import Button from '@atlaskit/button/new';
 import Lozenge from '@atlaskit/lozenge';
-import SectionMessage, { SectionMessageAction } from '@atlaskit/section-message';
+import SectionMessage from '@atlaskit/section-message';
 import Spinner from '@atlaskit/spinner';
 import Tabs, { Tab, TabList, TabPanel } from '@atlaskit/tabs';
 import { token } from '@atlaskit/tokens';
@@ -15,11 +15,15 @@ import { ThreatDiff } from './ThreatDiff.js';
 import { WhatIf } from './WhatIf.js';
 import { StatusSteps } from './StatusSteps.js';
 import { ThreatCard } from './ThreatCard.js';
-import { pollMs, viewOf } from './states.js';
+import { pollMs, RERUN_WAIT_MS, rerunLanded, rerunWaitOf, viewOf, type RerunWait } from './states.js';
+import { useInFlight } from '../components/in-flight.js';
 import { RequirementsTab } from './RequirementsTab.js';
 import { AcceptancesTab } from './AcceptancesTab.js';
 import { ThreatTriage } from './ThreatEditor.js';
 import { ThreatModelPage } from './ThreatModelPage.js';
+
+const STILL_STARTING = 'The review is still starting. Refresh the panel in a minute or two to see it.';
+const NEEDS_EDIT = 'Someone with edit permission on this work item can re-run the review.';
 
 const DISCARD_REASON: Record<string, string> = {
   low_votes: 'Too few agent runs agreed',
@@ -31,10 +35,16 @@ const DISCARD_REASON: Record<string, string> = {
 export function IssuePanel({ api }: { api: PanelApi }) {
   const [dto, setDto] = useState<PanelDto | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  /** One panel-level mutation (re-run, confirm) at a time: a double click must not queue two re-runs. */
+  const acting = useInFlight();
+  const busy = acting.busy;
+  const loadingMore = useInFlight();
   const [notice, setNotice] = useState<string | null>(null);
   const [showDiscarded, setShowDiscarded] = useState(false);
   const [more, setMore] = useState<{ threats: Threat[]; cursor: number | null } | null>(null);
+  const [moreError, setMoreError] = useState<string | null>(null);
+  /** Set after a re-run starts, until the new revision shows up (or the wait runs out). */
+  const [waiting, setWaiting] = useState<RerunWait | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -60,43 +70,79 @@ export function IssuePanel({ api }: { api: PanelApi }) {
 
   const view = useMemo(() => (dto ? viewOf(dto) : null), [dto]);
   useEffect(() => {
-    const ms = view ? pollMs(view) : null;
+    if (waiting && dto && rerunLanded(waiting, dto)) setWaiting(null);
+  }, [dto, waiting]);
+  useEffect(() => {
+    const ms = view ? pollMs(view, waiting !== null) : null;
     if (!ms) return;
-    const id = setInterval(() => void load(), ms);
-    return () => clearInterval(id);
-  }, [view, load]);
-
-  const rerun = async () => {
-    setBusy(true);
-    const r = await api.rerun().catch((): ApiError => ({ error: 'unavailable' }));
-    setBusy(false);
-    if (isError(r))
-      setNotice(
-        r.error === 'rate_limited'
-          ? 'You have re-run reviews 10 times this hour. Try again later.'
-          : r.error === 'not_found'
-            ? 'You need edit permission to re-run the review.'
-            : 'The re-run could not start. Try again.',
-      );
-    else {
-      setNotice('Review started. This usually takes about a minute.');
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const tick = () => {
+      if (waiting && Date.now() - waiting.since >= RERUN_WAIT_MS) {
+        setWaiting(null);
+        setNotice(STILL_STARTING);
+        return;
+      }
       void load();
-    }
-  };
+    };
+    // A hidden tab does not poll; showing it again checks at once and resumes.
+    const start = () => {
+      if (timer === null && !document.hidden) timer = setInterval(tick, ms);
+    };
+    const stop = () => {
+      if (timer !== null) clearInterval(timer);
+      timer = null;
+    };
+    const onVisibility = () => {
+      if (document.hidden) return stop();
+      tick();
+      start();
+    };
+    start();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [view, waiting, load]);
 
-  const confirm = async (kind: 'review' | 'budget') => {
-    if (!dto?.review) return;
-    const r = await api.confirm(dto.review.id, kind).catch((): ApiError => ({ error: 'unavailable' }));
-    if (isError(r)) setNotice(errorText(r));
-    else {
+  const rerun = () =>
+    acting.run(async () => {
+      const before = rerunWaitOf(dto, Date.now());
+      const r = await api.rerun().catch((): ApiError => ({ error: 'unavailable' }));
+      if (isError(r))
+        return setNotice(
+          r.error === 'rate_limited'
+            ? 'You have re-run reviews 10 times this hour. Try again later.'
+            : r.error === 'not_found'
+              ? 'You need edit permission on this work item to re-run the review.'
+              : 'The re-run could not start. Try again.',
+        );
+      setNotice('Review started. This usually takes about a minute.');
+      // The new revision comes from a queued job, so keep checking until it appears (see pollMs).
+      setWaiting({ ...before, since: Date.now() });
+      void load();
+    });
+
+  const confirm = (kind: 'review' | 'budget') =>
+    acting.run(async () => {
+      if (!dto?.review) return;
+      const r = await api.confirm(dto.review.id, kind).catch((): ApiError => ({ error: 'unavailable' }));
+      if (isError(r)) return setNotice(errorText(r));
       setNotice(
         kind === 'budget'
           ? 'Confirmed. The confirmation is in the ledger and the admin was alerted.'
           : 'Threats confirmed. Their requirements now decide the gate.',
       );
       void load();
-    }
-  };
+    });
+
+  const showMore = (from: number) =>
+    loadingMore.run(async () => {
+      const r = await api.threats(from).catch((): ApiError => ({ error: 'unavailable' }));
+      if (isError(r)) return setMoreError('Threatline could not load more threats. Try again.');
+      setMoreError(null);
+      setMore((m) => ({ threats: [...(m?.threats ?? []), ...r.threats], cursor: r.cursor }));
+    });
 
   if (error)
     return (
@@ -120,6 +166,14 @@ export function IssuePanel({ api }: { api: PanelApi }) {
   const threats = [...dto.threats, ...(more?.threats ?? [])];
   const cursor = more ? more.cursor : dto.threatsCursor;
   const injected = dto.facts.filter((f) => f.injectionSuspected);
+  /** Banner actions: disabled while a re-run or confirmation is in flight; no re-run for viewers who cannot edit. */
+  const action = (key: string, label: string, onClick: () => void) => (
+    <Button key={key} spacing="compact" isDisabled={busy} onClick={onClick}>
+      {label}
+    </Button>
+  );
+  const rerunActions = (label: string) => (canRun ? [action('rerun', label, () => void rerun())] : []);
+  const needsEdit = !canRun && <p style={{ margin: '6px 0 0', color: token('color.text.subtle') }}>{NEEDS_EDIT}</p>;
 
   return (
     <main
@@ -133,7 +187,7 @@ export function IssuePanel({ api }: { api: PanelApi }) {
     >
       <div aria-live="polite">{notice && <SectionMessage appearance="information">{notice}</SectionMessage>}</div>
       {view.state === 'not_reviewed' ? (
-        <EmptyState onRun={rerun} canRun={canRun} busy={busy} />
+        <EmptyState onRun={() => void rerun()} canRun={canRun} busy={busy} />
       ) : (
         <>
           <Header dto={dto} {...(canRun ? { onRerun: () => void rerun() } : {})} busy={busy} />
@@ -158,42 +212,28 @@ export function IssuePanel({ api }: { api: PanelApi }) {
             <SectionMessage
               appearance="error"
               title="The review failed"
-              actions={[
-                <SectionMessageAction key="retry" onClick={rerun}>
-                  Retry review
-                </SectionMessageAction>,
-              ]}
+              actions={rerunActions('Retry review')}
             >
               Threatline could not finish this review, so Done and merge stay blocked until it runs again.
+              {needsEdit}
             </SectionMessage>
           )}
           {view.state === 'timeout' && (
             <SectionMessage
               appearance="error"
               title="The AI review did not arrive in time"
-              actions={[
-                <SectionMessageAction key="retry" onClick={rerun}>
-                  Retry review
-                </SectionMessageAction>,
-              ]}
+              actions={rerunActions('Retry review')}
             >
               {dto.samples.received} of {dto.samples.expected} agent runs arrived. A missing review counts as a failed
               one, so Done and merge stay blocked.
+              {needsEdit}
             </SectionMessage>
           )}
           {view.state === 'budget' && (
             <SectionMessage
               appearance="warning"
               title="Reviews are paused at the AI budget"
-              actions={
-                champion
-                  ? [
-                      <SectionMessageAction key="confirm" onClick={() => void confirm('budget')}>
-                        Confirm this work item
-                      </SectionMessageAction>,
-                    ]
-                  : []
-              }
+              actions={champion ? [action('confirm', 'Confirm this work item', () => void confirm('budget'))] : []}
             >
               The site reached its review budget (or, in Rovo agent mode, ran out of Rovo credits). A security champion can confirm this work
               item; the confirmation is recorded in the ledger.
@@ -203,15 +243,7 @@ export function IssuePanel({ api }: { api: PanelApi }) {
             <SectionMessage
               appearance="warning"
               title="Threats need a security champion"
-              actions={
-                champion
-                  ? [
-                      <SectionMessageAction key="confirm" onClick={() => void confirm('review')}>
-                        Confirm threats
-                      </SectionMessageAction>,
-                    ]
-                  : []
-              }
+              actions={champion ? [action('confirm', 'Confirm threats', () => void confirm('review'))] : []}
             >
               {humanReason.message}
             </SectionMessage>
@@ -220,13 +252,10 @@ export function IssuePanel({ api }: { api: PanelApi }) {
             <SectionMessage
               appearance="warning"
               title="Context changed since the last review"
-              actions={[
-                <SectionMessageAction key="rerun" onClick={rerun}>
-                  Re-run review
-                </SectionMessageAction>,
-              ]}
+              actions={rerunActions('Re-run review')}
             >
               The design or linked work changed. Re-run the review before moving this work item to Done.
+              {needsEdit}
             </SectionMessage>
           )}
           {view.partial && (
@@ -273,8 +302,8 @@ export function IssuePanel({ api }: { api: PanelApi }) {
                     facts={facts}
                     covers={dto.covered.filter((c) => c.coveredBy === t.id).map((c) => c.title)}
                     explain={async (x) => {
-                      const r = await api.explain(x.reviewId, x.id).catch(() => null);
-                      return r && !isError(r) ? r : null;
+                      const r = await api.explain(x.reviewId, x.id).catch((): ApiError => ({ error: 'unavailable' }));
+                      return isError(r) ? null : r;
                     }}
                   >
                     {champion && settled && t.state !== 'dismissed' && (
@@ -296,16 +325,15 @@ export function IssuePanel({ api }: { api: PanelApi }) {
                   </p>
                 )}
                 {cursor !== null && (
-                  <div>
-                    <Button
-                      onClick={async () => {
-                        const r = await api.threats(cursor);
-                        if (!isError(r))
-                          setMore({ threats: [...(more?.threats ?? []), ...r.threats], cursor: r.cursor });
-                      }}
-                    >
+                  <div style={{ display: 'grid', gap: 4, justifyItems: 'start' }}>
+                    <Button isDisabled={loadingMore.busy} onClick={() => void showMore(cursor)}>
                       Show more threats
                     </Button>
+                    {moreError && (
+                      <p role="alert" style={{ margin: 0, color: token('color.text.danger'), font: token('font.body.small') }}>
+                        {moreError}
+                      </p>
+                    )}
                   </div>
                 )}
                 {(dto.discarded.length > 0 || dto.hiddenDiscarded > 0) && (

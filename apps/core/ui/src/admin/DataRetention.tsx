@@ -5,6 +5,7 @@ import { errorText, isError, type AdminApi } from '../bridge.js';
 import type { ApiError } from '../types.js';
 import { box, errorText as errorStyle, field } from '../panel/form-styles.js';
 import { count } from '../text.js';
+import { useInFlight } from '../components/in-flight.js';
 import { h2, hint, Labeled, sectionStyle } from './policy-editor.js';
 
 /** Privacy: what Threatline keeps and for how long, and a purge for a project Threatline no longer reviews. */
@@ -14,22 +15,23 @@ export function DataRetention({ api }: { api: AdminApi }) {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { busy, run } = useInFlight();
 
   const purge = async (e: FormEvent) => {
     e.preventDefault();
+    if (busy) return;
     const projectKey = key.trim().toUpperCase();
     setDone(null);
     if (!/^[A-Z][A-Z0-9_]*$/.test(projectKey)) return setError('Give a Jira project key (like PAY).');
     if (confirm.trim() !== projectKey) return setError(`Type ${projectKey} to confirm. This cannot be undone.`);
-    setBusy(true);
-    const r = await api.purgeProject(projectKey, confirm.trim()).catch((): ApiError => ({ error: 'unavailable' }));
-    setBusy(false);
-    if (isError(r)) return setError(errorText(r));
-    setError(null);
-    setKey('');
-    setConfirm('');
-    setDone(`Purged ${r.projectKey}: ${count(r.reviews, 'review')} and ${count(r.requirements, 'requirement')} deleted. The risk ledger is kept.`);
+    await run(async () => {
+      const r = await api.purgeProject(projectKey, confirm.trim()).catch((): ApiError => ({ error: 'unavailable' }));
+      if (isError(r)) return setError(errorText(r));
+      setError(null);
+      setKey('');
+      setConfirm('');
+      setDone(`Purged ${r.projectKey}: ${count(r.reviews, 'review')} and ${count(r.requirements, 'requirement')} deleted. The risk ledger is kept.`);
+    });
   };
 
   return (

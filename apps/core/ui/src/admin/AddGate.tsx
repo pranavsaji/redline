@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Button from '@atlaskit/button/new';
 import { errorText, isError, type AdminApi, type GateInstallDto } from '../bridge.js';
 import type { ApiError } from '../types.js';
+import { useInFlight } from '../components/in-flight.js';
 
 const summary = (r: GateInstallDto): string => {
   const added = r.projects.flatMap((p) => p.added);
@@ -20,14 +21,14 @@ const summary = (r: GateInstallDto): string => {
  * project. Needed for team-managed projects, whose workflow editor does not list app validators.
  */
 export function AddGate({ api }: { api: AdminApi }) {
-  const [busy, setBusy] = useState(false);
+  const flight = useInFlight();
+  const busy = flight.busy;
   const [message, setMessage] = useState<string | null>(null);
-  const run = async () => {
-    setBusy(true);
-    const r = await api.installGate().catch((): ApiError => ({ error: 'unavailable' }));
-    setBusy(false);
-    setMessage(isError(r) ? errorText(r) : summary(r));
-  };
+  const run = () =>
+    flight.run(async () => {
+      const r = await api.installGate().catch((): ApiError => ({ error: 'unavailable' }));
+      setMessage(isError(r) ? errorText(r) : summary(r));
+    });
   return (
     <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
       <Button appearance="primary" isDisabled={busy} onClick={() => void run()}>
