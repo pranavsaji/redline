@@ -4,7 +4,7 @@ import { z } from 'zod';
 export const VerifySchema = z
   .object({
     verdicts: z
-      .array(z.object({ id: z.string().regex(/^T\d{1,3}$/), keep: z.boolean(), reason: z.string().max(300) }).strict())
+      .array(z.object({ id: z.string().regex(/^T\d{1,3}$/), keep: z.boolean(), reason: z.string().max(300), duplicateOf: z.string().regex(/^T\d{1,3}$/).optional() }).strict())
       .max(80),
   })
   .strict();
@@ -23,7 +23,8 @@ export function fitVerify(raw: unknown): unknown {
     const id = typeof o.id === 'string' ? o.id.trim().toUpperCase() : o.id;
     const keep = o.keep === 'true' ? true : o.keep === 'false' ? false : o.keep;
     const reason = typeof o.reason === 'string' ? (o.reason.length > 300 ? `${o.reason.slice(0, 299).trimEnd()}…` : o.reason) : '';
-    return { id, keep, reason };
+    const dup = typeof o.duplicateOf === 'string' ? o.duplicateOf.trim().toUpperCase() : undefined;
+    return { id, keep, reason, ...(dup && dup !== id && /^T\d{1,3}$/.test(dup) ? { duplicateOf: dup } : {}) };
   });
   return { verdicts };
 }
@@ -57,7 +58,9 @@ For each threat decide "keep":
 - keep: false when the quotes do not support it (the attacked thing is not in the design), when it is generic hygiene with no link to this design, or when it repeats the attack and harm of an earlier threat in the list.
 Do not judge severity or STRIDE labels. When unsure, keep the threat.
 
-Reply with JSON only: {"verdicts":[{"id":"T1","keep":true,"reason":"<at most 25 words>"}]}. Exactly one verdict per id.`;
+When a threat repeats the attack and harm of another threat in the list, set keep to false and "duplicateOf" to that threat's id.
+
+Reply with JSON only: {"verdicts":[{"id":"T1","keep":true,"reason":"<at most 25 words>"},{"id":"T2","keep":false,"reason":"…","duplicateOf":"T1"}]}. Exactly one verdict per id.`;
   const user = items
     .map(
       (t) =>

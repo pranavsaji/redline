@@ -7,6 +7,8 @@ export interface Verdict4 {
   threatId: string;
   keep: boolean;
   reason: string;
+  /** The threat (by id) this one repeats, when the verifier says so. */
+  duplicateOf?: string;
 }
 
 /** The threats the verifier sees: accepted AI threats. Rule-based ones are never sent; needs-human ones already wait. */
@@ -33,14 +35,21 @@ export async function engineVerify(deps: Pick<PipelineDeps, 'llm' | 'policy'>, t
     const t = items[Number(d) - 1];
     return t ? `“${t.title}”` : m;
   });
-  return ok(items.map((t, n) => ({ threatId: t.id, keep: byId.get(ids[n]!)!.keep, reason: named(byId.get(ids[n]!)!.reason) })));
+  return ok(
+    items.map((t, n) => {
+      const v = byId.get(ids[n]!)!;
+      const dup = v.duplicateOf ? items[Number(v.duplicateOf.slice(1)) - 1] : undefined;
+      return { threatId: t.id, keep: v.keep, reason: named(v.reason), ...(dup && dup.id !== t.id ? { duplicateOf: dup.id } : {}) };
+    }),
+  );
 }
 
 /**
  * Deterministic: what the verifier's verdicts do. Kept threats are marked verified. A rejected threat below the site's
  * blocking threshold is dismissed (reason recorded); one at or above it goes to a security champion instead, so the
  * verifier (which reads untrusted quotes) can never remove anything that gates Done or merge.
- * A rule-based threat covered by a threat that is no longer accepted is active again. Under suspected injection, or for
+ * A threat the verifier calls a duplicate of a kept, at-least-as-severe threat stands back under it (state `covered`).
+ * A threat covered by a threat that is no longer accepted is active again. Under suspected injection, or for
  * a threat that cites a flagged source, nothing is demoted: attacker text must not steer what is dropped.
  */
 export function applyVerification(
@@ -56,8 +65,13 @@ export function applyVerification(
     if (!v || !verifiable(t)) return t;
     const verification = { keep: v.keep, reason: v.reason.slice(0, 300) };
     let u: Threat;
+    const cover = v.duplicateOf ? threats.find((x) => x.id === v.duplicateOf) : undefined;
     if (v.keep) u = { ...t, verification };
     else if (t.citations.some((c) => opts.taintedFacts?.has(c.factId))) u = { ...t, verification };
+    // A duplicate stands back under the threat it repeats, only when that one was kept, is in force, is at least as
+    // severe and rests on clean sources: the cover still gates Done and merge, so nothing that blocks is lost.
+    else if (cover && byId.get(cover.id)?.keep === true && cover.state === 'accepted' && severityRank(cover.severity) >= severityRank(t.severity) && !cover.citations.some((c) => opts.taintedFacts?.has(c.factId)))
+      u = { ...t, state: 'covered', coveredBy: cover.id, verification };
     // Security: the verifier reads untrusted quotes, so it may never remove anything that would gate Done or merge.
     else if (severityRank(t.severity) >= severityRank(opts.blockAtOrAbove ?? 'High')) u = { ...t, state: 'needs_human', verification };
     else u = { ...t, state: 'dismissed', dismissReason: 'false_positive', verification };

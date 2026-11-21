@@ -117,6 +117,7 @@ export type LedgerEventType =
   | 'budget.champion_confirmed'
   | 'policy.warn_only'
   | 'policy.changed'
+  | 'requirement.verified'
   | 'project.purged'
   | 'reviews.resumed'
   | 'review.sample'

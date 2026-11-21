@@ -127,6 +127,17 @@ describe('R7: incremental re-review (assembleReview with the previous revision)'
     expect(out.threats.some((t) => t.title === transcriptLeak.title)).toBe(true);
   });
 
+  it('once the new runs are in, a below-threshold AI threat nobody raised again goes; a blocking one stays (no re-run lottery)', () => {
+    const low = { ...triaged.find((t) => t.title === refundAbuse.title)!, title: 'Low-impact noise', severity: 'Low' as const, likelihood: 1, impact: 2, state: 'accepted' as const };
+    const crit = { ...low, title: 'A Critical the models missed this time', severity: 'Critical' as const, likelihood: 5, impact: 5 };
+    const prior = { threats: [...triaged, low, crit], facts: base };
+    const done = run(2, next, [1, 2, 3].map(() => model([refundAbuse])), prior);
+    expect(done.threats.some((t) => t.title === low.title)).toBe(false);
+    expect(done.threats.some((t) => t.title === crit.title)).toBe(true);
+    const inFlight = run(2, next, [model([refundAbuse])], prior);
+    expect(inFlight.threats.some((t) => t.title === low.title)).toBe(true);
+  });
+
   it('a carried threat’s severity can rise with new agent evidence, never fall', () => {
     const louder = { ...refundAbuse, likelihood: 5, impact: 5 };
     const out = run(2, next, [1, 2, 3].map(() => model([louder])), { threats: triaged, facts: base });

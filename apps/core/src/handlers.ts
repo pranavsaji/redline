@@ -7,6 +7,7 @@ import { getReview } from './actions/get-review.js';
 import { getSecurityRequirements } from './actions/get-security-requirements.js';
 import { checkChangeRisk } from './actions/check-change-risk.js';
 import { requestRiskAcceptance } from './actions/request-risk-acceptance.js';
+import { verifyRequirement } from './actions/verify-requirement.js';
 import { explainThreat } from './actions/explain-threat.js';
 import { getReleaseReadiness } from './actions/release-readiness.js';
 import { startReview } from './actions/start-review.js';
@@ -64,6 +65,7 @@ export const getReviewHandler = async (payload: ActionPayload, ctx?: ForgeContex
 export const getSecurityRequirementsHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => getSecurityRequirements(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));
 export const checkChangeRiskHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => checkChangeRisk(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));
 export const requestRiskAcceptanceHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => requestRiskAcceptance(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));
+export const verifyRequirementHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => verifyRequirement(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));
 export const explainThreatHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => explainThreat(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));
 export const releaseReadinessHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => getReleaseReadiness(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));
 export const startReviewHandler = async (payload: ActionPayload, ctx?: ForgeContext & Principal) => startReview(withCaller(payload, ctx), composeCore(actionCtx(payload, ctx)));

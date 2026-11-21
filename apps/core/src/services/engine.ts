@@ -126,7 +126,7 @@ async function applyAndStore(deps: CoreDeps, review: Review, verdicts: Verdicts)
   if (!rows.ok) return rows;
   for (const t of applied.changed) {
     const row = rows.value.find((r) => r.threatId === t.id);
-    if (t.state === 'dismissed' && row && row.status === 'Open' && !row.subtaskKey && !row.evidence) {
+    if ((t.state === 'dismissed' || t.state === 'covered') && row && row.status === 'Open' && !row.subtaskKey && !row.evidence) {
       const d = await deps.requirements.remove(row.id);
       if (!d.ok) return d;
     }

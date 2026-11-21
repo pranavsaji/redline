@@ -70,6 +70,18 @@ describe('applyVerification (deterministic: the verifier asks, code decides)', (
     expect(out.changed.map((t) => t.id).sort()).toEqual(['thr_base', 'thr_generic', 'thr_loud', 'thr_refund']);
   });
 
+  it('a duplicate of a kept, at-least-as-severe threat stands back under it (covered), and returns if the cover goes', () => {
+    const twin = threat({ id: 'thr_twin', title: 'Refund abuse, again', severity: 'High', likelihood: 4, impact: 4 });
+    const r = applyVerification([refund, twin], [{ threatId: 'thr_refund', keep: true, reason: 'ok' }, { threatId: 'thr_twin', keep: false, reason: 'same', duplicateOf: 'thr_refund' }], { injectionSuspected: false, blockAtOrAbove: 'High' });
+    expect(r.threats.find((t) => t.id === 'thr_twin')).toMatchObject({ state: 'covered', coveredBy: 'thr_refund' });
+    // The cover is not more severe, or was itself rejected: the usual rule applies (a High goes to a champion).
+    const worse = threat({ id: 'thr_worse', title: 'Worse', severity: 'Critical', likelihood: 5, impact: 5 });
+    const r2 = applyVerification([refund, worse], [{ threatId: 'thr_refund', keep: true, reason: 'ok' }, { threatId: 'thr_worse', keep: false, reason: 'same', duplicateOf: 'thr_refund' }], { injectionSuspected: false, blockAtOrAbove: 'High' });
+    expect(r2.threats.find((t) => t.id === 'thr_worse')!.state).toBe('needs_human');
+    const r3 = applyVerification([refund, twin], [{ threatId: 'thr_refund', keep: false, reason: 'no' }, { threatId: 'thr_twin', keep: false, reason: 'same', duplicateOf: 'thr_refund' }], { injectionSuspected: false, blockAtOrAbove: 'High' });
+    expect(r3.threats.find((t) => t.id === 'thr_twin')!.state).toBe('needs_human');
+  });
+
   it('security: under suspected injection nothing changes (attacker text must not steer the verifier)', () => {
     const out = applyVerification([refund, generic, loud, base], verdicts, { injectionSuspected: true });
     expect(out.changed).toEqual([]);
