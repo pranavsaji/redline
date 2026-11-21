@@ -349,6 +349,19 @@ describe('posture-summary', () => {
     expect(r.expiring.map((a) => a.acceptanceId)).toEqual(['acc_b', 'acc_a']);
     expect(r.expiring[0]).toMatchObject({ issueKey: 'PAY-7', requirementId: req.id, severity: 'High', expiresAt: expiresAt(5) });
   });
+
+  it('scale: posture and release readiness read only their work items\' acceptance events, never every one on the site', async () => {
+    const { t, req } = await reviewed({ allVerified: true });
+    const expiresAt = new Date(t.clock.now().getTime() + 5 * 86_400_000).toISOString();
+    await appendLedger(t.deps.ledger, t.deps.clock, 'acceptance.requested', { acceptanceId: 'acc_x', requirementId: req.id, issueId: ISSUE, severity: 'High', reason: 'r', controls: '', expiresAt, needsApprover: 'none' }, CHAMP);
+    const refuse = async () => ({ ok: false as const, error: { code: 'internal' as const, message: 'site-wide ledger read' } });
+    t.deps.ledger = { ...t.deps.ledger, all: refuse, ofTypes: refuse };
+    t.jira.search = async () => ok([jiraIssue({ id: ISSUE, key: 'PAY-7', fixVersions: ['4.2'] })]);
+    const posture = await getPostureSummary({ project: 'PAY', ...ctx(ME) }, t.deps);
+    expect('error' in posture ? posture.error : posture.expiring.map((a) => a.acceptanceId)).toEqual(['acc_x']);
+    const release = await getReleaseReadiness({ fixVersion: '4.2', ...ctx(ME) }, t.deps);
+    expect('error' in release ? release.error : release.expiringSoon.map((a) => a.requirementId)).toEqual([req.id]);
+  });
 });
 
 describe('caller identity for MCP calls', () => {

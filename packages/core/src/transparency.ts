@@ -49,14 +49,29 @@ export interface LedgerProof {
 const plainHead = ({ publishedPageId: _p, ...h }: TreeHead) => h;
 
 export function buildLedgerProof(rows: readonly LedgerRow[], seq: number, head: TreeHead, publicKey: string, previous?: TreeHead | null): Result<LedgerProof> {
-  const sorted = bySeq(rows) as LedgerRow[];
+  return buildLedgerProofFromHashes(rows, seq, rows.find((r) => r.seq === seq) ?? null, head, publicKey, previous);
+}
+
+/**
+ * Scale: the same proof from the leaves' inputs (seq and entry hash of every entry) plus the one full entry it is
+ * about, so the caller need not read every payload.
+ */
+export function buildLedgerProofFromHashes(
+  hashes: readonly Pick<LedgerRow, 'seq' | 'entryHash'>[],
+  seq: number,
+  entry: LedgerRow | null,
+  head: TreeHead,
+  publicKey: string,
+  previous?: TreeHead | null,
+): Result<LedgerProof> {
+  const sorted = bySeq(hashes) as Array<Pick<LedgerRow, 'seq' | 'entryHash'>>;
   if (head.treeSize > sorted.length) return err(appError('internal', 'the signed tree head is larger than the ledger'));
   const covered = sorted.slice(0, head.treeSize);
   const leaves = ledgerLeafHashes(covered);
   if (merkleRoot(leaves) !== head.rootHash) return err(appError('internal', 'the ledger does not match its signed tree head'));
-  const index = covered.findIndex((r) => r.seq === seq);
-  if (index < 0) return err(appError('not_found', `ledger entry ${seq} is not in this tree head`));
-  const e = covered[index]!;
+  const index = entry && entry.seq === seq ? covered.findIndex((r) => r.seq === seq && r.entryHash === entry.entryHash) : -1;
+  if (!entry || index < 0) return err(appError('not_found', `ledger entry ${seq} is not in this tree head`));
+  const e = entry;
   const proof: LedgerProof = {
     format: LEDGER_PROOF_FORMAT,
     entry: { seq: e.seq, eventType: e.eventType, payload: e.payload, actor: e.actor, createdAt: e.createdAt, prevHash: e.prevHash, entryHash: e.entryHash },

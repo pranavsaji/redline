@@ -121,6 +121,19 @@ describe('Journey B: risk accepted under time pressure (RL-1, RL-2, RL-5)', () =
   });
 });
 
+describe('scale: the hourly expiry sweep reads recent acceptance events only', () => {
+  it('expires a due acceptance without reading every acceptance event ever written', async () => {
+    const { t, req } = await reviewed();
+    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: '', expiryDays: 7 });
+    if ('error' in asked) throw new Error('request failed');
+    await acceptanceDecide(t.deps, as(CHAMP), { acceptanceId: asked.acceptanceId, decision: 'approve' });
+    const refuse = async () => ({ ok: false as const, error: { code: 'internal' as const, message: 'site-wide ledger read' } });
+    t.deps.ledger = { ...t.deps.ledger, all: refuse, ofTypes: refuse };
+    t.clock.advance(8 * DAY);
+    expect(await expireAcceptances(t.deps, t.clock.now())).toEqual({ ok: true, value: { expired: 1 } });
+  });
+});
+
 describe('approvers must be able to see the requirement’s threat (viewer scope)', () => {
   async function hideThreat(t: Awaited<ReturnType<typeof reviewed>>['t'], threatId: string) {
     const latest = (await t.deps.reviews.latest(ISSUE)) as { ok: true; value: { id: string } };
