@@ -1,10 +1,10 @@
 {
-  "name": "@redline/prompts",
+  "name": "@threatline/prompts",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": { ".": "./src/index.ts" },
-  "dependencies": { "@redline/shared": "workspace:*", "zod": "^4.6.6" }
+  "dependencies": { "@threatline/shared": "workspace:*", "zod": "^4.6.6" }
 }

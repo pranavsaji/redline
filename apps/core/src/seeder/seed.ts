@@ -1,4 +1,4 @@
-import { appError, err, ok, type Result } from '@redline/shared';
+import { appError, err, ok, type Result } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import type { AdfDoc, JiraIssue } from '../adapters/jira.js';
 import { DEMO_COMPONENT, DEMO_LABEL, DESIGN_PAGE_TITLE, designPageStorage, EPIC, INCIDENTS, STORIES } from './content/demo.js';
@@ -15,7 +15,7 @@ const adf = (text: string): AdfDoc => ({ type: 'doc', version: 1, content: [{ ty
 /**
  * Loads the demo onto a site (Task 24): an epic with two stories under it, a design page (with one poisoned paragraph)
  * linked from both stories, two recent incidents on the same component, and the project enabled in the policy.
- * Idempotent: items are matched by summary among those labelled `redline-demo`, the page by title.
+ * Idempotent: items are matched by summary among those labelled `threatline-demo`, the page by title.
  */
 export async function seedDemo(deps: CoreDeps, i: { projectKey: string; spaceKey: string }, actorAccountId?: string): Promise<Result<SeedResult>> {
   const project = await deps.jira.projectInfo(i.projectKey);
@@ -62,7 +62,7 @@ export async function seedDemo(deps: CoreDeps, i: { projectKey: string; spaceKey
   const epic = await ensure(EPIC.summary, EPIC.description, epicType, {});
   if (!epic.ok) return epic;
   // The epic links the design page as well, so a review of the epic reads it (and flags its hidden instruction).
-  const epicLink = await deps.jira.addRemoteLink(epic.value.id, { globalId: `redline-demo-design-${epic.value.id}`, url: pageUrl, title: DESIGN_PAGE_TITLE });
+  const epicLink = await deps.jira.addRemoteLink(epic.value.id, { globalId: `threatline-demo-design-${epic.value.id}`, url: pageUrl, title: DESIGN_PAGE_TITLE });
   if (!epicLink.ok) return epicLink;
   const storyKeys: string[] = [];
   const reviewIds = [epic.value.id];
@@ -71,7 +71,7 @@ export async function seedDemo(deps: CoreDeps, i: { projectKey: string; spaceKey
     if (!story.ok) return story;
     storyKeys.push(story.value.key);
     reviewIds.push(story.value.id);
-    const link = await deps.jira.addRemoteLink(story.value.id, { globalId: `redline-demo-design-${story.value.id}`, url: pageUrl, title: DESIGN_PAGE_TITLE });
+    const link = await deps.jira.addRemoteLink(story.value.id, { globalId: `threatline-demo-design-${story.value.id}`, url: pageUrl, title: DESIGN_PAGE_TITLE });
     if (!link.ok) return link;
   }
   const incidentKeys: string[] = [];

@@ -1,4 +1,4 @@
-import { appError, err, ok, type Result } from '@redline/shared';
+import { appError, err, ok, type Result } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 
 export const RERUNS_PER_HOUR = 10;

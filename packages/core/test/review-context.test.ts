@@ -15,7 +15,7 @@ describe('review context', () => {
     }
     expect(dto.facts.find((f) => f.id === normalizeFact(poisonedRawFact).id)!.injectionSuspected).toBe(true);
     expect(dto.facts.find((f) => f.id === normalizeFact(poisonedRawFact).id)!.text).toContain('Title: Design addendum');
-    expect(dto.outputContract).toContain('redline.threatmodel.v1');
+    expect(dto.outputContract).toContain('threatline.threatmodel.v1');
   });
   it('stays under 200 KB by dropping tail facts and marking partial', () => {
     const big = Array.from({ length: 200 }, (_, i) => normalizeFact({ ...rawFacts[1]!, sourceAri: `ari:p/${i}`, text: 'word '.repeat(400) }));

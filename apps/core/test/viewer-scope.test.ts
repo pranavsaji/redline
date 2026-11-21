@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ok, type ContextFact, type Threat } from '@redline/shared';
+import { ok, type ContextFact, type Threat } from '@threatline/shared';
 import { scopeForViewer } from '../src/services/viewer-scope.js';
 import type { ConfluenceClient } from '../src/adapters/confluence.js';
 import type { JiraClient } from '../src/adapters/jira.js';
@@ -54,7 +54,7 @@ describe('scopeForViewer (security)', () => {
   });
 
   it('denies by default any source type it cannot verify (e.g. graph commits, teams)', async () => {
-    const extra = [fact('commit', 'ari:cloud:graph::commit/abc', 'commit'), fact('team', 'ari:cloud:identity::team/t1', 'team'), fact('rev', 'ari:redline:review/rev_1', 'review'), fact('cmt', 'ari:cloud:jira:c:issue-comment/5', 'jira_comment')];
+    const extra = [fact('commit', 'ari:cloud:graph::commit/abc', 'commit'), fact('team', 'ari:cloud:identity::team/t1', 'team'), fact('rev', 'ari:threatline:review/rev_1', 'review'), fact('cmt', 'ari:cloud:jira:c:issue-comment/5', 'jira_comment')];
     const r = await scopeForViewer(clients(), 'acc', '10042', extra, []);
     expect(r.facts.map((f) => f.id)).toEqual(['rev', 'cmt']);
   });

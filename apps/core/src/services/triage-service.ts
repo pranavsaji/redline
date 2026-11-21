@@ -1,5 +1,5 @@
-import { appendLedger, requirementsFor, severityOf, type LedgerRow } from '@redline/core';
-import { appError, err, ok, type Citation, type DismissReason, type Mapping, type Result, type Review, type Threat } from '@redline/shared';
+import { appendLedger, requirementsFor, severityOf, type LedgerRow } from '@threatline/core';
+import { appError, err, ok, type Citation, type DismissReason, type Mapping, type Result, type Review, type Threat } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import type { JiraIssue } from '../adapters/jira.js';
 import { isBudgetPaused } from './budget.js';

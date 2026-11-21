@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEventLib from '@testing-library/user-event';
 import axe from 'axe-core';
-import { encodeAttestation, generateKeyPair } from '@redline/crypto';
+import { encodeAttestation, generateKeyPair } from '@threatline/crypto';
 import { RepoSettings } from '../src/RepoSettings.js';
 import type { SettingsApi, Settings } from '../src/bridge.js';
 

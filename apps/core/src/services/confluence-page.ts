@@ -1,5 +1,5 @@
-import { ACCEPTANCE_EVENTS, DEFAULT_OWNER_NOTES, extractOwnerNotes, rebuildAcceptances, renderThreatModel } from '@redline/core';
-import { appError, err, ok, type Result } from '@redline/shared';
+import { ACCEPTANCE_EVENTS, DEFAULT_OWNER_NOTES, extractOwnerNotes, rebuildAcceptances, renderThreatModel } from '@threatline/core';
+import { appError, err, ok, type Result } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { readVerdict } from './verdict-service.js';
@@ -127,7 +127,7 @@ export async function publishThreatModel(deps: CoreDeps, issueId: string): Promi
   } catch (e) {
     log('confluence.publish.record_failed', { issueId, error: e instanceof Error ? e.message : String(e) });
   }
-  const link = await deps.jira.addRemoteLink(issueId, { globalId: `redline-threat-model-${issueId}`, url: created.value.url, title });
+  const link = await deps.jira.addRemoteLink(issueId, { globalId: `threatline-threat-model-${issueId}`, url: created.value.url, title });
   if (!link.ok) log('confluence.publish.link_failed', { issueId, code: link.error.code });
   return ok({ pageId: created.value.id, url: created.value.url, created: true });
 }

@@ -18,10 +18,10 @@ await build({
   logLevel: 'warning',
   loader: { '.json': 'json' },
 });
-writeFileSync('dist/package.json', JSON.stringify({ name: 'redline-bundle', private: true, type: 'commonjs' }, null, 2));
+writeFileSync('dist/package.json', JSON.stringify({ name: 'threatline-bundle', private: true, type: 'commonjs' }, null, 2));
 if (existsSync('src/prebuilt')) cpSync('src/prebuilt', 'dist', { recursive: true });
 
-// agent/prompt.md is generated from @redline/prompts so the deployed agent and the offline evals share one prompt.
+// agent/prompt.md is generated from @threatline/prompts so the deployed agent and the offline evals share one prompt.
 mkdirSync('.build', { recursive: true });
 await build({ entryPoints: ['scripts/agent-prompt.ts'], outfile: '.build/agent-prompt.mjs', bundle: true, platform: 'node', format: 'esm', logLevel: 'warning' });
 const { text } = await import(pathToFileURL('.build/agent-prompt.mjs').href + `?t=${Date.now()}`);

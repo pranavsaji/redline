@@ -1,7 +1,7 @@
 import { useId, useState, type FormEvent } from 'react';
 import Button from '@atlaskit/button/new';
 import { token } from '@atlaskit/tokens';
-import { decodeAttestation, findAttestations, fromB64url, kidOf } from '@redline/crypto';
+import { decodeAttestation, findAttestations, fromB64url, kidOf } from '@threatline/crypto';
 import { field, label, box } from './styles.js';
 
 /** Builds kid → key from the pasted keys (one per line), skipping lines that are not keys. */

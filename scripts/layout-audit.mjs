@@ -3,7 +3,7 @@
 // headless Chromium over the DevTools protocol (Node built-ins only), fails if any page scrolls sideways, and can save
 // full-page screenshots.
 //
-//   pnpm --filter @redline/core-ui dev --port 5179 & pnpm --filter @redline/bitbucket-ui dev --port 5180 &
+//   pnpm --filter @threatline/core-ui dev --port 5179 & pnpm --filter @threatline/bitbucket-ui dev --port 5180 &
 //   node scripts/layout-audit.mjs [--shots DIR] [--only name,name] [--widths 320,1280] [--themes light,dark]
 //
 // CHROME may point at any Chromium binary; by default the Playwright headless shell in the user cache is used.
@@ -58,7 +58,7 @@ function chromePath() {
 }
 
 export async function launch() {
-  const profile = join(tmpdir(), `redline-audit-${process.pid}`);
+  const profile = join(tmpdir(), `threatline-audit-${process.pid}`);
   const proc = spawn(chromePath(), ['--headless', '--disable-gpu', '--hide-scrollbars', '--remote-debugging-port=0', `--user-data-dir=${profile}`, ...(process.platform === 'linux' ? ['--no-sandbox'] : []), 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
   const wsUrl = await new Promise((resolve, reject) => {
     let buf = '';

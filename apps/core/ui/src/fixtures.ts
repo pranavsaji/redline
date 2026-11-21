@@ -42,7 +42,7 @@ const base: PanelDto = {
   ],
   acceptances: [],
   viewerAccountId: 'acc-dev',
-  acceptancePolicy: { maxExpiryDays: { Critical: 30, default: 90 }, techLeadMaxSeverity: 'Medium', championGroup: 'redline-security-champions', techLeadGroup: 'redline-tech-leads' },
+  acceptancePolicy: { maxExpiryDays: { Critical: 30, default: 90 }, techLeadMaxSeverity: 'Medium', championGroup: 'threatline-security-champions', techLeadGroup: 'threatline-tech-leads' },
   history: [{ revision: 1, createdAt: '2026-11-16T05:30:43.000Z', riskScore: 72, status: 'ready', added: 4, removed: 0 }],
   samples: { received: 3, expected: 3 },
   roles: ['viewer', 'developer'],

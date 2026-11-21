@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { decodeAttestation, encodeAttestation, findAttestations, generateKeyPair } from '../src/index.js';
-import type { AttestationPayload } from '@redline/shared';
+import type { AttestationPayload } from '@threatline/shared';
 
 const key = generateKeyPair();
 const now = 1_800_000_000;
@@ -21,7 +21,7 @@ const keys = { [key.kid]: key.publicKey };
 describe('attestations', () => {
   it('encodes with the v1 prefix and decodes back to the payload', () => {
     const token = encodeAttestation(payload, key);
-    expect(token.startsWith('redline-att.v1.')).toBe(true);
+    expect(token.startsWith('threatline-att.v1.')).toBe(true);
     const r = decodeAttestation(token, keys, now + 10);
     expect(r).toEqual({ ok: true, value: payload });
   });
@@ -70,8 +70,8 @@ describe('attestations', () => {
   });
 
   it('rejects malformed tokens', () => {
-    expect(!decodeAttestation('redline-att.v1.only', keys, now).ok).toBe(true);
-    const r = decodeAttestation('redline-att.v2.a.b', keys, now);
+    expect(!decodeAttestation('threatline-att.v1.only', keys, now).ok).toBe(true);
+    const r = decodeAttestation('threatline-att.v2.a.b', keys, now);
     expect(!r.ok && r.error.code).toBe('malformed');
   });
 
@@ -83,7 +83,13 @@ describe('attestations', () => {
   it('finds every token in a PR body in order', () => {
     const t1 = encodeAttestation(payload, key);
     const t2 = encodeAttestation({ ...payload, nonce: 'zzzz9999' }, key);
-    const body = `Fixes PROJ-142\n\nRedline attestation:\n${t1}\n\nlater:\n\`${t2}\`\nbroken: redline-att.v1.abc def.ghi`;
+    const body = `Fixes PROJ-142\n\nThreatline attestation:\n${t1}\n\nlater:\n\`${t2}\`\nbroken: threatline-att.v1.abc def.ghi`;
     expect(findAttestations(body)).toEqual([t1, t2]);
+  });
+
+  it('still accepts tokens issued before the rename (redline-att.v1 prefix)', () => {
+    const legacy = encodeAttestation(payload, key).replace('threatline-att.v1.', 'redline-att.v1.');
+    expect(decodeAttestation(legacy, keys, now + 10)).toEqual({ ok: true, value: payload });
+    expect(findAttestations(`old PR body:\n${legacy}`)).toEqual([legacy]);
   });
 });

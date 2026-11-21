@@ -1,4 +1,4 @@
-import { appError, err, ok, type ContextFact, type Requirement, type Review, type Threat } from '@redline/shared';
+import { appError, err, ok, type ContextFact, type Requirement, type Review, type Threat } from '@threatline/shared';
 import type {
   AttestationRepo,
   AttestationRow,

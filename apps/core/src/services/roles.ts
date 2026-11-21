@@ -1,5 +1,5 @@
-import type { Role } from '@redline/core';
-import type { SitePolicy } from '@redline/shared';
+import type { Role } from '@threatline/core';
+import type { SitePolicy } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 
 /**

@@ -1,4 +1,4 @@
-import type { ReviewStatus } from '@redline/shared';
+import type { ReviewStatus } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { expireAcceptances } from '../services/acceptance-service.js';

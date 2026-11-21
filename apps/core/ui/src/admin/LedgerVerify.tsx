@@ -46,7 +46,7 @@ export function LedgerVerify({ api }: { api: AdminApi }) {
       return setError(errorText(r));
     }
     setError(null);
-    setPack({ ...r, name: `redline-evidence-${key}-${from}-${to}` });
+    setPack({ ...r, name: `threatline-evidence-${key}-${from}-${to}` });
   };
 
   return (

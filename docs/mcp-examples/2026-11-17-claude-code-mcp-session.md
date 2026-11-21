@@ -1,18 +1,18 @@
 # Claude Code + Threatline MCP: a recorded session (live, 2026-11-17)
 
 - **Where:** demo site `one-atlas-mefc`, Threatline development environment (app 6.x), served through Atlassian's Forge MCP endpoint `https://mcp.atlassian.com/forge/<appId>`. The app has one installation shared by Jira (required) and Confluence (optional).
-- **Client:** Claude Code (`claude -p`, model claude-opus-5-5) with all of its own tools off (`--tools ""`) and only the Threatline MCP server allowed (`--allowedTools mcp__redline`). Signed in with OAuth via `claude mcp login redline`; Forge checks the caller's Jira permissions on every call.
+- **Client:** Claude Code (`claude -p`, model claude-opus-5-5) with all of its own tools off (`--tools ""`) and only the Threatline MCP server allowed (`--allowedTools mcp__threatline`). Signed in with OAuth via `claude mcp login threatline`; Forge checks the caller's Jira permissions on every call.
 - **How to reproduce:** see `mcp-skill/skill.md` for the `claude mcp add` command, then run the prompt below.
 - **Transcript:** tool calls and the agent's final answer are verbatim. Long tool results are cut to their first two items with an "omitted here" marker; nothing else is changed. In Claude Code, tool names show the environment suffix `_development`.
 
 ## Prompt
 
 ```text
-You are a coding agent about to work on Jira work item PAY-7 ("Verify refund webhook signatures") in the Bitbucket repository pranavsaji/redline. Use only the Threatline MCP tools, and follow the Threatline workflow:
+You are a coding agent about to work on Jira work item PAY-7 ("Verify refund webhook signatures") in the Bitbucket repository pranavsaji/threatline. Use only the Threatline MCP tools, and follow the Threatline workflow:
 1. Call get-security-requirements for PAY-7 (status Open) and summarise what must be true before Done.
 2. Call get-review for PAY-7, then explain-threat for the most severe threat (use its T-n ref).
 3. The planned change touches src/auth/webhook.ts and README.md. Call check-change-risk for PAY-7 with those paths and say whether it would pass.
-4. Call get-merge-attestation for PAY-7, repo pranavsaji/redline, commit caf80f1cfbff47d603baeb761ba02338b0dedcd2. If it is blocked, list the reasons and stop; do not retry.
+4. Call get-merge-attestation for PAY-7, repo pranavsaji/threatline, commit caf80f1cfbff47d603baeb761ba02338b0dedcd2. If it is blocked, list the reasons and stop; do not retry.
 5. Call posture-summary for project PAY.
 Do not call request-risk-acceptance. Finish with a short summary for the developer.
 ```
@@ -280,7 +280,7 @@ Do not call request-risk-acceptance. Finish with a short summary for the develop
 
 ### 5. `get-merge-attestation`
 
-**Input:** `{"commitSha": "caf80f1cfbff47d603baeb761ba02338b0dedcd2", "issueKey": "PAY-7", "repo": "pranavsaji/redline"}`
+**Input:** `{"commitSha": "caf80f1cfbff47d603baeb761ba02338b0dedcd2", "issueKey": "PAY-7", "repo": "pranavsaji/threatline"}`
 
 ```json
 {

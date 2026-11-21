@@ -1,5 +1,5 @@
-import { appendLedger, issueAttestation } from '@redline/core';
-import { appError, err, ok, type BlockReason, type Result } from '@redline/shared';
+import { appendLedger, issueAttestation } from '@threatline/core';
+import { appError, err, ok, type BlockReason, type Result } from '@threatline/shared';
 import { ISSUE_KEY } from '../actions/common.js';
 import type { CoreDeps } from '../deps.js';
 import { refreshVerdict, verdictKey, type StoredVerdict } from './verdict-service.js';

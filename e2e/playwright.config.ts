@@ -8,7 +8,7 @@ import { defineConfig, devices } from '@playwright/test';
  *  - `local` (CI): the real UI against the real resolvers, actions, validator and signing over in-memory Atlassian
  *    fakes (local/server.ts). Journeys A and B and the merge check, deterministic, no network, no account.
  *  - `site` (manual / nightly with a secret): the deployed app on the demo Jira site, signed in with a browser state
- *    you save yourself (`pnpm --filter @redline/e2e login`). Never a password in code, config or CI logs.
+ *    you save yourself (`pnpm --filter @threatline/e2e login`). Never a password in code, config or CI logs.
  */
 
 /** Off CI, reuse a Chromium already in the Playwright cache instead of downloading the pinned build. */
@@ -45,7 +45,7 @@ export default defineConfig({
   ],
   webServer: [
     { command: 'pnpm exec tsx local/server.ts', url: 'http://localhost:5190/health', reuseExistingServer: !process.env.CI, timeout: 60_000 },
-    { command: 'pnpm --filter @redline/core-ui exec vite --port 5179 --strictPort', url: 'http://localhost:5179/', reuseExistingServer: !process.env.CI, timeout: 120_000 },
-    { command: 'pnpm --filter @redline/bitbucket-ui exec vite --port 5180 --strictPort', url: 'http://localhost:5180/', reuseExistingServer: !process.env.CI, timeout: 120_000 },
+    { command: 'pnpm --filter @threatline/core-ui exec vite --port 5179 --strictPort', url: 'http://localhost:5179/', reuseExistingServer: !process.env.CI, timeout: 120_000 },
+    { command: 'pnpm --filter @threatline/bitbucket-ui exec vite --port 5180 --strictPort', url: 'http://localhost:5180/', reuseExistingServer: !process.env.CI, timeout: 120_000 },
   ],
 });

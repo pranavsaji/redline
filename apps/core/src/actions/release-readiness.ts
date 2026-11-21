@@ -1,5 +1,5 @@
-import { ACCEPTANCE_EVENTS, rebuildAcceptances, releaseReadiness, type ReleaseCall } from '@redline/core';
-import type { Severity, Verdict } from '@redline/shared';
+import { ACCEPTANCE_EVENTS, rebuildAcceptances, releaseReadiness, type ReleaseCall } from '@threatline/core';
+import type { Severity, Verdict } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { readVerdict } from '../services/verdict-service.js';

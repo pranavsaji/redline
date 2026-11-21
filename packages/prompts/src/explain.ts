@@ -1,4 +1,4 @@
-import type { Mapping, Stride } from '@redline/shared';
+import type { Mapping, Stride } from '@threatline/shared';
 
 export function explainPrompt(t: { title: string; scenario: string; stride: Stride; component: string; mappings: Mapping[] }): { system: string; user: string } {
   return {

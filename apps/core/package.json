@@ -1,5 +1,5 @@
 {
-  "name": "@redline/core-app",
+  "name": "@threatline/core-app",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -13,12 +13,12 @@
     "@forge/llm": "1.0.10",
     "@forge/resolver": "^2.0.2",
     "@forge/sql": "^4.0.10",
-    "@redline/core": "workspace:*",
-    "@redline/crypto": "workspace:*",
-    "@redline/db": "workspace:*",
-    "@redline/frameworks": "workspace:*",
-    "@redline/prompts": "workspace:*",
-    "@redline/shared": "workspace:*",
+    "@threatline/core": "workspace:*",
+    "@threatline/crypto": "workspace:*",
+    "@threatline/db": "workspace:*",
+    "@threatline/frameworks": "workspace:*",
+    "@threatline/prompts": "workspace:*",
+    "@threatline/shared": "workspace:*",
     "zod": "^4.6.6"
   },
   "devDependencies": {

@@ -11,12 +11,12 @@ import type {
   SigningKeyStore,
   UsageRepo,
   VerdictSink, TreeHeadRepo
-} from '@redline/core';
-import type { Result } from '@redline/shared';
+} from '@threatline/core';
+import type { Result } from '@threatline/shared';
 import type { ConfluenceClient } from './adapters/confluence.js';
 import type { JiraClient } from './adapters/jira.js';
 import type { ConfigStore, KvsPort } from './adapters/kvs-config.js';
-import type { RetentionStore } from '@redline/db';
+import type { RetentionStore } from '@threatline/db';
 import type { ReviewJob } from './jobs/types.js';
 
 export interface JobQueue {

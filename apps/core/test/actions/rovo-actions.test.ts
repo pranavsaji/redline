@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ok, type Requirement } from '@redline/shared';
+import { ok, type Requirement } from '@threatline/shared';
 import { getReview } from '../../src/actions/get-review.js';
 import { getSecurityRequirements } from '../../src/actions/get-security-requirements.js';
 import { checkChangeRisk } from '../../src/actions/check-change-risk.js';
@@ -11,7 +11,7 @@ import { getPostureSummary } from '../../src/actions/posture-summary.js';
 import { fitJson, MAX_ACTION_BYTES } from '../../src/actions/schemas.js';
 import { callerOf, withCaller } from '../../src/actions/common.js';
 import { jiraIssue } from '../support/core-deps.js';
-import { appendLedger } from '@redline/core';
+import { appendLedger } from '@threatline/core';
 import { verdictKey } from '../../src/services/verdict-service.js';
 import { CHAMP, DEV, ISSUE, reviewed } from '../support/reviewed.js';
 
@@ -301,7 +301,7 @@ describe('start-review', () => {
     const { t } = await reviewed();
     const r = await startReview({ issueKey: 'PAY-7', ...ctx(ME) }, t.deps);
     expect(r).toMatchObject({ queued: true, issueKey: 'PAY-7' });
-    expect(t.jira.labels).toContain('+redline-review');
+    expect(t.jira.labels).toContain('+threatline-review');
     expect(t.pushed).toContainEqual({ kind: 'gather', issueId: ISSUE, reason: 'rerun', actorAccountId: ME });
   });
 });

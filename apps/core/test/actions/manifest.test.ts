@@ -2,8 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { allAsvs, strideDefaults } from '@redline/frameworks';
-import { StrideSchema } from '@redline/shared';
+import { allAsvs, strideDefaults } from '@threatline/frameworks';
+import { StrideSchema } from '@threatline/shared';
 
 type Mod = Record<string, unknown>;
 const root = join(import.meta.dirname, '..', '..');
@@ -85,9 +85,9 @@ describe('manifest: Rovo actions, skill and MCP (Task 28)', () => {
 
 describe('manifest: posture surfaces (Task 29)', () => {
   it('a global page and a dashboard gadget serve the posture view through the shared resolver', () => {
-    const page = (m.modules['jira:globalPage'] ?? []).find((x) => x.key === 'redline-posture');
+    const page = (m.modules['jira:globalPage'] ?? []).find((x) => x.key === 'threatline-posture');
     expect(page).toMatchObject({ resource: 'panel', resolver: { function: 'panelResolverFn' }, title: 'Threatline security posture' });
-    const gadget = (m.modules['jira:dashboardGadget'] ?? []).find((x) => x.key === 'redline-posture-gadget');
+    const gadget = (m.modules['jira:dashboardGadget'] ?? []).find((x) => x.key === 'threatline-posture-gadget');
     expect(gadget).toMatchObject({ resource: 'panel', resolver: { function: 'panelResolverFn' } });
     expect(gadget!.description).toBeTruthy();
     expect(gadget!.thumbnail).toMatch(/^https:\/\//);

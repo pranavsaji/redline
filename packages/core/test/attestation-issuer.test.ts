@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeAttestation, generateKeyPair } from '@redline/crypto';
+import { decodeAttestation, generateKeyPair } from '@threatline/crypto';
 import { computeVerdict, DEFAULT_SITE_POLICY, issueAttestation } from '../src/index.js';
 import { input, requirement } from './fixtures/verdict.js';
 

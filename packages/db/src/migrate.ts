@@ -1,4 +1,4 @@
-import { ok, type Result } from '@redline/shared';
+import { ok, type Result } from '@threatline/shared';
 import type { Migration } from '../migrations/index.js';
 import type { SqlExecutor } from './executor.js';
 

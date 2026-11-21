@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { verifyChain } from '@redline/crypto';
+import { verifyChain } from '@threatline/crypto';
 import { appendLedger } from '../src/index.js';
 import { fixedClock, memoryLedgerRepo } from './fakes/index.js';
 

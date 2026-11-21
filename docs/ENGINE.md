@@ -45,7 +45,7 @@ precision 18.7% against 35.9%, recall 80.0% against 85.2% (`evals/results/2026-1
 Proposals that cannot read the design write generic threats. So each engine run is the agent prompt over the fenced
 context, whose injection defences the eval already measures (6 of 6 poisoned cases held).
 
-`pnpm redline eval --llm recorded --path engine --verify claude-code` replays the recorded agent runs and adds the
+`pnpm threatline eval --llm recorded --path engine --verify claude-code` replays the recorded agent runs and adds the
 verifier (its replies are saved in `evals/results/verified-engine/`; CI replays them). On the 30 cases:
 
 | Metric | Agent runs | Agent runs + verifier (Threatline Engine) |

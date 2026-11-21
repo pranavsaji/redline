@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ok, type Threat } from '@redline/shared';
-import { normalizeFact } from '@redline/core';
+import { ok, type Threat } from '@threatline/shared';
+import { normalizeFact } from '@threatline/core';
 import { panelEnrich, panelGet, panelRerun, panelThreats, threatExplain } from '../../src/resolvers/panel.js';
 import { handleJob } from '../../src/consumers/review-consumer.js';
 import { coreDeps, jiraIssue } from '../support/core-deps.js';
@@ -188,19 +188,19 @@ describe('panel.get requirements', () => {
 });
 
 describe('panel.rerun', () => {
-  it('adds the redline-review label and queues a gather, rate-limited per account', async () => {
+  it('adds the threatline-review label and queues a gather, rate-limited per account', async () => {
     const { t } = await reviewed();
     expect(await panelRerun(t.deps, viewer())).toEqual({ ok: true });
-    expect(t.jira.labels).toEqual(['+redline-review']);
+    expect(t.jira.labels).toEqual(['+threatline-review']);
     expect(t.pushed).toEqual([{ kind: 'gather', issueId: ISSUE, reason: 'rerun', actorAccountId: 'acc-1' }]);
     for (let i = 0; i < 9; i++) await panelRerun(t.deps, viewer());
     expect(await panelRerun(t.deps, viewer())).toEqual({ error: 'rate_limited' });
   });
 
   it('when the label is already there it is removed and added again, so the Automation re-run rule fires every time', async () => {
-    const t = coreDeps({ issues: [jiraIssue({ id: ISSUE, key: 'PAY-7', labels: ['redline-review'] })] });
+    const t = coreDeps({ issues: [jiraIssue({ id: ISSUE, key: 'PAY-7', labels: ['threatline-review'] })] });
     expect(await panelRerun(t.deps, viewer())).toEqual({ ok: true });
-    expect(t.jira.labels).toEqual(['-redline-review', '+redline-review']);
+    expect(t.jira.labels).toEqual(['-threatline-review', '+threatline-review']);
   });
 
   it('needs edit permission', async () => {

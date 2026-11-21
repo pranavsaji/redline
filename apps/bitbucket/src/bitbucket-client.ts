@@ -1,4 +1,4 @@
-import { appError, err, ok, type Result } from '@redline/shared';
+import { appError, err, ok, type Result } from '@threatline/shared';
 
 export interface PullRequestJson {
   title?: string;
@@ -25,7 +25,7 @@ export interface BitbucketClient {
 }
 
 const MAX_PAGES = 10;
-import { MAX_DIFF_TEXT, TRUNCATED_PATH } from '@redline/core';
+import { MAX_DIFF_TEXT, TRUNCATED_PATH } from '@threatline/core';
 const COMMIT = /^[0-9a-f]{7,40}$/i;
 const SAFE_PATH = /^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/;
 

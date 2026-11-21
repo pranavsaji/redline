@@ -96,10 +96,10 @@ instructions to the AI in the design text; a poisoned case holds when its risk a
 its clean twin's and the injection is flagged. Run it yourself:
 
 ```bash
-pnpm redline eval --llm recorded --subset 30 --judge recorded   # replay recorded outputs and judge verdicts (CI)
-pnpm redline eval --llm claude-code --subset 30          # live, through your own Claude Code subscription
-pnpm redline eval --llm recorded --subset 30 --judge claude-code   # re-grade the extras live (one call per case)
-pnpm redline eval --llm fake                             # deterministic baseline rules only, no model
+pnpm threatline eval --llm recorded --subset 30 --judge recorded   # replay recorded outputs and judge verdicts (CI)
+pnpm threatline eval --llm claude-code --subset 30          # live, through your own Claude Code subscription
+pnpm threatline eval --llm recorded --subset 30 --judge claude-code   # re-grade the extras live (one call per case)
+pnpm threatline eval --llm fake                             # deterministic baseline rules only, no model
 ```
 
 ## Try it
@@ -112,8 +112,8 @@ pnpm redline eval --llm fake                             # deterministic baselin
   ```bash
   pnpm install
   pnpm test                                   # unit, contract, pipeline, UI and accessibility tests
-  pnpm --filter @redline/core-ui dev --port 5179   # http://localhost:5179/?state=ready · ?view=admin · ?view=posture
-  pnpm redline sign-demo                      # sign an attestation and watch a one-character change fail
+  pnpm --filter @threatline/core-ui dev --port 5179   # http://localhost:5179/?state=ready · ?view=admin · ?view=posture
+  pnpm threatline sign-demo                      # sign an attestation and watch a one-character change fail
   pnpm e2e                                    # Journeys A and B and the merge check in a real browser
   ```
 
@@ -134,11 +134,11 @@ pnpm redline eval --llm fake                             # deterministic baselin
 apps/core        Threatline for Jira: Forge functions, Rovo actions and agent, Custom UI (apps/core/ui)
 apps/bitbucket   Threatline for Bitbucket: merge check and repository settings
 apps/github-action  Threatline merge gate for GitHub (same decision code; see docs/GITHUB.md)
-apps/local       pnpm redline: offline reviews, evals, demo signing
+apps/local       pnpm threatline: offline reviews, evals, demo signing
 packages/        core (domain), crypto, db, frameworks (ASVS 5, CWE, OWASP LLM/Agentic), prompts, shared, llm-dev
 evals/           cases, runner, metrics, recorded model outputs, results
 e2e/             Playwright journeys (local harness in CI; optional smoke test on a real site)
 scripts/         ledger proof verifier, layout audit, listing screenshots
 ```
 
-Deploy (development): `pnpm --filter @redline/core-ui build && cd apps/core && node build.mjs && forge deploy -e development`.
+Deploy (development): `pnpm --filter @threatline/core-ui build && cd apps/core && node build.mjs && forge deploy -e development`.

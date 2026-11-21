@@ -1,5 +1,5 @@
-import type { Result, SitePolicy } from '@redline/shared';
-import { ok } from '@redline/shared';
+import type { Result, SitePolicy } from '@threatline/shared';
+import { ok } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 
 export const monthOf = (d: Date) => d.toISOString().slice(0, 7);

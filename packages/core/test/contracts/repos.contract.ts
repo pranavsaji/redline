@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Requirement, Review, Threat } from '@redline/shared';
-import { GENESIS_HASH } from '@redline/crypto';
+import type { Requirement, Review, Threat } from '@threatline/shared';
+import { GENESIS_HASH } from '@threatline/crypto';
 import { appendLedger } from '../../src/ledger.js';
 import type { AttestationRepo, FeedbackRepo, IssueRepo, LedgerRepo, RequirementRepo, ReviewRepo, UsageRepo, TreeHeadRepo } from '../../src/ports.js';
 import { fixedClock } from '../fakes/fixed-clock.js';
@@ -67,12 +67,12 @@ export function repoContract(name: string, f: RepoFactory): void {
       expect(t2.ok && t2.value[0]).toMatchObject({ state: 'dismissed', dismissReason: 'false_positive', citations: [{ factId: 'f', quote: 'q' }] });
       expect((await r.updateThreat('missing', { state: 'accepted' })).ok).toBe(false);
       await r.saveSample('rev_1', 1, { failed: 'schema' });
-      await r.saveSample('rev_1', 0, { schema: 'redline.threatmodel.v1', issueKey: 'PROJ-1', threats: [] });
+      await r.saveSample('rev_1', 0, { schema: 'threatline.threatmodel.v1', issueKey: 'PROJ-1', threats: [] });
       // Race fix: a run number is taken once; a concurrent save of the same number conflicts instead of overwriting.
       const again = await r.saveSample('rev_1', 1, { failed: 'no_json' });
       expect(!again.ok && again.error.code).toBe('conflict');
       const s = await r.samples('rev_1');
-      expect(s.ok && s.value).toEqual([{ schema: 'redline.threatmodel.v1', issueKey: 'PROJ-1', threats: [] }, { failed: 'schema' }]);
+      expect(s.ok && s.value).toEqual([{ schema: 'threatline.threatmodel.v1', issueKey: 'PROJ-1', threats: [] }, { failed: 'schema' }]);
       await r.saveStage('rev_1', 'extract', 'running');
       await r.saveStage('rev_1', 'extract', 'done', { sketch: { a: 1 } });
       expect((await r.stage('rev_1', 'extract')).ok && (await r.stage('rev_1', 'extract'))).toMatchObject({ ok: true, value: { status: 'done', checkpoint: { sketch: { a: 1 } } } });

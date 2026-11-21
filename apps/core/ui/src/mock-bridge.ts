@@ -3,7 +3,7 @@ import { DRILL_FIXTURE, POSTURE_FIXTURE, RELEASE_FIXTURE } from './posture/fixtu
 import { DIFF_FIXTURE, FIXTURES } from './fixtures.js';
 import { ADMIN_POLICY_FIXTURE, RUNS_FIXTURE, USAGE_FIXTURE } from './admin/fixtures.js';
 
-/** Local preview: `pnpm --filter @redline/core-ui dev`, then ?state=ready|in_progress|failed|… and ?theme=dark. */
+/** Local preview: `pnpm --filter @threatline/core-ui dev`, then ?state=ready|in_progress|failed|… and ?theme=dark. */
 export function mockApi(state = new URLSearchParams(window.location.search).get('state') ?? 'ready'): PanelApi {
   const dto = FIXTURES[state] ?? FIXTURES.ready!;
   return {
@@ -32,7 +32,7 @@ export function mockApi(state = new URLSearchParams(window.location.search).get(
     revokeAcceptance: async () => ({ entryHash: 'd'.repeat(64) }),
     breakGlass: async (_r, hours) => ({ entryHash: 'c'.repeat(64), until: new Date(Date.now() + hours * 3_600_000).toISOString() }),
     attestation: async (repo, commitSha) => {
-      const token = `redline-att.v1.mock-${repo.replace('/', '-')}-${commitSha.slice(0, 7)}.sig`;
+      const token = `threatline-att.v1.mock-${repo.replace('/', '-')}-${commitSha.slice(0, 7)}.sig`;
       return { token, expiresAt: new Date(Date.now() + 86_400_000).toISOString(), prDescriptionSnippet: `Threatline attestation for ${dto.issueKey} (expires tomorrow):\n${token}` };
     },
     publish: async () => ({ pageId: '900', url: 'https://example.atlassian.net/wiki/spaces/PAY/pages/900', created: true }),
@@ -73,7 +73,7 @@ export function mockAdminApi(state = typeof window === 'undefined' ? 'ready' : (
       return { ops: dto.ops, digest: dto.digest };
     },
     treeHead: async () => ({ treeHead: { treeSize: 12, rootHash: '3a03ebd5cbaa6828e1bf78ea19554fe4b9992ff4492ab79faca95065a0c66352', timestamp: '2026-11-18T03:00:00.000Z', kid: 'k-mock' }, publicKey: 'MCowBQYDK2VwAyEAmockpublickey', publishedPageId: null }),
-    ledgerProof: async (seq) => ({ seq, treeSize: 12, json: JSON.stringify({ format: 'redline-ledger-proof-v1', entry: { seq }, leafIndex: seq - 1, auditPath: [], treeHead: { treeSize: 12 } }, null, 2) }),
+    ledgerProof: async (seq) => ({ seq, treeSize: 12, json: JSON.stringify({ format: 'threatline-ledger-proof-v1', entry: { seq }, leafIndex: seq - 1, auditPath: [], treeHead: { treeSize: 12 } }, null, 2) }),
     projectStatuses: async (projectKey) => ({ projectKey, statuses: ['To Do', 'In Progress', 'In Review', 'Done'] }),
     seed: async (projectKey) => ({ epicKey: `${projectKey}-1`, storyKeys: [`${projectKey}-2`, `${projectKey}-3`], designPageUrl: 'https://example.atlassian.net/wiki/spaces/PAY/pages/1', incidentKeys: [`${projectKey}-4`, `${projectKey}-5`] }),
     publicKeys: async () => ({ active: { kid: 'k-mock', publicKey: 'MCowBQYDK2VwAyEAmockpublickey' } }),

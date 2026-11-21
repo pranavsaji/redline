@@ -1,4 +1,4 @@
-import type { ArchitectureSketch, ContextFact } from '@redline/shared';
+import type { ArchitectureSketch, ContextFact } from '@threatline/shared';
 import type { EvidenceItem } from './schemas.js';
 
 const LENSES = [

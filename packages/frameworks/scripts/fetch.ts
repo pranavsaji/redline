@@ -1,6 +1,6 @@
 /**
  * One-off generator for packages/frameworks/data/asvs-5.0.json from the official OWASP ASVS 5.0.0 release.
- * Run: pnpm --filter @redline/frameworks fetch   (fetches public reference data at build time; not app egress)
+ * Run: pnpm --filter @threatline/frameworks fetch   (fetches public reference data at build time; not app egress)
  */
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

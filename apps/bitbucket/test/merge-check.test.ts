@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { encodeAttestation, generateKeyPair, type KeyPair } from '@redline/crypto';
-import type { AttestationPayload } from '@redline/shared';
+import { encodeAttestation, generateKeyPair, type KeyPair } from '@threatline/crypto';
+import type { AttestationPayload } from '@threatline/shared';
 import { evaluateMergeCheck, runMergeCheck, type RepoSettings } from '../src/merge-check.js';
 import type { BitbucketClient } from '../src/bitbucket-client.js';
 
@@ -204,6 +204,8 @@ describe('runMergeCheck: reads the PR, its diffstat, the destination policy and 
     const { c, calls } = client({ description: token({ commitSha: 'b'.repeat(40) }) });
     const r = await runMergeCheck(event, { client: c, settings: async () => settings(), nowSec: () => NOW });
     expect(r).toEqual({ success: true, message: 'Threatline: attested by PAY-7, 2 requirements verified.' });
+    expect(calls).toContain('file:dddddddddddd:.threatline/policy.yml');
+    // No .threatline/policy.yml: the file's name from before the rename is read instead.
     expect(calls).toContain('file:dddddddddddd:.redline/policy.yml');
   });
 

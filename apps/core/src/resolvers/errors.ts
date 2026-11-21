@@ -1,4 +1,4 @@
-import type { AppError } from '@redline/shared';
+import type { AppError } from '@threatline/shared';
 
 export type ApiErrorCode = 'not_found' | 'unavailable' | 'rate_limited' | 'validation' | 'forbidden' | 'conflict';
 /** What a resolver returns instead of data. `message` is shown to the person, so it never carries internal detail. */

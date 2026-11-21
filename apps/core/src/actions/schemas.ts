@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RequirementStatusSchema, type AppError, TEST_LANGUAGES, type TestLanguage } from '@redline/shared';
+import { RequirementStatusSchema, type AppError, TEST_LANGUAGES, type TestLanguage } from '@threatline/shared';
 import type { JiraIssue } from '../adapters/jira.js';
 import type { CoreDeps } from '../deps.js';
 import { authorise, type Viewer } from '../resolvers/panel.js';

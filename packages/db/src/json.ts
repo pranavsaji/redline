@@ -1,4 +1,4 @@
-import { appError, err, ok, type Result } from '@redline/shared';
+import { appError, err, ok, type Result } from '@threatline/shared';
 import type { z } from 'zod';
 
 /** Every JSON column is validated on read: a corrupt row is an error, never a silently wrong object. */

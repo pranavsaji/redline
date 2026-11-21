@@ -1,4 +1,4 @@
-import { canonicalJson } from '@redline/shared';
+import { canonicalJson } from '@threatline/shared';
 import { sha256Hex } from './hash.js';
 
 export const GENESIS_HASH = '0'.repeat(64);

@@ -1,4 +1,4 @@
-import { AgentThreatModelSchema, appError, err, ok, type AgentThreatModel, type ArchitectureSketch, type ContextBundle, type Result, type Review, type SitePolicy } from '@redline/shared';
+import { AgentThreatModelSchema, appError, err, ok, type AgentThreatModel, type ArchitectureSketch, type ContextBundle, type Result, type Review, type SitePolicy } from '@threatline/shared';
 import {
   agentPrompt,
   automationPrompt,
@@ -11,7 +11,7 @@ import {
   fitProposal,
   proposePrompt,
   type EvidenceItem,
-} from '@redline/prompts';
+} from '@threatline/prompts';
 import { z } from 'zod';
 import { scanForInjection } from './context/injection.js';
 import { assembleReview, extractAgentJson, fitAgentModel, parseFirstObject, type AssembleOutput } from './ingest.js';
@@ -195,7 +195,7 @@ export async function engineProposal(deps: StageDeps, review: Review, bundle: Co
   if (!r.ok && r.error.code === 'budget') return r;
   const sample: Sample = r.ok
     ? ({
-        schema: 'redline.threatmodel.v1',
+        schema: 'threatline.threatmodel.v1',
         issueKey: bundle.issueKey,
         sketch: { components: sketch.components, dataStores: sketch.dataStores, externalServices: sketch.externalServices, trustBoundaries: sketch.trustBoundaries, dataClasses: sketch.dataClasses, exposure: sketch.exposure, llmFeatures: sketch.llmFeatures },
         threats: r.value.threats.flatMap((t) => {

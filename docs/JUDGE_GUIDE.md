@@ -67,7 +67,7 @@ that ran the rule.
   (**Threatline security review**).
 - **Load demo data says the Confluence space was not found**: create a space (any name) and enter its key.
 - **Run review on this work item does nothing for a long time**: the re-run needs a second Automation rule with the
-  trigger *Field value changed → Labels → Value added*, condition `{{issue.labels}}` contains `redline-review`, and the
+  trigger *Field value changed → Labels → Value added*, condition `{{issue.labels}}` contains `threatline-review`, and the
   same three **Use agent: Threatline** steps.
 
 ## Without a Jira site
@@ -76,10 +76,10 @@ Everything above runs against fixture data in a local preview, no Atlassian site
 
 ```bash
 pnpm install
-pnpm --filter @redline/core-ui dev --port 5179   # then open http://localhost:5179/?state=ready (or ?view=admin, ?view=posture)
+pnpm --filter @threatline/core-ui dev --port 5179   # then open http://localhost:5179/?state=ready (or ?view=admin, ?view=posture)
 pnpm test                                        # 1,050+ tests, including accessibility checks
-pnpm redline sign-demo                           # sign an attestation, then show that one changed character fails
-pnpm redline eval --llm recorded --subset 30     # replay the recorded eval offline
+pnpm threatline sign-demo                           # sign an attestation, then show that one changed character fails
+pnpm threatline eval --llm recorded --subset 30     # replay the recorded eval offline
 ```
 
 Screenshots of every surface are in [screenshots/](screenshots/README.md); the design in [ARCHITECTURE.md](ARCHITECTURE.md);

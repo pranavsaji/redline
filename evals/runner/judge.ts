@@ -1,5 +1,5 @@
-import { appError, err, ok, type Result, type Severity, type Stride } from '@redline/shared';
-import type { LlmPort } from '@redline/core';
+import { appError, err, ok, type Result, type Severity, type Stride } from '@threatline/shared';
+import type { LlmPort } from '@threatline/core';
 
 /**
  * Offline eval only, never in the product: a separate model call grades each reported threat that is not on a case's

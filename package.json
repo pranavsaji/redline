@@ -1,5 +1,5 @@
 {
-  "name": "redline",
+  "name": "threatline",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.33.2",
@@ -13,8 +13,8 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:cov": "vitest run --coverage",
-    "redline": "tsx apps/local/src/cli.ts",
-    "e2e": "pnpm --filter @redline/e2e exec playwright test --project local",
+    "threatline": "tsx apps/local/src/cli.ts",
+    "e2e": "pnpm --filter @threatline/e2e exec playwright test --project local",
     "knip": "knip"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 import { sql } from '@forge/sql';
-import type { SqlExecutor } from '@redline/db';
-import { appError, err, ok, type AppError, type Result } from '@redline/shared';
+import type { SqlExecutor } from '@threatline/db';
+import { appError, err, ok, type AppError, type Result } from '@threatline/shared';
 
 /** The subset of `@forge/sql`'s client Threatline uses. */
 export interface ForgeSqlClient {

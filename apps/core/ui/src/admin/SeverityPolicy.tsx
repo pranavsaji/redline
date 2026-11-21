@@ -65,7 +65,7 @@ export function SeverityPolicy(props: PolicySectionProps) {
             <textarea id={fid} value={paths} onChange={(e) => setPaths(e.target.value)} rows={6} spellCheck={false} style={{ ...field, fontFamily: token('font.family.code') }} />
           )}
         </Labeled>
-        <span style={hint}>Glob patterns. Pull requests touching none of these merge freely; repositories can add more in .redline/policy.yml.</span>
+        <span style={hint}>Glob patterns. Pull requests touching none of these merge freely; repositories can add more in .threatline/policy.yml.</span>
       </PolicyForm>
     </section>
   );

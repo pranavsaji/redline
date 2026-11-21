@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SITE_POLICY } from '@redline/core';
-import { signB64, verifyB64 } from '@redline/crypto';
+import { DEFAULT_SITE_POLICY } from '@threatline/core';
+import { signB64, verifyB64 } from '@threatline/crypto';
 import { defaultsFromEnv, kvsConfigStore } from '../../src/adapters/kvs-config.js';
 import { memoryKvs } from '../support/memory-kvs.js';
 import { kvsSigningKeys } from '../../src/adapters/signing-keys.js';
@@ -63,8 +63,8 @@ describe('kvsConfigStore', () => {
 });
 
 describe('defaultsFromEnv', () => {
-  it('parses REDLINE_ENABLED_PROJECTS and drops anything that is not a project key', () => {
-    expect(defaultsFromEnv({ REDLINE_ENABLED_PROJECTS: ' pay, SEC ,bad key,PAY,' }).enabledProjects).toEqual(['PAY', 'SEC']);
+  it('parses THREATLINE_ENABLED_PROJECTS and drops anything that is not a project key', () => {
+    expect(defaultsFromEnv({ THREATLINE_ENABLED_PROJECTS: ' pay, SEC ,bad key,PAY,' }).enabledProjects).toEqual(['PAY', 'SEC']);
     expect(defaultsFromEnv({}).enabledProjects).toEqual([]);
   });
 });

@@ -1,5 +1,5 @@
 {
-  "name": "@redline/github-action",
+  "name": "@threatline/github-action",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -7,9 +7,9 @@
     "build": "node build.mjs"
   },
   "dependencies": {
-    "@redline/core": "workspace:*",
-    "@redline/crypto": "workspace:*",
-    "@redline/shared": "workspace:*"
+    "@threatline/core": "workspace:*",
+    "@threatline/crypto": "workspace:*",
+    "@threatline/shared": "workspace:*"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

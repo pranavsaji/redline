@@ -1,5 +1,5 @@
 {
-  "name": "@redline/db",
+  "name": "@threatline/db",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,8 +9,8 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@redline/core": "workspace:*",
-    "@redline/shared": "workspace:*",
+    "@threatline/core": "workspace:*",
+    "@threatline/shared": "workspace:*",
     "zod": "^4.6.6"
   }
 }

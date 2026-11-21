@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GENESIS_HASH } from '@redline/crypto';
+import { GENESIS_HASH } from '@threatline/crypto';
 import { FakeLlm, fixedClock, memoryLedgerRepo, memoryReviewRepo } from './fakes/index.js';
 
 describe('fakes', () => {

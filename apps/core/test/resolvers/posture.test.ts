@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ok, type Requirement } from '@redline/shared';
+import { ok, type Requirement } from '@threatline/shared';
 import { postureDrill, postureDrill as drill, postureGet, releaseReport } from '../../src/resolvers/posture.js';
 import { handleJob } from '../../src/consumers/review-consumer.js';
 import { setRequirementStatus } from '../../src/services/requirements-service.js';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STRIDE } from '@redline/shared';
+import { STRIDE } from '@threatline/shared';
 import { agenticTop10, allAsvs, asvsSearch, cweById, getAsvs, isValidRef, llmTop10, strideDefaults } from '../src/index.js';
 
 describe('frameworks', () => {

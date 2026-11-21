@@ -40,7 +40,8 @@ export const AgentSketchSchema = z
 
 export const AgentThreatModelSchema = z
   .object({
-    schema: z.literal('redline.threatmodel.v1'),
+    // `redline.threatmodel.v1`: runs recorded before the rename to Threatline.
+    schema: z.enum(['threatline.threatmodel.v1', 'redline.threatmodel.v1']),
     issueKey: z.string().min(1),
     sketch: AgentSketchSchema.optional(),
     threats: z.array(AgentThreatSchema).max(25),

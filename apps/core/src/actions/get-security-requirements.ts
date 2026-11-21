@@ -1,4 +1,4 @@
-import { fixBy, dueDate, severityRank, testScaffold, type Requirement, type Severity, type TestLanguage } from '@redline/shared';
+import { fixBy, dueDate, severityRank, testScaffold, type Requirement, type Severity, type TestLanguage } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { panelGet } from '../resolvers/panel.js';
 import type { ActionPayload } from './common.js';

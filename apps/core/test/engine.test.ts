@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Requirement, Threat } from '@redline/shared';
+import type { Requirement, Threat } from '@threatline/shared';
 import { handleJob } from '../src/consumers/review-consumer.js';
 import { getReviewContext } from '../src/actions/get-review-context.js';
 import { submitThreatModel } from '../src/actions/submit-threat-model.js';
@@ -17,7 +17,7 @@ const extract = (injection = false) => (req: { user: string }) =>
 const keyIn = (user: string) => /^Review ([A-Z][A-Z0-9_]*-\d+)\./m.exec(user)?.[1] ?? 'PAY-1';
 const RUN = (req: { user: string }) =>
   JSON.stringify({
-    schema: 'redline.threatmodel.v1',
+    schema: 'threatline.threatmodel.v1',
     issueKey: keyIn(req.user),
     threats: [
       { stride: 'Spoofing', title: 'Forged refund webhook events', scenario: 'An attacker posts fake refund events to the public webhook.', component: 'webhook endpoint', likelihood: 4, impact: 4, evidence: [{ quote: QUOTE }] },

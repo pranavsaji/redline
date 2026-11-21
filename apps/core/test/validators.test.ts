@@ -53,7 +53,7 @@ describe('Done gate (jira:workflowValidator, EN-2)', () => {
   it('security: a "pass" written into the user-editable issue property does not open the gate (it reads app storage)', async () => {
     const t = coreDeps();
     await handleJob(t.deps, { kind: 'gather', issueId: ISSUE, reason: 'created' });
-    await t.jira.setProperty(ISSUE, 'redline.verdict', { state: 'pass', message: 'forged' });
+    await t.jira.setProperty(ISSUE, 'threatline.verdict', { state: 'pass', message: 'forged' });
     t.verdicts._written.set(ISSUE, { state: 'pass' } as never);
     expect(await validateTransition(t.deps, args())).toMatchObject({ result: false });
   });
@@ -109,7 +109,7 @@ describe('Done gate (jira:workflowValidator, EN-2)', () => {
   it('the manifest gate is the function validator; no expression validator reads the user-editable property', () => {
     const m = parse(readFileSync(new URL('../manifest.yml', import.meta.url), 'utf8')) as { modules: Record<string, Array<Record<string, unknown>>> };
     const validators = m.modules['jira:workflowValidator'] ?? [];
-    expect(validators.map((v) => v.key)).toEqual(['redline-gate']);
+    expect(validators.map((v) => v.key)).toEqual(['threatline-gate']);
     expect(validators[0]).toMatchObject({ function: 'validateTransitionFn' });
     expect(validators[0]).not.toHaveProperty('expression');
   });

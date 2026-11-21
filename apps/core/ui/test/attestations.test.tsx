@@ -35,13 +35,13 @@ async function fill(form: HTMLElement, repo: string, sha: string) {
 
 describe('Copy merge attestation (AT-1)', () => {
   it('returns the text to paste into the pull request, with a copy button', async () => {
-    const attestation = vi.fn(async () => ({ token: 'redline-att.v1.x.y', expiresAt: '2026-11-17T12:00:00.000Z', prDescriptionSnippet: 'Threatline attestation for PAY-6 (expires 2026-11-17 12:00 UTC):\nredline-att.v1.x.y' }));
+    const attestation = vi.fn(async () => ({ token: 'threatline-att.v1.x.y', expiresAt: '2026-11-17T12:00:00.000Z', prDescriptionSnippet: 'Threatline attestation for PAY-6 (expires 2026-11-17 12:00 UTC):\nthreatline-att.v1.x.y' }));
     await openRequirements(api(['viewer', 'developer'], { attestation }));
     const form = screen.getByRole('form', { name: 'Merge attestation' });
     await fill(form, 'acme/payments', SHA);
     expect(attestation).toHaveBeenCalledWith('acme/payments', SHA);
     const out = (await screen.findByRole('textbox', { name: 'Paste into the pull request description' })) as HTMLTextAreaElement;
-    expect(out.value).toContain('redline-att.v1.x.y');
+    expect(out.value).toContain('threatline-att.v1.x.y');
     expect(out.readOnly).toBe(true);
     expect(screen.getByRole('button', { name: 'Copy attestation' })).toBeTruthy();
   });

@@ -142,7 +142,7 @@ describe('Admin: policy sections (Task 30)', () => {
     const form = await screen.findByRole('form', { name: 'Roles' });
     await userEvent.selectOptions(within(form).getByRole('combobox', { name: 'Tech leads may accept risk up to' }), 'Low');
     await userEvent.click(within(form).getByRole('button', { name: 'Save roles' }));
-    expect(setPolicy).toHaveBeenCalledWith(expect.objectContaining({ techLeadMaxSeverity: 'Low', championGroup: 'redline-security-champions', techLeadGroup: 'redline-tech-leads' }));
+    expect(setPolicy).toHaveBeenCalledWith(expect.objectContaining({ techLeadMaxSeverity: 'Low', championGroup: 'threatline-security-champions', techLeadGroup: 'threatline-tech-leads' }));
   });
 
   it('a non-admin sees a plain message instead of the policy', async () => {
@@ -320,8 +320,8 @@ describe('Admin: transparency log (R5)', () => {
     await userEvent.click(within(form).getByRole('button', { name: 'Get proof' }));
     expect(ledgerProof).toHaveBeenCalledWith(3);
     const link = await within(form).findByRole('link', { name: 'Download proof for entry 3' });
-    expect(link.getAttribute('download')).toBe('redline-ledger-proof-3.json');
-    expect(decodeURIComponent(link.getAttribute('href')!)).toContain('"format": "redline-ledger-proof-v1"');
+    expect(link.getAttribute('download')).toBe('threatline-ledger-proof-3.json');
+    expect(decodeURIComponent(link.getAttribute('href')!)).toContain('"format": "threatline-ledger-proof-v1"');
     expect(within(form).getByText(/node scripts\/verify-ledger-proof.mjs/)).toBeTruthy();
   });
 

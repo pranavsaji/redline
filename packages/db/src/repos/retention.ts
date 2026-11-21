@@ -1,5 +1,5 @@
 import type { SqlExecutor } from '../executor.js';
-import { ok, type Result } from '@redline/shared';
+import { ok, type Result } from '@threatline/shared';
 
 export interface RetentionStore {
   /** Deletes reviews (and their facts, threats, samples, stages) last updated before `iso`. Never the ledger, never an issue's latest revision. */

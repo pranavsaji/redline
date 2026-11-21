@@ -1,5 +1,5 @@
-import { appError, err, ok, type AttestationPayload, type Requirement, type Result, type Verdict } from '@redline/shared';
-import { encodeAttestation, type KeyPair } from '@redline/crypto';
+import { appError, err, ok, type AttestationPayload, type Requirement, type Result, type Verdict } from '@threatline/shared';
+import { encodeAttestation, type KeyPair } from '@threatline/crypto';
 
 const randomNonce = (): string => {
   const b = new Uint8Array(12);

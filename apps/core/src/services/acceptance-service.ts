@@ -1,5 +1,5 @@
-import { ACCEPTANCE_EVENTS, appendLedger, canApprove, rebuildAcceptances, validateAcceptanceRequest, type ApproverNeeded, type LedgerRow } from '@redline/core';
-import { appError, err, ok, type Acceptance, type AcceptanceState, type Requirement, type Result, type SitePolicy } from '@redline/shared';
+import { ACCEPTANCE_EVENTS, appendLedger, canApprove, rebuildAcceptances, validateAcceptanceRequest, type ApproverNeeded, type LedgerRow } from '@threatline/core';
+import { appError, err, ok, type Acceptance, type AcceptanceState, type Requirement, type Result, type SitePolicy } from '@threatline/shared';
 import type { JiraIssue } from '../adapters/jira.js';
 import { log } from '../adapters/log.js';
 import type { CoreDeps } from '../deps.js';
@@ -9,7 +9,7 @@ import { threatVisible } from './requirements-service.js';
 import { rolesOf } from './roles.js';
 import { refreshVerdict } from './verdict-service.js';
 
-export const SYSTEM_ACTOR = 'redline';
+export const SYSTEM_ACTOR = 'threatline';
 const HOUR = 3_600_000;
 export const BREAK_GLASS_MAX_HOURS = 72;
 export const BREAK_GLASS_MIN_REASON = 20;

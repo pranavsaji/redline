@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { decodeAttestation } from '@redline/crypto';
-import { ok } from '@redline/shared';
+import { decodeAttestation } from '@threatline/crypto';
+import { ok } from '@threatline/shared';
 import { getMergeAttestation } from '../../src/actions/get-merge-attestation.js';
 import { BITBUCKET_KEY_COPIED_KEY } from '../../src/resolvers/admin.js';
 import { attestationCopy, keysCopied, keysPublic, keysRotate } from '../../src/resolvers/attestations.js';
@@ -68,7 +68,7 @@ describe('requestAttestation (AT-1)', () => {
     const r = await requestAttestation(t.deps, { issueKey: 'PAY-7', repo: REPO, commitSha: SHA.toUpperCase(), accountId: DEV });
     if (!r.ok || !('token' in r.value)) throw new Error(`expected a token: ${JSON.stringify(r)}`);
     const { token, expiresAt, prDescriptionSnippet } = r.value;
-    expect(token).toMatch(/^redline-att\.v1\./);
+    expect(token).toMatch(/^threatline-att\.v1\./);
     expect(expiresAt).toBe('2026-11-16T12:00:00.000Z');
     expect(prDescriptionSnippet).toBe(`Threatline attestation for PAY-7 (expires 2026-11-16 12:00 UTC):\n${token}`);
     const rows = await ledgerTypes(t);
@@ -84,7 +84,7 @@ describe('requestAttestation (AT-1)', () => {
 
   it('reads the verdict from app storage, not the editable issue property', async () => {
     const { t } = await reviewed();
-    await t.jira.setProperty(ISSUE, 'redline.verdict', { state: 'pass', reasons: [] });
+    await t.jira.setProperty(ISSUE, 'threatline.verdict', { state: 'pass', reasons: [] });
     const r = await requestAttestation(t.deps, { issueKey: 'PAY-7', repo: REPO, commitSha: SHA, accountId: DEV });
     expect(r.ok && 'blocking' in r.value).toBe(true);
     expect(((await t.deps.state.get(verdictKey(ISSUE))) as { state: string }).state).toBe('block');
@@ -140,7 +140,7 @@ describe('get-merge-attestation action and attestation.copy resolver', () => {
   it('the action uses the caller from the payload context and answers in plain words', async () => {
     const { t } = await reviewed({ allVerified: true });
     const r = await getMergeAttestation({ context: { accountId: DEV }, issueKey: 'PAY-7', repo: REPO, commitSha: SHA }, t.deps);
-    expect(r).toMatchObject({ issued: true, token: expect.stringMatching(/^redline-att\.v1\./), prDescriptionSnippet: expect.stringContaining('PAY-7') });
+    expect(r).toMatchObject({ issued: true, token: expect.stringMatching(/^threatline-att\.v1\./), prDescriptionSnippet: expect.stringContaining('PAY-7') });
     expect(await getMergeAttestation({ issueKey: 'PAY-7', repo: REPO, commitSha: SHA }, t.deps)).toMatchObject({ issued: false, error: 'not_found' });
     expect(await getMergeAttestation({ context: { accountId: DEV }, issueKey: 'PAY-7', repo: REPO, commitSha: 'nope' }, t.deps)).toMatchObject({ issued: false, error: 'invalid_input' });
   });

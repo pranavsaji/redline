@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fixedClock, memoryIssueRepo, memoryReviewRepo } from '@redline/core/testing';
+import { fixedClock, memoryIssueRepo, memoryReviewRepo } from '@threatline/core/testing';
 import { createConfluenceClient } from '../../src/adapters/confluence.js';
 import { createJiraClient } from '../../src/adapters/jira.js';
 import { restGatherer } from '../../src/adapters/rest-gatherer.js';
@@ -125,7 +125,7 @@ describe('restGatherer', () => {
     const r = await g.gather('10042', ACTOR);
     const rev = r.ok ? r.value.facts.filter((f) => f.sourceType === 'review') : [];
     expect(rev).toHaveLength(1);
-    expect(rev[0]).toMatchObject({ trustLevel: 'trusted', sourceAri: 'ari:redline:review/rev_1' });
+    expect(rev[0]).toMatchObject({ trustLevel: 'trusted', sourceAri: 'ari:threatline:review/rev_1' });
     expect(rev[0]!.excerpt).toContain('64');
   });
 

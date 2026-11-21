@@ -3,7 +3,7 @@
 #     --metrics off --severity ERROR --error
 # Each rule pins a control from docs/SECURITY_REVIEW.md so a regression fails CI, not just a test.
 rules:
-  - id: redline-no-egress
+  - id: threatline-no-egress
     message: >-
       Forge app code must not call fetch(): Threatline declares no egress and reaches Atlassian only through
       @forge/api (requestJira, requestConfluence, requestBitbucket) or Rovo. Nothing leaves Atlassian.
@@ -16,9 +16,9 @@ rules:
       - pattern: import { fetch } from '@forge/api'
       - pattern: import { ..., fetch, ... } from '@forge/api'
 
-  - id: redline-no-raw-console
+  - id: threatline-no-raw-console
     message: >-
-      Log through log() from @redline/shared (structured, with prompt text, quotes and secrets stripped), never console.*
+      Log through log() from @threatline/shared (structured, with prompt text, quotes and secrets stripped), never console.*
       directly: a raw log line can carry prompt text or a work item's content into Forge logs.
     severity: ERROR
     languages: [typescript]
@@ -32,7 +32,7 @@ rules:
       - pattern: console.error(...)
       - pattern: console.debug(...)
 
-  - id: redline-no-raw-html
+  - id: threatline-no-raw-html
     message: >-
       Threat text, quotes and design excerpts are attacker-controlled. Render them as text through React, never as
       HTML.
@@ -47,7 +47,7 @@ rules:
       - pattern: $X.outerHTML = $Y
       - pattern: document.write(...)
 
-  - id: redline-no-dynamic-code
+  - id: threatline-no-dynamic-code
     message: No eval or Function constructor anywhere in Threatline.
     severity: ERROR
     languages: [typescript]
@@ -58,7 +58,7 @@ rules:
       - pattern: new Function(...)
       - pattern: Function(...)
 
-  - id: redline-crypto-randomness
+  - id: threatline-crypto-randomness
     message: Key material, nonces and attestation ids must come from node:crypto, never Math.random.
     severity: ERROR
     languages: [typescript]
@@ -66,7 +66,7 @@ rules:
       include: ['packages/crypto/src/**', 'apps/core/src/adapters/signing-keys.ts', 'apps/core/src/services/attestation*.ts']
     pattern: Math.random()
 
-  - id: redline-no-model-in-validator
+  - id: threatline-no-model-in-validator
     message: >-
       The Done validator and merge check decide from stored state only. Calling a model there would let the model
       decide a verdict and make the gate slow and non-deterministic.

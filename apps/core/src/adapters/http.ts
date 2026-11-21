@@ -1,4 +1,4 @@
-import { appError, err, ok, type ErrorCode, type Result } from '@redline/shared';
+import { appError, err, ok, type ErrorCode, type Result } from '@threatline/shared';
 
 export interface HttpInit {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';

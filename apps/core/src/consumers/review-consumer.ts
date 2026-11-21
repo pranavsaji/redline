@@ -1,8 +1,8 @@
 import { engineJob, isEngineReview, reapplyVerification } from '../services/engine.js';
-import { assembleReview, requirementsFor } from '@redline/core';
-import { PROMPT_VERSION } from '@redline/prompts';
-import { appError, err, ok, type ContextBundle, type ContextFact, type Result, type Review, type SitePolicy, type Threat } from '@redline/shared';
-import type { Sample } from '@redline/core';
+import { assembleReview, requirementsFor } from '@threatline/core';
+import { PROMPT_VERSION } from '@threatline/prompts';
+import { appError, err, ok, type ContextBundle, type ContextFact, type Result, type Review, type SitePolicy, type Threat } from '@threatline/shared';
+import type { Sample } from '@threatline/core';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { ReviewJobSchema, type ReviewJob } from '../jobs/types.js';
@@ -19,7 +19,7 @@ async function afterChange(deps: CoreDeps, issueId: string, republish: boolean):
 
 export const SCHEMA_VERSION_KEY = 'schema:version';
 /** The model id a rules-only review records: no model, only Threatline's deterministic rule-based checks. */
-export const RULES_ONLY_MODEL = 'redline-rules';
+export const RULES_ONLY_MODEL = 'threatline-rules';
 
 const voidOk = (): Result<void> => ok(undefined);
 

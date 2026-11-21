@@ -1,5 +1,5 @@
-import { postureSummary } from '@redline/core';
-import type { Severity } from '@redline/shared';
+import { postureSummary } from '@threatline/core';
+import type { Severity } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { callerOf, type ActionPayload } from './common.js';

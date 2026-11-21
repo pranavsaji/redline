@@ -1,4 +1,4 @@
-import { appError, err, ok, type Result } from '@redline/shared';
+import { appError, err, ok, type Result } from '@threatline/shared';
 import type { LlmPort, LlmPurpose, LlmRequest, LlmResponse } from '../../src/ports.js';
 
 type Responder = string[] | ((req: LlmRequest, callIndex: number) => string);

@@ -1,5 +1,5 @@
-import { ACCEPTANCE_EVENTS, combineVerdicts, computeVerdict, rebuildAcceptances, verdictLapsed, type LedgerEventType, type LedgerRow } from '@redline/core';
-import { appError, err, ok, type BlockReason, type Requirement, type Result, type SitePolicy, type Verdict } from '@redline/shared';
+import { ACCEPTANCE_EVENTS, combineVerdicts, computeVerdict, rebuildAcceptances, verdictLapsed, type LedgerEventType, type LedgerRow } from '@threatline/core';
+import { appError, err, ok, type BlockReason, type Requirement, type Result, type SitePolicy, type Verdict } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import type { JiraIssue } from '../adapters/jira.js';
 import { log } from '../adapters/log.js';
@@ -8,7 +8,7 @@ import { isBudgetPaused } from './budget.js';
 export const contextKey = (issueId: string) => `ctx:${issueId}`;
 /**
  * The authoritative verdict, in app storage only the app can write. The Done gate and the panel read it. The
- * `redline.verdict` issue property is a copy for JQL and display: anyone who can edit the work item can edit it.
+ * `threatline.verdict` issue property is a copy for JQL and display: anyone who can edit the work item can edit it.
  */
 export const verdictKey = (issueId: string) => `verdict:${issueId}`;
 
@@ -248,7 +248,7 @@ async function write(deps: CoreDeps, issueId: string, verdict: Verdict & Record<
 
 /**
  * computeVerdict for the work item, combined with every reviewed ancestor (a subtask inherits its story's block),
- * written to the `redline.verdict` property the Done gate reads. Also keeps the `issues` row (key, project, parent)
+ * written to the `threatline.verdict` property the Done gate reads. Also keeps the `issues` row (key, project, parent)
  * current, so a moved issue keeps its requirements under the same id. The property carries `message` (what the
  * validator shows), `panelUrl` and `riskScore` (indexed for JQL).
  */

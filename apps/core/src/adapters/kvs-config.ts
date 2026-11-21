@@ -1,6 +1,6 @@
 import { kvs } from '@forge/kvs';
-import { DEFAULT_SITE_POLICY } from '@redline/core';
-import { appError, err, ok, SitePolicySchema, type Result, type SitePolicy } from '@redline/shared';
+import { DEFAULT_SITE_POLICY } from '@threatline/core';
+import { appError, err, ok, SitePolicySchema, type Result, type SitePolicy } from '@threatline/shared';
 
 /** The subset of `@forge/kvs` Threatline uses. Injected so tests run against an in-memory map. */
 export interface KvsPort {
@@ -67,9 +67,9 @@ export function kvsConfigStore(store: KvsPort = forgeKvs(), defaults: SitePolicy
   };
 }
 
-/** Bootstrap before the admin page exists: `forge variables set REDLINE_ENABLED_PROJECTS PAY,SEC`. Keys are validated. */
+/** Bootstrap before the admin page exists: `forge variables set THREATLINE_ENABLED_PROJECTS PAY,SEC`. Keys are validated. */
 export function defaultsFromEnv(env: Record<string, string | undefined>): SitePolicy {
-  const projects = (env.REDLINE_ENABLED_PROJECTS ?? '')
+  const projects = (env.THREATLINE_ENABLED_PROJECTS ?? '')
     .split(',')
     .map((p) => p.trim().toUpperCase())
     .filter((p) => /^[A-Z][A-Z0-9_]{0,254}$/.test(p));

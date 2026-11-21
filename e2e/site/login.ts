@@ -3,7 +3,7 @@
  * in yourself (this script never sees, types or stores a password), then press Enter here. The cookies are written
  * to e2e/.auth/site.json, which git ignores. Delete that file to sign out.
  *
- *   E2E_SITE_URL=https://<your-site>.atlassian.net pnpm --filter @redline/e2e login
+ *   E2E_SITE_URL=https://<your-site>.atlassian.net pnpm --filter @threatline/e2e login
  */
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';

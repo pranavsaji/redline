@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateKeyPair } from '@redline/crypto';
+import { generateKeyPair, signB64, utf8 } from '@threatline/crypto';
 import { appendLedger, buildLedgerProof, ledgerLeafHashes, signTreeHead, verifyLedgerProof, verifyTreeHead, type LedgerRow } from '../src/index.js';
 import { fixedClock, memoryLedgerRepo } from './fakes/index.js';
 
@@ -37,7 +37,7 @@ describe('R5: inclusion proofs an auditor can check offline', () => {
     const head = signTreeHead(rows, key, now);
     const p = buildLedgerProof(rows, 4, head, key.publicKey);
     if (!p.ok) throw new Error(p.error.message);
-    expect(p.value).toMatchObject({ format: 'redline-ledger-proof-v1', entry: { seq: 4, eventType: 'acceptance.approved' }, leafIndex: 3, treeHead: head, publicKey: key.publicKey });
+    expect(p.value).toMatchObject({ format: 'threatline-ledger-proof-v1', entry: { seq: 4, eventType: 'acceptance.approved' }, leafIndex: 3, treeHead: head, publicKey: key.publicKey });
     expect(verifyLedgerProof(p.value)).toEqual({ ok: true, treeSize: 9, seq: 4 });
   });
 
@@ -74,5 +74,18 @@ describe('R5: inclusion proofs an auditor can check offline', () => {
     expect(buildLedgerProof(rows, 5, head, key.publicKey)).toMatchObject({ ok: false, error: { code: 'not_found' } });
     const lying = { ...signTreeHead(rows, key, now), rootHash: 'a'.repeat(64) };
     expect(buildLedgerProof(rows, 2, lying, key.publicKey)).toMatchObject({ ok: false, error: { code: 'internal' } });
+  });
+});
+
+describe('tree heads and proofs from before the rename to Threatline', () => {
+  it('verify, while new heads and proofs use the threatline names', async () => {
+    const rows = await ledger(4);
+    const fresh = signTreeHead(rows, key, now);
+    const legacyHead = { ...fresh, signature: signB64(utf8(`redline-tree-head-v1\n${fresh.treeSize}\n${fresh.rootHash}\n${fresh.timestamp}`), key.privateKey) };
+    expect(verifyTreeHead(legacyHead, key.publicKey)).toBe(true);
+    const proof = buildLedgerProof(rows, 2, legacyHead, key.publicKey);
+    if (!proof.ok) throw new Error('proof');
+    expect(proof.value.format).toBe('threatline-ledger-proof-v1');
+    expect(verifyLedgerProof({ ...proof.value, format: 'redline-ledger-proof-v1' })).toMatchObject({ ok: true, seq: 2 });
   });
 });

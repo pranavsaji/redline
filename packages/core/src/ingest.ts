@@ -17,8 +17,8 @@ import {
   type SitePolicy,
   type Stride,
   type Threat,
-} from '@redline/shared';
-import { sha256Hex } from '@redline/crypto';
+} from '@threatline/shared';
+import { sha256Hex } from '@threatline/crypto';
 import { extractSignals, type Signals } from './context/signals.js';
 import { htmlToText } from './context/normalize.js';
 import { baselineThreats, coveredByText } from './baseline/rules.js';
@@ -32,7 +32,8 @@ import { riskScore } from './scoring.js';
 import { diffBundles, threatsToReevaluate } from './incremental.js';
 import { isFailedSample, type DiscardedThreat, type Sample } from './ports.js';
 
-export const AGENT_SCHEMA_MARKER = 'redline.threatmodel.v1';
+export const AGENT_SCHEMA_MARKER = 'threatline.threatmodel.v1';
+const LEGACY_SCHEMA_MARKER = 'redline.threatmodel.v1';
 export const MAX_AGENT_RESPONSE_BYTES = 200 * 1024;
 const MAX_CANDIDATES = 50;
 const MAX_CITATIONS = 4;
@@ -98,7 +99,7 @@ function tryExtract(text: string, expectedIssueKey: string): Result<AgentThreatM
     }
   }
   const objects = parsed.filter((p): p is Record<string, unknown> => typeof p === 'object' && p !== null && !Array.isArray(p));
-  const marked = objects.find((o) => o.schema === AGENT_SCHEMA_MARKER);
+  const marked = objects.find((o) => o.schema === AGENT_SCHEMA_MARKER || o.schema === LEGACY_SCHEMA_MARKER);
   if (!marked) {
     if (objects.length > 0) return err({ code: 'schema', message: `no JSON object with "schema": "${AGENT_SCHEMA_MARKER}"` });
     return err(text.includes('{') ? { code: 'invalid_json', message: 'JSON could not be parsed (truncated or malformed)' } : { code: 'no_json', message: 'no JSON found in agent response' });

@@ -1,17 +1,17 @@
-import { ok, type AgentThreatModel, type Requirement } from '@redline/shared';
+import { ok, type AgentThreatModel, type Requirement } from '@threatline/shared';
 import { handleJob } from '../../src/consumers/review-consumer.js';
 import { coreDeps, jiraIssue } from './core-deps.js';
 import { sqliteLedger } from './sqlite-ledger.js';
 
 export const ISSUE = '10042';
-export const CHAMPIONS = 'redline-security-champions';
-export const LEADS = 'redline-tech-leads';
+export const CHAMPIONS = 'threatline-security-champions';
+export const LEADS = 'threatline-tech-leads';
 export const DEV = 'acc-dev';
 export const CHAMP = 'acc-champ';
 export const ADMIN = 'acc-admin';
 
 const model: AgentThreatModel = {
-  schema: 'redline.threatmodel.v1',
+  schema: 'threatline.threatmodel.v1',
   issueKey: 'PAY-7',
   threats: [
     { stride: 'Spoofing', title: 'Forged refund webhooks', scenario: 'An attacker posts a fake refund event.', component: 'webhook endpoint', likelihood: 4, impact: 4, evidence: [{ quote: 'Public webhook that receives refund events' }] },

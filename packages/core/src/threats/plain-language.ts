@@ -1,4 +1,4 @@
-import type { AgentThreat, Stride } from '@redline/shared';
+import type { AgentThreat, Stride } from '@threatline/shared';
 
 const TEMPLATES: Record<Stride, (c: string) => string> = {
   Spoofing: (c) => `Someone could pretend to be a legitimate user or service of the ${c}.`,

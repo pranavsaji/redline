@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { appError, AgentThreatModelSchema, ContextFactSchema, err, ok, ReviewSchema, ThreatSchema, type Review } from '@redline/shared';
-import type { DiscardedThreat, ReviewRepo, Sample } from '@redline/core';
+import { appError, AgentThreatModelSchema, ContextFactSchema, err, ok, ReviewSchema, ThreatSchema, type Review } from '@threatline/shared';
+import type { DiscardedThreat, ReviewRepo, Sample } from '@threatline/core';
 import type { SqlExecutor } from '../executor.js';
 import { collect, parseJson } from '../json.js';
 

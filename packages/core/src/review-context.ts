@@ -1,5 +1,5 @@
-import type { ContextBundle } from '@redline/shared';
-import { OUTPUT_CONTRACT } from '@redline/prompts';
+import type { ContextBundle } from '@threatline/shared';
+import { OUTPUT_CONTRACT } from '@threatline/prompts';
 import { extractSignals, type Signals } from './context/signals.js';
 
 export const MAX_CONTEXT_BYTES = 200 * 1024;

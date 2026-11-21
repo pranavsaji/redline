@@ -1,4 +1,4 @@
-import type { Acceptance, Requirement, Review, Threat } from '@redline/shared';
+import type { Acceptance, Requirement, Review, Threat } from '@threatline/shared';
 import { DEFAULT_SITE_POLICY, type VerdictInput } from '../../src/index.js';
 
 export const NOW = new Date('2026-11-15T12:00:00Z');

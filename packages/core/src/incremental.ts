@@ -1,4 +1,4 @@
-import type { ContextFact, Threat } from '@redline/shared';
+import type { ContextFact, Threat } from '@threatline/shared';
 import { similar } from './threats/cluster.js';
 
 type FactRef = Pick<ContextFact, 'id' | 'sourceAri' | 'version'>;

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { appendLedger, type PublicKeyInfo } from '@redline/core';
+import { appendLedger, type PublicKeyInfo } from '@threatline/core';
 import type { CoreDeps } from '../deps.js';
 import { COMMIT_SHA, REPO, requestAttestation, type AttestationOutcome } from '../services/attestation-service.js';
 import { BITBUCKET_KEY_COPIED_KEY, requireAdmin, type Admin } from './admin.js';

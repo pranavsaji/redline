@@ -1,4 +1,4 @@
-import type { BlockReason } from '@redline/shared';
+import type { BlockReason } from '@threatline/shared';
 import { log } from '../adapters/log.js';
 import type { CoreDeps } from '../deps.js';
 import { COMMIT_SHA, REPO, requestAttestation } from '../services/attestation-service.js';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Threat } from '@redline/shared';
+import type { Threat } from '@threatline/shared';
 import { matches, scoreCase, summarize } from './metrics.js';
 
 const t = (stride: Threat['stride'], title: string, scenario = ''): Pick<Threat, 'stride' | 'title' | 'scenario' | 'severity'> => ({ stride, title, scenario, severity: 'High' });

@@ -1,4 +1,4 @@
-import type { Acceptance, BlockReason, Verdict } from '@redline/shared';
+import type { Acceptance, BlockReason, Verdict } from '@threatline/shared';
 
 export type ReleaseCall = 'Go' | 'Conditional' | 'No-go';
 const SOON_MS = 14 * 86_400_000;

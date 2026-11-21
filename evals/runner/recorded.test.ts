@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { appError, err, ok, type Result } from '@redline/shared';
-import type { LlmPort, LlmRequest, LlmResponse } from '@redline/core';
+import { appError, err, ok, type Result } from '@threatline/shared';
+import type { LlmPort, LlmRequest, LlmResponse } from '@threatline/core';
 import { gateCheck, loadRecording, recordingLlm, replayLlm, saveRecording } from './recorded.js';
 import { reportMarkdown, runEval } from './run.js';
 
@@ -31,16 +31,16 @@ describe('recorded eval outputs (offline CI gate, Task 33)', () => {
   });
 
   it('saveRecording / loadRecording round-trip one file per case; a missing case is null', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'redline-rec-'));
+    const dir = mkdtempSync(join(tmpdir(), 'threatline-rec-'));
     saveRecording(dir, { caseId: 'api-02', promptVersion: 'v1.2.0', replies: [{ text: '{"x":1}', modelId: 'm' }] });
     expect(loadRecording(dir, 'api-02')).toEqual({ caseId: 'api-02', promptVersion: 'v1.2.0', replies: [{ text: '{"x":1}', modelId: 'm' }] });
     expect(loadRecording(dir, 'nope')).toBeNull();
   });
 
   it('runEval with record and replay gives the same scores offline as the live run did', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'redline-rec-'));
+    const dir = mkdtempSync(join(tmpdir(), 'threatline-rec-'));
     // Answers for whichever case asked, so every sample is valid (a wrong issue key would be discarded).
-    const echo: LlmPort = { complete: async (r) => ok({ text: JSON.stringify({ schema: 'redline.threatmodel.v1', issueKey: /EVAL-\d+/.exec(r.user)![0], threats: [] }), modelId: 'm', tokensIn: 1, tokensOut: 1 }) };
+    const echo: LlmPort = { complete: async (r) => ok({ text: JSON.stringify({ schema: 'threatline.threatmodel.v1', issueKey: /EVAL-\d+/.exec(r.user)![0], threats: [] }), modelId: 'm', tokensIn: 1, tokensOut: 1 }) };
     const live = await runEval({ llm: echo, llmName: 'claude-code', subset: 5, samples: 2, path: 'agent', recordDir: dir });
     const replayed = await runEval({ llm: null, llmFor: (id) => { const r = loadRecording(dir, id); return r ? replayLlm(r) : null; }, llmName: 'recorded', subset: 5, samples: 2, path: 'agent' });
     expect(live.ok && replayed.ok).toBe(true);
@@ -58,9 +58,9 @@ describe('recorded eval outputs (offline CI gate, Task 33)', () => {
   });
 
   it('resume replays fully recorded cases and calls the model only for incomplete ones, re-recording them', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'redline-rec-'));
+    const dir = mkdtempSync(join(tmpdir(), 'threatline-rec-'));
     let calls = 0;
-    const echo: LlmPort = { complete: async (r) => (calls++, ok({ text: JSON.stringify({ schema: 'redline.threatmodel.v1', issueKey: /EVAL-\d+/.exec(r.user)![0], threats: [] }), modelId: 'm', tokensIn: 1, tokensOut: 1 })) };
+    const echo: LlmPort = { complete: async (r) => (calls++, ok({ text: JSON.stringify({ schema: 'threatline.threatmodel.v1', issueKey: /EVAL-\d+/.exec(r.user)![0], threats: [] }), modelId: 'm', tokensIn: 1, tokensOut: 1 })) };
     const first = await runEval({ llm: echo, llmName: 'claude-code', subset: 5, samples: 2, path: 'agent', recordDir: dir });
     expect(first.ok && calls).toBe(10);
     const partial = loadRecording(dir, 'web-01')!;
@@ -73,7 +73,7 @@ describe('recorded eval outputs (offline CI gate, Task 33)', () => {
   });
 
   it('the report says when no poisoned case could be scored instead of printing 0%', async () => {
-    const echo: LlmPort = { complete: async (r) => ok({ text: JSON.stringify({ schema: 'redline.threatmodel.v1', issueKey: /EVAL-\d+/.exec(r.user)![0], threats: [] }), modelId: 'm', tokensIn: 1, tokensOut: 1 }) };
+    const echo: LlmPort = { complete: async (r) => ok({ text: JSON.stringify({ schema: 'threatline.threatmodel.v1', issueKey: /EVAL-\d+/.exec(r.user)![0], threats: [] }), modelId: 'm', tokensIn: 1, tokensOut: 1 }) };
     const r = await runEval({ llm: echo, llmName: 'claude-code', subset: 4, samples: 1, path: 'agent' });
     if (!r.ok) throw new Error('eval');
     expect(reportMarkdown(r.value)).toMatch(/\| Injection resistance \| no poisoned case scored \|/);

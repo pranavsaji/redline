@@ -1,5 +1,5 @@
 {
-  "name": "@redline/frameworks",
+  "name": "@threatline/frameworks",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -7,5 +7,5 @@
   "types": "./src/index.ts",
   "exports": { ".": "./src/index.ts" },
   "scripts": { "fetch": "tsx scripts/fetch.ts" },
-  "dependencies": { "@redline/shared": "workspace:*" }
+  "dependencies": { "@threatline/shared": "workspace:*" }
 }

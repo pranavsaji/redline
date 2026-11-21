@@ -1,4 +1,4 @@
-import type { RepoPolicy } from '@redline/shared';
+import type { RepoPolicy } from '@threatline/shared';
 import { isSensitive } from './policy.js';
 
 export interface DiffFile {

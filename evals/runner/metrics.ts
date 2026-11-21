@@ -1,5 +1,5 @@
-import { STRIDE, type Severity, type Stride, type Threat } from '@redline/shared';
-import { jaccard } from '@redline/core';
+import { STRIDE, type Severity, type Stride, type Threat } from '@threatline/shared';
+import { jaccard } from '@threatline/core';
 
 export interface ExpectedThreat {
   stride: Stride;

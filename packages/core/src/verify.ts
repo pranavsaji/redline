@@ -1,6 +1,6 @@
-import { severityRank, type Result, type Severity, type Threat } from '@redline/shared';
-import { verifyPrompt, VerifySchema } from '@redline/prompts';
-import { appError, err, ok } from '@redline/shared';
+import { severityRank, type Result, type Severity, type Threat } from '@threatline/shared';
+import { verifyPrompt, VerifySchema } from '@threatline/prompts';
+import { appError, err, ok } from '@threatline/shared';
 import { callStage, type PipelineDeps, type Usage } from './pipeline.js';
 
 export interface Verdict4 {

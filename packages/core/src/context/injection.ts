@@ -1,4 +1,4 @@
-import type { InjectionReason } from '@redline/shared';
+import type { InjectionReason } from '@threatline/shared';
 
 const AI_DIRECTIVES: RegExp[] = [
   /\bignore\s+(?:all\s+|any\s+|the\s+)?(?:previous|prior|above|earlier)\s+(?:instructions|prompts|messages|rules)/i,

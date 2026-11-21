@@ -10,7 +10,7 @@ const escape = (s: string) => s.replace(/%/g, '%25').replace(/\r/g, '%0D').repla
 const say = (line: string) => process.stdout.write(`${line}\n`);
 
 async function main(): Promise<number> {
-  const nowSec = env.REDLINE_NOW ? Number(env.REDLINE_NOW) : Math.floor(Date.now() / 1000);
+  const nowSec = env.THREATLINE_NOW ? Number(env.THREATLINE_NOW) : Math.floor(Date.now() / 1000);
   const settings = parseInputs({ 'public-keys': input('public-keys'), 'sensitive-paths': input('sensitive-paths'), mode: input('mode'), 'warn-until': input('warn-until'), 'diff-score-threshold': input('diff-score-threshold') }, nowSec);
   if (!settings.ok) return finish(false, 'config_error', settings.message);
   const event = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH ?? '', 'utf8')) as { pull_request?: { number?: number }; repository?: { full_name?: string } };

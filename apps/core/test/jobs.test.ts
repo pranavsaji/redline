@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { MIGRATIONS } from '@redline/db';
-import { migrate } from '@redline/db';
+import { MIGRATIONS } from '@threatline/db';
+import { migrate } from '@threatline/db';
 import { sqliteExecutor } from '../../../packages/db/test/sqlite-executor.js';
-import { sqlRetention } from '@redline/db';
+import { sqlRetention } from '@threatline/db';
 import { handleJob } from '../src/consumers/review-consumer.js';
 import { sweep } from '../src/jobs/sweeper.js';
 import { hourly } from '../src/jobs/hourly.js';
 import { daily } from '../src/jobs/daily.js';
-import { appendLedger } from '@redline/core';
+import { appendLedger } from '@threatline/core';
 import { checkRerunLimit } from '../src/services/rate-limit.js';
 import { coreDeps, drain } from './support/core-deps.js';
 
@@ -28,7 +28,7 @@ describe('sweeper', () => {
     const t = coreDeps();
     await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
     const rev = (await t.deps.reviews.latest('10042')) as { ok: true; value: { id: string } };
-    const model = { schema: 'redline.threatmodel.v1' as const, issueKey: 'PAY-7', threats: [{ stride: 'Spoofing' as const, title: 'Forged refund webhooks', scenario: 'An attacker posts a fake refund event.', component: 'webhook endpoint', likelihood: 4, impact: 4, evidence: [{ quote: 'Public webhook that receives refund events' }] }] };
+    const model = { schema: 'threatline.threatmodel.v1' as const, issueKey: 'PAY-7', threats: [{ stride: 'Spoofing' as const, title: 'Forged refund webhooks', scenario: 'An attacker posts a fake refund event.', component: 'webhook endpoint', likelihood: 4, impact: 4, evidence: [{ quote: 'Public webhook that receives refund events' }] }] };
     for (const n of [1, 2]) await t.deps.reviews.saveSample(rev.value.id, n, model);
     t.clock.set('2026-11-15T12:20:00Z');
     t.pushed.length = 0;

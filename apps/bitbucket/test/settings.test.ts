@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateKeyPair } from '@redline/crypto';
+import { generateKeyPair } from '@threatline/crypto';
 import { parseSettingsInput, kvsSettingsStore, type SettingsKvs } from '../src/settings-store.js';
 import { settingsGet, settingsSave } from '../src/resolvers.js';
 

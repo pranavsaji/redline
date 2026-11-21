@@ -75,11 +75,11 @@ export function TransparencyLog({ api }: { api: AdminApi }) {
         <div role="status" style={{ display: 'grid', gap: 4 }}>
           {proof && (
             <>
-              <a href={dataUrl(proof.json)} download={`redline-ledger-proof-${proof.seq}.json`} style={{ color: token('color.link') }}>
+              <a href={dataUrl(proof.json)} download={`threatline-ledger-proof-${proof.seq}.json`} style={{ color: token('color.link') }}>
                 {`Download proof for entry ${proof.seq}`}
               </a>
               <span style={{ font: token('font.body.small'), color: token('color.text.subtle') }}>
-                Check it offline with <code>node scripts/verify-ledger-proof.mjs redline-ledger-proof-{proof.seq}.json</code>, and compare the public key it prints with the Confluence page.
+                Check it offline with <code>node scripts/verify-ledger-proof.mjs threatline-ledger-proof-{proof.seq}.json</code>, and compare the public key it prints with the Confluence page.
               </span>
             </>
           )}

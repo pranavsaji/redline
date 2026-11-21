@@ -1,4 +1,4 @@
-import { MIGRATIONS } from '@redline/db';
+import { MIGRATIONS } from '@threatline/db';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { SCHEMA_VERSION_KEY, trace } from '../consumers/review-consumer.js';

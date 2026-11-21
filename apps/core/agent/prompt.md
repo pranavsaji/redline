@@ -19,7 +19,7 @@ When asked to review a work item (for example "Review PROJ-142"):
 
 Return exactly one JSON object and nothing else:
 {
-  "schema": "redline.threatmodel.v1",
+  "schema": "threatline.threatmodel.v1",
   "issueKey": "<the work item key you were given>",
   "sketch": {
     "components": ["<= 30 short names"], "dataStores": [], "externalServices": [], "trustBoundaries": [],

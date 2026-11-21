@@ -1,11 +1,13 @@
-import { AttestationPayloadSchema, canonicalJson, err, ok, type AttestationPayload, type Result } from '@redline/shared';
+import { AttestationPayloadSchema, canonicalJson, err, ok, type AttestationPayload, type Result } from '@threatline/shared';
 import { fromB64url, fromUtf8, toB64url, utf8 } from './b64.js';
 import { signB64, verifyB64, type KeyPair } from './ed25519.js';
 
-export const ATTESTATION_PREFIX = 'redline-att.v1.';
+export const ATTESTATION_PREFIX = 'threatline-att.v1.';
+/** Tokens issued before the rename to Threatline. The signature covers only the payload, so they verify the same way. */
+const LEGACY_ATTESTATION_PREFIX = 'redline-att.v1.';
 export type AttestationError = 'malformed' | 'unknown_key' | 'bad_signature' | 'expired' | 'not_yet_valid' | 'schema';
 
-/** `redline-att.v1.<b64url(canonicalJson(payload))>.<b64url(ed25519 signature over those payload bytes)>` */
+/** `threatline-att.v1.<b64url(canonicalJson(payload))>.<b64url(ed25519 signature over those payload bytes)>` */
 export function encodeAttestation(p: AttestationPayload, key: KeyPair): string {
   if (p.kid !== key.kid) throw new Error('encodeAttestation: payload kid does not match signing key');
   const bytes = utf8(canonicalJson(AttestationPayloadSchema.parse(p)));
@@ -19,8 +21,9 @@ export function decodeAttestation(
   skewSec = 300,
 ): Result<AttestationPayload, { code: AttestationError; message: string }> {
   const fail = (code: AttestationError, message: string) => err({ code, message });
-  if (!token.startsWith(ATTESTATION_PREFIX)) return fail('malformed', 'not a Threatline v1 attestation');
-  const parts = token.slice(ATTESTATION_PREFIX.length).split('.');
+  const prefix = [ATTESTATION_PREFIX, LEGACY_ATTESTATION_PREFIX].find((x) => token.startsWith(x));
+  if (!prefix) return fail('malformed', 'not a Threatline v1 attestation');
+  const parts = token.slice(prefix.length).split('.');
   if (parts.length !== 2) return fail('malformed', 'expected payload and signature segments');
   const [body, sig] = parts as [string, string];
   const bytes = fromB64url(body);
@@ -46,5 +49,5 @@ export function decodeAttestation(
 }
 
 export function findAttestations(text: string): string[] {
-  return text.match(/redline-att\.v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g) ?? [];
+  return text.match(/(?:threatline|redline)-att\.v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g) ?? [];
 }

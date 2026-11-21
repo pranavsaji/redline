@@ -1,4 +1,4 @@
-import type { ContextFact, DataClass, Exposure } from '@redline/shared';
+import type { ContextFact, DataClass, Exposure } from '@threatline/shared';
 
 export interface Evidence {
   factId: string;

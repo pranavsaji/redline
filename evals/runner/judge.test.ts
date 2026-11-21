@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { appError, err, ok } from '@redline/shared';
-import type { LlmPort, LlmRequest } from '@redline/core';
+import { appError, err, ok } from '@threatline/shared';
+import type { LlmPort, LlmRequest } from '@threatline/core';
 import { judgeExtras, judgeSystemPrompt, judgeUserPrompt, parseJudge, type JudgeItem } from './judge.js';
 import { loadRecording, replayLlm } from './recorded.js';
 import { scoreCase, summarize } from './metrics.js';
@@ -87,8 +87,8 @@ describe('LLM judge for threats outside the must-find list (offline eval only, T
   });
 
   it('runEval with a judge records its replies, replays them offline, and reports judged precision next to strict', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'redline-judge-'));
-    const proposer: LlmPort = { complete: async (r) => ok({ text: JSON.stringify({ schema: 'redline.threatmodel.v1', issueKey: /EVAL-\d+/.exec(r.user)![0], threats: [] }), modelId: 'm', tokensIn: 1, tokensOut: 1 }) };
+    const dir = mkdtempSync(join(tmpdir(), 'threatline-judge-'));
+    const proposer: LlmPort = { complete: async (r) => ok({ text: JSON.stringify({ schema: 'threatline.threatmodel.v1', issueKey: /EVAL-\d+/.exec(r.user)![0], threats: [] }), modelId: 'm', tokensIn: 1, tokensOut: 1 }) };
     let judgeCalls = 0;
     const judge: LlmPort = {
       complete: async (r) => {
@@ -110,7 +110,7 @@ describe('LLM judge for threats outside the must-find list (offline eval only, T
   });
 
   it('a judge failure is reported by case and leaves that case out of judged precision, never counted as valid', async () => {
-    const proposer: LlmPort = { complete: async (r) => ok({ text: JSON.stringify({ schema: 'redline.threatmodel.v1', issueKey: /EVAL-\d+/.exec(r.user)![0], threats: [] }), modelId: 'm', tokensIn: 1, tokensOut: 1 }) };
+    const proposer: LlmPort = { complete: async (r) => ok({ text: JSON.stringify({ schema: 'threatline.threatmodel.v1', issueKey: /EVAL-\d+/.exec(r.user)![0], threats: [] }), modelId: 'm', tokensIn: 1, tokensOut: 1 }) };
     const down: LlmPort = { complete: async () => err(appError('upstream', 'claude -p exited with 1')) };
     const r = await runEval({ llm: proposer, llmName: 'claude-code', subset: 5, samples: 1, path: 'agent', judge: { llmFor: () => down } });
     expect(r.ok).toBe(true);

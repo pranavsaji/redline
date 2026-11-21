@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { appendLedger, verifyLedgerProof } from '@redline/core';
-import { ok } from '@redline/shared';
+import { appendLedger, verifyLedgerProof } from '@threatline/core';
+import { ok } from '@threatline/shared';
 import type { ConfluenceClient } from '../../src/adapters/confluence.js';
 import { DIGEST_CONFIG_KEY } from '../../src/services/digest.js';
 import { currentTreeHead, ledgerProofFor, publishTreeHead, TREE_HEADS_PAGE_TITLE } from '../../src/services/transparency.js';
@@ -106,7 +106,7 @@ describe('R5: downloadable inclusion proofs', () => {
     expect(await ledgerProof(t.deps, { accountId: 'acc-admin' }, { seq: 0 })).toMatchObject({ error: 'validation' });
     expect(await ledgerProof(t.deps, { accountId: 'acc-admin' }, { seq: 99 })).toEqual({ error: 'not_found' });
     const p = await ledgerProof(t.deps, { accountId: 'acc-admin' }, { seq: 2 });
-    expect('json' in p && JSON.parse(p.json)).toMatchObject({ format: 'redline-ledger-proof-v1', entry: { seq: 2 } });
+    expect('json' in p && JSON.parse(p.json)).toMatchObject({ format: 'threatline-ledger-proof-v1', entry: { seq: 2 } });
     expect(await ledgerTreeHead(t.deps, { accountId: 'acc-admin' })).toMatchObject({ treeHead: { treeSize: 4 }, publicKey: expect.any(String), publishedPageId: null });
   });
 });

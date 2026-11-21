@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { XMLValidator } from 'fast-xml-parser';
-import type { Acceptance, Requirement, Review, Threat } from '@redline/shared';
+import type { Acceptance, Requirement, Review, Threat } from '@threatline/shared';
 import { DEFAULT_OWNER_NOTES, extractOwnerNotes, renderThreatModel, type ThreatModelDto } from '../src/render/threat-model-storage.js';
 
 const review: Review = {

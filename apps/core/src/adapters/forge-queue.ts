@@ -1,9 +1,9 @@
 import { Queue } from '@forge/events';
-import { appError, err, ok } from '@redline/shared';
+import { appError, err, ok } from '@threatline/shared';
 import type { JobQueue } from '../deps.js';
 import type { ReviewJob } from '../jobs/types.js';
 
-export const JOB_QUEUE_KEY = 'redline-jobs';
+export const JOB_QUEUE_KEY = 'threatline-jobs';
 const MAX_PER_PUSH = 50;
 
 /** Jobs for one work item run one at a time (Forge concurrency key), so duplicate events cannot race a revision. */

@@ -23,7 +23,7 @@ interface Baseline {
  */
 describe('offline eval gate', () => {
   it('replayed recorded outputs stay within 3 F1 points of the baseline, with no case failing', { timeout: 120_000 }, async () => {
-    expect(existsSync(BASELINE), 'no evals/results/baseline.json: run `pnpm redline eval --llm claude-code --write-baseline`').toBe(true);
+    expect(existsSync(BASELINE), 'no evals/results/baseline.json: run `pnpm threatline eval --llm claude-code --write-baseline`').toBe(true);
     const base = JSON.parse(readFileSync(BASELINE, 'utf8')) as Baseline;
     const r = await runEval({
       llm: null,
