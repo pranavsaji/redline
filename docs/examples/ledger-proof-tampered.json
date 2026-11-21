@@ -1,0 +1,43 @@
+{
+  "format": "threatline-ledger-proof-v1",
+  "entry": {
+    "seq": 6,
+    "eventType": "attestation.issued",
+    "payload": {
+      "issueKey": "PAY-7",
+      "repo": "acme/payments",
+      "commitSha": "f00dfeedf00dfeedf00dfeedf00dfeedf00dfeed"
+    },
+    "actor": "demo-dev",
+    "createdAt": "2026-11-02T14:00:00.000Z",
+    "prevHash": "83010a55108d545240f9f2137df3f98253db8ff96b31630b96dbc899884613e1",
+    "entryHash": "ab87d6569a9fd529fd53c85057109f47cc50ec61a42c9f36dd3a03495e06a89a"
+  },
+  "leafIndex": 5,
+  "leafHash": "5752f17e6a83629f858d66aa5cbaae5243db0542daa6fac93562cff39ff3c862",
+  "auditPath": [
+    "d81acf5209071a8ab1f5f6bff30dd6bf7c36619f3b56a38b9c3b546609973353",
+    "492558fc3720b65d2cace7feb894cd503cb4113f74ecc658b1f578e5712713ab",
+    "e47226ba1b888c5abc64e182239959b17e22fe5cb82609d04c6dddb04d221ab5"
+  ],
+  "treeHead": {
+    "treeSize": 8,
+    "rootHash": "c2326c75743bb5f5153ba85be52d7ce417d287c73cf1fb797952e43eceecdb6a",
+    "timestamp": "2026-11-02T17:00:00.000Z",
+    "kid": "f4dc95a1eb1902e4",
+    "signature": "UAN9KLShNw6Kk3ektwjFbvmdb9dG-6y-YBLNEMVi1Z-q9fvPBrYFHxrOFU4zDYYYe9KSxI4psR9SUMi6UYpLBQ"
+  },
+  "publicKey": "ihXDX_OHPt0TIxhax2CBCqgc4lgjU8TzrlQThOzz6g8",
+  "consistency": {
+    "fromTreeHead": {
+      "treeSize": 4,
+      "rootHash": "e47226ba1b888c5abc64e182239959b17e22fe5cb82609d04c6dddb04d221ab5",
+      "timestamp": "2026-11-02T13:00:00.000Z",
+      "kid": "f4dc95a1eb1902e4",
+      "signature": "KzOhV2BrkzG9RuNYJav3ZHIUa-IbMVzXXzlWAbnHJ16_QyiDREYw5JcX9AvC-R0KjEjwOn7ObFU-S9qhhOUIBg"
+    },
+    "proof": [
+      "8990caa3fd7e5dc286eb91caa22f75d364b8819a88535173a4c67c9966e683c2"
+    ]
+  }
+}

@@ -1,9 +1,13 @@
 export interface Settings {
   publicKeys: Record<string, string>;
+  /** kid → ISO time the key retires (shown as `<key> until=<date>`). */
+  keyRetireAt?: Record<string, string>;
   sensitivePaths: string[];
   mode: 'warn' | 'block';
   /** When warn mode ends (at most 14 days after it was switched on); then the check blocks again. */
   warnUntil?: string;
+  /** When an earlier warn-only window ended (the check blocks again; mode reads as block). */
+  warnEnded?: string;
   diffScoreThreshold: number;
 }
 export interface SettingsInput {

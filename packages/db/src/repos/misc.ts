@@ -93,6 +93,42 @@ export function sqlUsageRepo(x: SqlExecutor): UsageRepo {
       const v = r.value[0];
       return ok(v ? { tokensIn: Number(v.tokens_in), tokensOut: Number(v.tokens_out), reviews: Number(v.reviews) } : { tokensIn: 0, tokensOut: 0, reviews: 0 });
     },
+    async takeSlot(bucket, window, limit) {
+      // One row per bucket. The conditional UPDATE is the check and the increment in one statement, so parallel callers
+      // cannot all pass; `used` is assigned before `win`, so it sees the old window under MySQL and SQLite alike.
+      const take = () =>
+        x.exec('UPDATE rate_limits SET used = CASE WHEN win = ? THEN used + 1 ELSE 1 END, win = ? WHERE bucket = ? AND (win <> ? OR used < ?)', [window, window, bucket, window, limit]);
+      const used = async () => {
+        const r = await x.query<{ used: number }>('SELECT used FROM rate_limits WHERE bucket = ?', [bucket]);
+        return r.ok ? ok(Math.min(limit, Number(r.value[0]?.used ?? 1))) : r;
+      };
+      if (limit <= 0) return ok(null);
+      const u = await take();
+      if (!u.ok) return u;
+      if (u.value.affectedRows > 0) return used();
+      const i = await x.exec('INSERT INTO rate_limits (bucket, win, used) VALUES (?, ?, 1)', [bucket, window]);
+      if (i.ok) return ok(1);
+      if (i.error.code !== 'conflict') return i;
+      // Someone else created the row first: take from it, or it is already full.
+      const again = await take();
+      if (!again.ok) return again;
+      return again.value.affectedRows > 0 ? used() : ok(null);
+    },
+    async reserveReview(month, cap) {
+      // Increment-then-check in one conditional UPDATE, so parallel gathers at cap - 1 cannot all pass.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const u = await x.exec('UPDATE usage_monthly SET reviews = reviews + 1 WHERE month = ? AND reviews + 1 <= ?', [month, cap]);
+        if (!u.ok) return u;
+        if (u.value.affectedRows > 0) return ok(true);
+        const g = await x.query<{ reviews: number }>('SELECT reviews FROM usage_monthly WHERE month = ?', [month]);
+        if (!g.ok) return g;
+        if (g.value[0] || cap < 1) return ok(false);
+        const i = await x.exec('INSERT INTO usage_monthly (month, tokens_in, tokens_out, reviews) VALUES (?, 0, 0, 1)', [month]);
+        if (i.ok) return ok(true);
+        if (i.error.code !== 'conflict') return i;
+      }
+      return ok(false);
+    },
   };
 }
 

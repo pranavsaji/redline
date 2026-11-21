@@ -79,4 +79,15 @@ export const MIGRATIONS: Migration[] = [
     // this migration have no issue_id; reads include them, so nothing is missed and the cost stays bounded.
     statements: [`ALTER TABLE ledger ADD COLUMN issue_id VARCHAR(40)`, `CREATE INDEX idx_ledger_issue ON ledger (issue_id, event_type)`],
   },
+  {
+    version: 5,
+    name: 'rate_limits_and_ledger_time_index',
+    // Security: re-run limits are a conditional UPDATE on one row per account (or work item), so parallel re-runs
+    // cannot all pass a read-then-write check. One row per bucket: the window column resets it, nothing accumulates.
+    // Scale: the acceptance expiry sweep reads acceptance events of the last ~400 days by type and time, not all of them.
+    statements: [
+      `CREATE TABLE IF NOT EXISTS rate_limits (bucket VARCHAR(191) PRIMARY KEY, win VARCHAR(20) NOT NULL, used INT NOT NULL)`,
+      `CREATE INDEX idx_ledger_type_time ON ledger (event_type, created_at)`,
+    ],
+  },
 ];

@@ -3,6 +3,7 @@ import Button from '@atlaskit/button/new';
 import type { Evidence } from '../types.js';
 import { box, errorText, field, label } from './form-styles.js';
 import { useInlineForm } from '../components/inline-form.js';
+import { useInFlight } from '../components/in-flight.js';
 
 const KINDS: Array<{ kind: Evidence['kind']; label: string; hint: string }> = [
   { kind: 'pr', label: 'PR link', hint: 'https://bitbucket.org/…/pull-requests/42' },
@@ -16,18 +17,16 @@ export function EvidenceForm({ onSubmit, onCancel }: { onSubmit: (e: Pick<Eviden
   const [kind, setKind] = useState<Evidence['kind']>('pr');
   const [ref, setRef] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const { busy: saving, run } = useInFlight();
   const id = useId();
   const form = useInlineForm(onCancel);
   const current = KINDS.find((k) => k.kind === kind)!;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (!ref.trim()) return setError('Add a link, path or note.');
-    setSaving(true);
-    const problem = await onSubmit({ kind, ref: ref.trim() });
-    setSaving(false);
-    setError(problem);
+    await run(async () => setError(await onSubmit({ kind, ref: ref.trim() })));
   };
 
   return (

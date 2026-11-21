@@ -236,13 +236,19 @@ describe('request-risk-acceptance', () => {
 
   it('a refused request says why (e.g. expiry above the cap)', async () => {
     const { t, req } = await reviewed();
-    const r = await requestRiskAcceptance({ requirementId: req.id, reason: 'Provider signs payloads; we verify next sprint', controls: '', expiryDays: 200, ...ctx(ME) }, t.deps);
+    const r = await requestRiskAcceptance({ requirementId: req.id, reason: 'Provider signs payloads; we verify next sprint', controls: 'IP allow-list', expiryDays: 200, ...ctx(ME) }, t.deps);
     expect(r).toMatchObject({ error: 'refused', message: expect.stringMatching(/at most \d+ days/) });
+  });
+
+  it('a request without compensating controls is refused and says what to add', async () => {
+    const { t, req } = await reviewed();
+    const r = await requestRiskAcceptance({ requirementId: req.id, reason: 'Provider signs payloads; we verify next sprint', expiryDays: 14, ...ctx(ME) }, t.deps);
+    expect(r).toMatchObject({ error: 'refused', message: expect.stringMatching(/compensating controls/) });
   });
 
   it('an unknown requirement is not_found', async () => {
     const { t } = await reviewed();
-    expect(await requestRiskAcceptance({ requirementId: 'req_nope', reason: 'Provider signs payloads; we verify next sprint', controls: '', expiryDays: 14, ...ctx(ME) }, t.deps)).toEqual({ error: 'not_found' });
+    expect(await requestRiskAcceptance({ requirementId: 'req_nope', reason: 'Provider signs payloads; we verify next sprint', controls: 'IP allow-list', expiryDays: 14, ...ctx(ME) }, t.deps)).toEqual({ error: 'not_found' });
   });
 });
 
@@ -257,6 +263,24 @@ describe('explain-threat', () => {
     expect(byRef.story.length).toBeGreaterThan(0);
     expect(byId).toEqual(byRef);
     expect(await explainThreat({ issueKey: 'PAY-7', threatId: 'T-99', ...ctx(ME) }, t.deps)).toEqual({ error: 'not_found' });
+  });
+
+  it('T-n means the same threat in get-review and explain-threat when a covered threat sorts first', async () => {
+    const { t } = await reviewed();
+    const latest = (await t.deps.reviews.latest(ISSUE)) as { ok: true; value: { id: string } };
+    const all = (await t.deps.reviews.threats(latest.value.id)) as { ok: true; value: Array<{ id: string; severity: string }> };
+    expect(all.value.length).toBeGreaterThan(1);
+    // The most severe threat becomes covered: get-review drops it, so its T-1 is the next one.
+    const [first, other] = all.value;
+    await t.deps.reviews.updateThreat(first!.id, { state: 'covered', coveredBy: other!.id, severity: 'Critical' });
+    const review = await getReview({ issueKey: 'PAY-7', ...ctx(ME) }, t.deps);
+    if ('error' in review) throw new Error(review.error);
+    expect(review.threats.map((x) => x.id)).not.toContain(first!.id);
+    for (const listed of review.threats) {
+      const e = await explainThreat({ issueKey: 'PAY-7', threatId: listed.ref, ...ctx(ME) }, t.deps);
+      expect('error' in e ? e.error : e.threatId).toBe(listed.id);
+    }
+    expect(await explainThreat({ issueKey: 'PAY-7', threatId: `T-${review.threats.length + 1}`, ...ctx(ME) }, t.deps)).toEqual({ error: 'not_found' });
   });
 });
 
@@ -331,6 +355,19 @@ describe('posture-summary', () => {
     expect(r.expiring.map((a) => a.acceptanceId)).toEqual(['acc_b', 'acc_a']);
     expect(r.expiring[0]).toMatchObject({ issueKey: 'PAY-7', requirementId: req.id, severity: 'High', expiresAt: expiresAt(5) });
   });
+
+  it('scale: posture and release readiness read only their work items\' acceptance events, never every one on the site', async () => {
+    const { t, req } = await reviewed({ allVerified: true });
+    const expiresAt = new Date(t.clock.now().getTime() + 5 * 86_400_000).toISOString();
+    await appendLedger(t.deps.ledger, t.deps.clock, 'acceptance.requested', { acceptanceId: 'acc_x', requirementId: req.id, issueId: ISSUE, severity: 'High', reason: 'r', controls: '', expiresAt, needsApprover: 'none' }, CHAMP);
+    const refuse = async () => ({ ok: false as const, error: { code: 'internal' as const, message: 'site-wide ledger read' } });
+    t.deps.ledger = { ...t.deps.ledger, all: refuse, ofTypes: refuse };
+    t.jira.search = async () => ok([jiraIssue({ id: ISSUE, key: 'PAY-7', fixVersions: ['4.2'] })]);
+    const posture = await getPostureSummary({ project: 'PAY', ...ctx(ME) }, t.deps);
+    expect('error' in posture ? posture.error : posture.expiring.map((a) => a.acceptanceId)).toEqual(['acc_x']);
+    const release = await getReleaseReadiness({ fixVersion: '4.2', ...ctx(ME) }, t.deps);
+    expect('error' in release ? release.error : release.expiringSoon.map((a) => a.requirementId)).toEqual([req.id]);
+  });
 });
 
 describe('caller identity for MCP calls', () => {
@@ -394,5 +431,18 @@ describe('verify-requirement: a coding agent closes the loop with the pull reque
     expect(await verifyRequirement({ requirementId: req.id, prUrl: 'https://x/pr/1', ...ctx(ME) }, t.deps)).toEqual({ error: 'not_found' });
     const saved = await t.deps.requirements.get(req.id);
     expect(saved.ok && saved.value?.status).toBe('Open');
+  });
+
+  it('stores the PR link itself as the evidence ref and the note beside it (a path-less link with a note works too)', async () => {
+    const { t, req } = await reviewed();
+    const url = 'https://bitbucket.org/acme/payments/pull-requests/42';
+    expect(await verifyRequirement({ requirementId: req.id, prUrl: url, note: 'test_webhook_rejects_bad_signature', ...ctx(ME) }, t.deps)).toMatchObject({ status: 'Verified' });
+    const saved = await t.deps.requirements.get(req.id);
+    expect(saved.ok && saved.value?.evidence).toEqual({ kind: 'pr', ref: url, note: 'test_webhook_rejects_bad_signature', attester: ME });
+
+    const other = await reviewed();
+    expect(await verifyRequirement({ requirementId: other.req.id, prUrl: 'https://github.example', note: 'merged as abc123', ...ctx(ME) }, other.t.deps)).toMatchObject({ status: 'Verified' });
+    const s2 = await other.t.deps.requirements.get(other.req.id);
+    expect(s2.ok && s2.value?.evidence).toMatchObject({ ref: 'https://github.example', note: 'merged as abc123' });
   });
 });

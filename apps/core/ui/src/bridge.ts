@@ -24,7 +24,10 @@ export interface PublicKeyInfo {
   active: { kid: string; publicKey: string };
   previous?: { kid: string; publicKey: string; retireAt: string };
 }
-export type ChainVerdict = { ok: true; length: number } | { ok: false; firstBrokenSeq: number; reason: 'prev_mismatch' | 'hash_mismatch' | 'seq_gap' };
+export type ChainVerdict =
+  | { ok: true; length: number; treeHeads?: number }
+  | { ok: false; firstBrokenSeq: number; reason: 'prev_mismatch' | 'hash_mismatch' | 'seq_gap' }
+  | { ok: false; firstBrokenSeq: number; treeSize: number; reason: 'truncated' | 'tree_head_mismatch' | 'tree_head_signature' };
 
 export type TriageInput =
   | { threatId: string; op: 'accept' }
@@ -59,10 +62,17 @@ export interface PanelApi {
   diff(from?: number, to?: number): Promise<ThreatDiffDto | ApiError>;
   /** R12: the score with a different exposure or data classes. Nothing is saved. */
   whatIf(change: { exposure?: Exposure; dataClasses?: DataClass[] }): Promise<WhatIfDto | ApiError>;
+  /**
+   * Opens a Jira path such as `/browse/PAY-101` in the host product. Inside Forge the app is served from Atlassian's CDN
+   * origin, so a relative link would resolve there; @forge/bridge's router resolves it against the site. Absent in the
+   * fixture and local bridges, where the plain link is followed.
+   */
+  navigate?(path: string, opts: { newTab: boolean }): Promise<void>;
 }
 
 export async function forgeApi(): Promise<PanelApi> {
-  return panelApiOver(await bridgeInvoke());
+  const { router } = await import('@forge/bridge');
+  return { ...panelApiOver(await bridgeInvoke()), navigate: (path, { newTab }) => (newTab ? router.open(path) : router.navigate(path)) };
 }
 
 export function panelApiOver(invoke: Invoke): PanelApi {

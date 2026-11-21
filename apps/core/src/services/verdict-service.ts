@@ -13,6 +13,7 @@ export const contextKey = (issueId: string) => `ctx:${issueId}`;
 export const verdictKey = (issueId: string) => `verdict:${issueId}`;
 
 const MAX_ANCESTORS = 5;
+const PAUSE_RECHECK_MS = 3_600_000;
 
 /**
  * `unreviewed`: Threatline does not review this item (project or issue type not enabled) and no ancestor has a review, so
@@ -154,10 +155,13 @@ async function ownVerdict(
   panelUrl: string,
   now: Date,
 ): Promise<Result<{ verdict: Verdict; reviewed: boolean; notApplicable: boolean; requirements: Requirement[]; riskScore?: number }>> {
-  if (!policy.enabledProjects.includes(issue.project.key) || !policy.reviewIssueTypes.includes(issue.issueType.name)) return ok({ verdict: notApplicable(now), reviewed: false, notApplicable: true, requirements: [] });
+  const scope = outOfScope(issue, policy);
   const latest = await deps.reviews.latest(issue.id);
   if (!latest.ok) return latest;
   const review = latest.value;
+  // Only never-reviewed items of other types or projects pass freely. Re-typing or moving a reviewed item must not
+  // shed its review: it is judged as before, and the gate says why.
+  if (scope && !review) return ok({ verdict: notApplicable(now), reviewed: false, notApplicable: true, requirements: [] });
   let threats: Awaited<ReturnType<CoreDeps['reviews']['threats']>> = ok([]);
   let injectionSuspected = false;
   if (review) {
@@ -194,7 +198,19 @@ async function ownVerdict(
     now,
     panelUrl,
   });
+  const [first, ...more] = verdict.reasons;
+  if (scope && first) verdict.reasons = [{ ...first, message: `Threatline reviewed this work item before it ${scope}, so its review and security requirements still apply. ${first.message}` }, ...more];
   return ok({ verdict, reviewed: review !== null, notApplicable: false, requirements: requirements.value, ...(review ? { riskScore: review.riskScore } : {}) });
+}
+
+/** Why Threatline would not review this item today (its type or project), worded for the gate; null when it would. */
+function outOfScope(issue: JiraIssue, policy: SitePolicy): string | null {
+  const type = issue.issueType.name;
+  const why = [
+    policy.reviewIssueTypes.includes(type) ? null : `became ${/^[aeiou]/i.test(type) ? 'an' : 'a'} ${type}, a work type Threatline does not review`,
+    policy.enabledProjects.includes(issue.project.key) ? null : `moved to ${issue.project.key}, a project Threatline is not turned on for`,
+  ].filter((w): w is string => w !== null);
+  return why.length > 0 ? why.join(' and ') : null;
 }
 
 /**
@@ -223,14 +239,23 @@ async function writeFailClosed(deps: CoreDeps, issueId: string, panelUrl: string
 
 /**
  * A Threatline requirement sub-task follows its own requirement rather than inheriting the whole story's block: it blocks
- * only while the story's verdict lists that requirement as open (and is lenient when the story is).
+ * only while the story's verdict lists that requirement as open (and is lenient when the story is, for as long as the
+ * story is: an overridden story's sub-task passes only until the override ends).
  */
 function requirementSubtaskVerdict(req: Requirement, story: Verdict, storyKey: string, now: Date): Verdict {
   const open = story.reasons.some((r) => r.code === 'open_requirement' && (r.requirementIds ?? []).includes(req.id));
   const base = { reviewId: story.reviewId, revision: story.revision, inheritedFrom: [], updatedAt: now.toISOString() };
-  if (!open || story.state === 'pass') return { state: 'pass', blockingCount: 0, maxOpenSeverity: null, reasons: [], ...base };
+  if (!open) return { state: 'pass', blockingCount: 0, maxOpenSeverity: null, reasons: [], ...base };
   const reasons: BlockReason[] = [{ code: 'open_requirement', message: `This security requirement is not verified yet. Add evidence on ${storyKey} in the Threatline panel.` }];
-  return { state: story.state, ...(story.validUntil ? { validUntil: story.validUntil } : {}), blockingCount: 1, maxOpenSeverity: req.severity, reasons, ...base };
+  return {
+    state: story.state,
+    ...(story.overridden ? { overridden: true } : {}),
+    ...(story.validUntil ? { validUntil: story.validUntil } : {}),
+    blockingCount: 1,
+    maxOpenSeverity: req.severity,
+    reasons,
+    ...base,
+  };
 }
 
 /** App storage first (the gate reads it; failure is an error so the job retries), then the issue property (display). */
@@ -299,7 +324,9 @@ export async function refreshVerdict(deps: CoreDeps, issueId: string): Promise<R
       const sv = await ownVerdict(deps, story.value, policy.value, ledgered, storyUrl, now);
       if (!sv.ok) return fail(sv);
       const v = requirementSubtaskVerdict(mine, sv.value.verdict, story.value.key, now);
-      const w = await write(deps, issue.id, { ...v, panelUrl: storyUrl, message: gateMessage(v, new Map(), storyUrl, guarded) }, version);
+      // Same M1 recheck as the story: the sub-task passes on its acceptance only until that acceptance runs out.
+      const due = recheckAt(ledgered.acceptances, new Set([mine.id]), now);
+      const w = await write(deps, issue.id, { ...v, panelUrl: storyUrl, message: gateMessage(v, new Map(), storyUrl, guarded), ...(due ? { recheckAt: due } : {}) }, version);
       return w.ok ? ok(v) : w;
     }
   }
@@ -325,15 +352,19 @@ export async function refreshVerdict(deps: CoreDeps, issueId: string): Promise<R
   }
 
   const final = combineVerdicts(own.value.verdict, ancestors);
-  const value = {
+  const value: StoredVerdict = {
     ...final,
     panelUrl,
     message: gateMessage(final, keys, panelUrl, guarded),
     ...(own.value.riskScore !== undefined ? { riskScore: own.value.riskScore } : {}),
     ...(own.value.notApplicable && final.state === 'pass' ? { notApplicable: true } : {}),
     ...(own.value.notApplicable && ancestors.length === 0 ? { unreviewed: true } : {}),
-    ...(recheckAt(ledgered.acceptances, reqIds, now) ? { recheckAt: recheckAt(ledgered.acceptances, reqIds, now)! } : {}),
   };
+  // Re-read at the earliest of an acceptance running out and (while held by a pause) the next pause check: a pause ends
+  // on its own (new month, credits signal timing out), and then the way out is a re-run, not a champion confirmation.
+  const ends = [recheckAt(ledgered.acceptances, reqIds, now), final.reasons.some((r) => r.code === 'budget_paused') ? new Date(now.getTime() + PAUSE_RECHECK_MS).toISOString() : undefined];
+  const due = ends.filter((e): e is string => e !== undefined).sort()[0];
+  if (due) value.recheckAt = due;
   const w = await write(deps, issue.id, value, version);
   return w.ok ? ok(final) : w;
 }

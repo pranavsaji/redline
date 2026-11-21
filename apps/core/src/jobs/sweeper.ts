@@ -26,8 +26,9 @@ export async function sweep(deps: CoreDeps): Promise<void> {
     return;
   }
   for (const r of stuck.value) {
-    const u = await deps.reviews.update(r.id, { status: 'agent_timeout', updatedAt: now.toISOString() });
-    if (!u.ok) continue;
+    // Compare-and-set: a review that settled after it was listed (its last run just arrived) is left as it is.
+    const u = await deps.reviews.updateWhere(r.id, { status: 'awaiting_agent' }, { status: 'agent_timeout', updatedAt: now.toISOString() });
+    if (!u.ok || !u.value) continue;
     await trace(deps, r.id, 'agent', 'failed', 'agent_timeout');
     log('review.agent_timeout', { reviewId: r.id, received: r.samplesReceived, expected: r.samplesExpected });
     await refreshVerdict(deps, r.issueId);

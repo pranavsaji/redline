@@ -1,4 +1,4 @@
-import { decodeAttestation, findAttestations, fromB64url, fromUtf8 } from '@threatline/crypto';
+import { decodeAttestation, findAttestations, fromB64url, fromUtf8, isValidPublicKey, kidOf } from '@threatline/crypto';
 import type { AttestationPayload } from '@threatline/shared';
 import { DEFAULT_SITE_POLICY, parseRepoPolicy } from './policy.js';
 import { scoreDiff, type DiffFile } from './diffscore.js';
@@ -34,6 +34,11 @@ export interface RepoSettings {
   keyHint?: string;
   /** kid → base64url Ed25519 public key, copied from Threatline's admin page. */
   publicKeys: Record<string, string>;
+  /**
+   * kid → ISO time a trusted key retires (from a `<key> until=<date>` line). From then on tokens signed by it fail: set
+   * it on the old key after a rotation's 7-day overlap, or just remove the key.
+   */
+  keyRetireAt?: Record<string, string>;
   sensitivePaths: string[];
   mode: 'warn' | 'block';
   /** Warn mode ends here (set when an admin saves warn mode, at most 14 days); after it, or without it, the check blocks. */
@@ -66,29 +71,88 @@ export interface PrFacts {
   branch?: string;
 }
 
-const ISSUE_KEY = /\b([A-Z][A-Z0-9_]+-\d+)\b/;
-const ISSUE_KEYS = /\b([A-Z][A-Z0-9_]+-\d+)\b/g;
+/**
+ * Work-item keys a pull request names in its title or branch. `\b` cannot bound them: `_` is a word character, so
+ * `PAY-7_fix` and `fix_PAY-7` would hide PAY-7 (and with it the need for PAY-7's own attestation). The rules:
+ * - a key is a project (a letter, then letters, digits or `_`) + `-` + digits, not touching another letter or digit
+ *   before it, nor a digit after it (`_`, `/`, `-`, `.` and the like separate);
+ * - an uppercase key counts (`PAY-7`, `MY_PROJ-12`). In `fix_PAY-7` the longest uppercase `_`-suffix is the project;
+ * - a lowercase or mixed-case key (`pay-7-fix`) counts only when its project, uppercased (or an `_`-suffix of it), is the
+ *   project of an uppercase key named in the title or branch. Alone, `utf-8` or `sha-256` would be a false requirement.
+ */
+const KEY_LIKE = /(?<![A-Za-z0-9])([A-Za-z][A-Za-z0-9_]*)-(\d+)(?![0-9])/g;
+const UPPER_PROJECT = /^[A-Z][A-Z0-9_]+$/;
+/** `fix_PAY` → [`fix_PAY`, `PAY`]: the project with each `_`-separated prefix dropped, longest first. */
+const suffixes = (project: string) => project.split('_').map((_, i, parts) => parts.slice(i).join('_'));
+
+export function namedIssueKeys(...texts: string[]): string[] {
+  const found = texts.flatMap((t) => [...t.matchAll(KEY_LIKE)].map((m) => ({ project: m[1]!, num: m[2]! })));
+  const upper = found.map((f) => {
+    const project = suffixes(f.project).find((p) => UPPER_PROJECT.test(p));
+    return project ? `${project}-${f.num}` : null;
+  });
+  const projects = new Set(upper.flatMap((k) => (k ? [k.slice(0, k.lastIndexOf('-'))] : [])));
+  const keys = found.flatMap((f, i) => {
+    if (upper[i]) return [upper[i]];
+    const project = suffixes(f.project.toUpperCase()).find((p) => projects.has(p));
+    return project ? [`${project}-${f.num}`] : [];
+  });
+  return [...new Set(keys)];
+}
+const FULL_SHA = /^[0-9a-f]{40}$/;
+
+/**
+ * Trusted public keys as an admin pastes them, one per line: `<base64url key>` or `<base64url key> until=<ISO date or
+ * time>` (a date alone means 00:00 UTC that day). Shared by Threatline for Bitbucket's settings and the GitHub Action's
+ * `public-keys` input. Bare keys are trusted until removed.
+ */
+export function parseTrustedKeys(lines: string[]): { ok: true; publicKeys: Record<string, string>; keyRetireAt: Record<string, string> } | { ok: false; line: number; reason: 'key' | 'until'; message: string } {
+  const publicKeys: Record<string, string> = {};
+  const keyRetireAt: Record<string, string> = {};
+  for (const [n, line] of lines.entries()) {
+    const [key = '', ...rest] = line.trim().split(/\s+/);
+    if (!isValidPublicKey(key)) return { ok: false, line: n + 1, reason: 'key', message: `"${key.slice(0, 12)}…" is not a Threatline public key` };
+    const kid = kidOf(fromB64url(key)!);
+    publicKeys[kid] = key;
+    if (rest.length === 0) continue;
+    const until = rest.length === 1 && rest[0]!.startsWith('until=') ? rest[0]!.slice('until='.length) : '';
+    // A time without a zone is UTC (JavaScript would otherwise read it in the runner's local time).
+    const at = /^\d{4}-\d{2}-\d{2}/.test(until) ? Date.parse(/T[\d:.]+$/.test(until) ? `${until}Z` : until) : NaN;
+    if (Number.isNaN(at)) return { ok: false, line: n + 1, reason: 'until', message: 'after the key, only until=<ISO date> (for example until=2026-12-01) is allowed' };
+    keyRetireAt[kid] = new Date(at).toISOString();
+  }
+  return { ok: true, publicKeys, keyRetireAt };
+}
 const MSG_SIGNATURE = 'Threatline: attestation signature invalid. Copy a fresh attestation from the Jira issue panel.';
 /** Bitbucket stores descriptions as Markdown and escapes punctuation (`\_`, `\-`); undo that before looking for tokens. */
 export const unescapeMarkdown = (text: string) => text.replace(/\\([\\`*_{}[\]()#+\-.!|~<>])/g, '$1');
 const utcMinute = (sec: number) => `${new Date(sec * 1000).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 
-/** The payload's repo, commit and iat, read without trusting it (only to choose which token to verify). */
-function peek(token: string): Pick<AttestationPayload, 'repo' | 'iat'> | null {
+/** The payload's repo, iat and kid, read without trusting them (only to choose which token to verify and explain why). */
+function peek(token: string): (Pick<AttestationPayload, 'repo' | 'iat'> & { kid?: string }) | null {
   const body = token.split('.')[2];
   const bytes = body ? fromB64url(body) : null;
   if (!bytes) return null;
   try {
-    const p = JSON.parse(fromUtf8(bytes)) as { repo?: unknown; iat?: unknown };
-    return typeof p.repo === 'string' && typeof p.iat === 'number' ? { repo: p.repo, iat: p.iat } : null;
+    const p = JSON.parse(fromUtf8(bytes)) as { repo?: unknown; iat?: unknown; kid?: unknown };
+    return typeof p.repo === 'string' && typeof p.iat === 'number' ? { repo: p.repo, iat: p.iat, ...(typeof p.kid === 'string' ? { kid: p.kid } : {}) } : null;
   } catch {
     return null;
   }
 }
 
+/**
+ * The gate's own configuration, on every platform: the CI that runs it (GitHub workflows and local actions, Bitbucket
+ * Pipelines) and Threatline's policy file (`.redline/` is its name from before the rename). Changing any of it is always
+ * sensitive, so a pull request cannot loosen the gate (edit, delete or shadow policy.yml) and then pass freely: the
+ * loosening itself needs an attestation like any other security change.
+ */
+export const GATE_CONFIG_PATHS = ['.github/workflows/**', '.github/actions/**', '.threatline/**', '.redline/**', 'bitbucket-pipelines.yml'];
+
 function effectivePolicy(settings: RepoSettings, yaml: string | null): { sensitivePaths: string[]; threshold: number; invalid: boolean } {
-  // Site defaults ∪ repo settings ∪ the destination's policy.yml: a file can add paths and lower the threshold, never weaken.
-  const paths = new Set([...DEFAULT_SITE_POLICY.sensitivePaths, ...settings.sensitivePaths]);
+  // Gate config ∪ site defaults ∪ repo settings ∪ the destination's policy.yml: a file can add paths and lower the
+  // threshold, never weaken.
+  const paths = new Set([...GATE_CONFIG_PATHS, ...DEFAULT_SITE_POLICY.sensitivePaths, ...settings.sensitivePaths]);
   let threshold = settings.diffScoreThreshold;
   if (yaml === null) return { sensitivePaths: [...paths], threshold, invalid: false };
   const parsed = parseRepoPolicy(yaml);
@@ -123,7 +187,8 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
   const sensitive = policy.invalid ? i.files.map((f) => f.path) : truncated ? [...markers, ...score.sensitiveFiles] : score.sensitiveFiles;
   if (sensitive.length === 0 && score.score < policy.threshold) return { success: true, outcome: 'pass_not_sensitive', message: 'Threatline: no security-sensitive changes.' };
 
-  const key = ISSUE_KEY.exec(i.pr.title ?? '')?.[1] ?? ISSUE_KEY.exec(i.pr.branch ?? '')?.[1] ?? 'the linked issue';
+  const named = namedIssueKeys(i.pr.title ?? '', i.pr.branch ?? '');
+  const key = named[0] ?? 'the linked issue';
   const shown = [...new Set(sensitive.length > 0 ? sensitive : i.files.map((f) => f.path))].slice(0, 3).join(', ');
   const missing: CheckResult = {
     success: false,
@@ -146,8 +211,20 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
 
   if (Object.keys(i.settings.publicKeys).length === 0)
     return { success: false, outcome: 'fail_signature', message: `Threatline: no Threatline public key is configured for this repository. ${i.settings.keyHint ?? 'A repository admin must paste it in Repository settings → Threatline.'}` };
-  const v = decodeAttestation(mine[0]!.t, i.settings.publicKeys, i.nowSec);
+  // Keys past their retire date are no longer trusted (rotated keys must stop verifying at some point).
+  const retiredAt = (kid: string | undefined) => {
+    const at = kid ? i.settings.keyRetireAt?.[kid] : undefined;
+    const sec = at ? Date.parse(at) / 1000 : NaN;
+    return sec <= i.nowSec ? sec : null;
+  };
+  const trusted = Object.fromEntries(Object.entries(i.settings.publicKeys).filter(([kid]) => retiredAt(kid) === null));
+  const v = decodeAttestation(mine[0]!.t, trusted, i.nowSec);
   if (!v.ok) {
+    const retired = retiredAt(mine[0]!.p!.kid);
+    if (retired !== null && (v.error.code === 'bad_signature' || v.error.code === 'unknown_key'))
+      return { success: false, outcome: 'fail_signature', message: `Threatline: this attestation is signed with key ${mine[0]!.p!.kid}, which this repository retired at ${utcMinute(retired)}. Request a new attestation (it is signed with Threatline's current key).` };
+    if (v.error.code === 'lifetime')
+      return { success: false, outcome: 'fail_signature', message: 'Threatline: this attestation is valid for longer than Threatline ever issues (7 days), so it is refused. Request a new one from the Jira issue panel.' };
     if (v.error.code === 'expired') {
       const exp = (() => {
         try {
@@ -162,11 +239,13 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
   }
   const p = v.value;
   const head = i.pr.headSha.toLowerCase();
-  // Bitbucket's pull request API reports 12-character hashes (GitHub's, all 40); the attestation carries all 40.
-  if (head.length < 7 || !p.commitSha.startsWith(head))
+  // The attestation names the full 40-character commit and must match exactly. Bitbucket's pull request API reports
+  // 12-character hashes; Threatline for Bitbucket resolves them to the full hash before calling the gate.
+  if (!FULL_SHA.test(head))
+    return { success: false, outcome: 'fail_stale_commit', message: `Threatline: the PR head commit ${head.slice(0, 12) || '(none)'} is not a full 40-character hash, so the attestation cannot be matched to it. Re-run the check.` };
+  if (p.commitSha !== head)
     return { success: false, outcome: 'fail_stale_commit', message: `Threatline: attestation is for commit ${p.commitSha.slice(0, 7)} but the PR head is ${head.slice(0, 7)}. Request a new attestation for the latest commit.` };
   // The attestation must be for a work item this PR names: otherwise any passing item's token could carry a blocked change.
-  const named = [...new Set([...(i.pr.title ?? '').matchAll(ISSUE_KEYS), ...(i.pr.branch ?? '').matchAll(ISSUE_KEYS)].map((m) => m[1]!))];
   if (named.length === 0)
     return { success: false, outcome: 'fail_other_issue', message: `Threatline: this pull request names no Jira work item. Put the work item key (${p.issueKey}) in the pull request title or branch name, then re-run the check.` };
   if (!named.includes(p.issueKey))
@@ -175,8 +254,8 @@ function decide(i: { pr: PrFacts; files: DiffFile[]; repoPolicyYaml: string | nu
   // item named next to a blocked one ("PAY-6 …, see PAY-7") would carry the blocked change.
   const attested = (key: string) =>
     mine.some((x) => {
-      const d = decodeAttestation(x.t, i.settings.publicKeys, i.nowSec);
-      return d.ok && d.value.issueKey === key && d.value.commitSha.startsWith(head);
+      const d = decodeAttestation(x.t, trusted, i.nowSec);
+      return d.ok && d.value.issueKey === key && d.value.commitSha === head;
     });
   const unattested = named.find((k) => k !== p.issueKey && !attested(k));
   if (unattested)

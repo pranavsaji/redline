@@ -33,6 +33,13 @@ const MODEL = {
 };
 const proseWrapped = `Here is the threat model for ${KEY}.\n\n\`\`\`json\n${JSON.stringify(MODEL, null, 2)}\n\`\`\`\n\nLet me know if you need more.`;
 
+/** The configured review author (the Automation rule owner): only their runs feed the out-of-credits signal. */
+async function asAuthor(t: ReturnType<typeof setup>, author = 'acc-1') {
+  const p = await t.deps.config.site();
+  if (!p.ok) throw new Error('policy');
+  await t.deps.config.setSite({ ...p.value, reviewAuthors: [author] });
+}
+
 function setup(over: { canBrowse?: boolean; canEdit?: boolean } = {}) {
   const t = coreDeps({ issues: [jiraIssue({ id: '10042', key: KEY })] });
   t.jira.canBrowse = async () => ok(over.canBrowse ?? true);
@@ -135,6 +142,7 @@ describe('security: only the configured review authors can submit agent runs (ga
 describe('submit-threat-model (CREATE action) and ingestSample', () => {
   it('prose-wrapped JSON is stored as a valid sample and pushes assemble', async () => {
     const t = setup();
+    await asAuthor(t);
     await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
     t.pushed.length = 0;
     const r = await submit(t.deps, KEY, proseWrapped);
@@ -158,11 +166,19 @@ describe('submit-threat-model (CREATE action) and ingestSample', () => {
     expect(t.pushed.map((j) => j.kind)).toEqual(['assemble']);
   });
 
-  it('an empty agent response counts toward the Rovo-credits signal', async () => {
+  it('an empty agent response from a configured review author counts toward the Rovo-credits signal', async () => {
     const t = setup();
+    await asAuthor(t);
     await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
     await submit(t.deps, KEY, '  ');
     expect(t.kv.data.get('ingest:recent')).toEqual([false]);
+  });
+
+  it('security: with no review authors configured, an editor\'s empty response is not counted (it could pause the site)', async () => {
+    const t = setup();
+    await handleJob(t.deps, { kind: 'gather', issueId: '10042', reason: 'created' });
+    await submit(t.deps, KEY, '  ');
+    expect(t.kv.data.get('ingest:recent')).toBeUndefined();
   });
 
   it('a non-empty submission records when the Automation agent last delivered (setup checklist)', async () => {

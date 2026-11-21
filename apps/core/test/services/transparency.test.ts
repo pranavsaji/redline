@@ -33,6 +33,31 @@ async function setup(entries = 5) {
   return { t, pages };
 }
 
+describe('R5 at scale: no full-ledger reads', () => {
+  it('the tree head and a proof read seq-ordered pages of hashes and one entry, never every full entry', async () => {
+    const { t } = await setup(7);
+    const full = await currentTreeHead(t.deps);
+    const ref = await ledgerProofFor(t.deps, 3);
+    if (!full.ok || !ref.ok) throw new Error('baseline failed');
+    const fresh = await setup(7);
+    const pages: number[] = [];
+    const real = fresh.t.deps.ledger;
+    fresh.t.deps.ledger = {
+      ...real,
+      all: async () => ({ ok: false, error: { code: 'internal', message: 'full read' } }),
+      // A repository may cap a page below what was asked: the reader keeps going until an empty page.
+      entryHashes: async (after, limit) => (pages.push(after), real.entryHashes(after, Math.min(limit, 2))),
+    };
+    const head = await currentTreeHead(fresh.t.deps);
+    expect(head.ok && head.value).toMatchObject({ treeSize: 7, rootHash: full.value.rootHash });
+    expect(pages.slice(0, 5)).toEqual([0, 2, 4, 6, 7]);
+    const proof = await ledgerProofFor(fresh.t.deps, 3);
+    expect(proof.ok && proof.value.entry.seq).toBe(3);
+    expect(proof.ok && verifyLedgerProof(proof.value)).toEqual({ ok: true, treeSize: 7, seq: 3 });
+    expect(await ledgerProofFor(fresh.t.deps, 99)).toMatchObject({ ok: false, error: { code: 'not_found' } });
+  });
+});
+
 describe('R5: signed tree heads', () => {
   it('signs and stores one head per ledger size', async () => {
     const { t } = await setup(5);

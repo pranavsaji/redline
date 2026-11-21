@@ -5,6 +5,7 @@ import { acceptanceDecide, acceptanceRequest, acceptanceRevoke, breakGlassOverri
 import { ledgerExport, ledgerVerify } from '../../src/resolvers/ledger.js';
 import { panelGet } from '../../src/resolvers/panel.js';
 import { expireAcceptances } from '../../src/services/acceptance-service.js';
+import { refreshVerdict } from '../../src/services/verdict-service.js';
 import { validateTransition } from '../../src/validators/validate-transition.js';
 import { coreDeps, jiraIssue } from '../support/core-deps.js';
 import { ADMIN, CHAMP, CHAMPIONS, DEV, ISSUE, LEADS, reviewed } from '../support/reviewed.js';
@@ -63,7 +64,7 @@ describe('Journey B: risk accepted under time pressure (RL-1, RL-2, RL-5)', () =
 
   it('a requester cannot approve their own request, even as a champion', async () => {
     const { t, req } = await reviewed({ groups: { [CHAMP]: [CHAMPIONS] } });
-    const asked = await acceptanceRequest(t.deps, as(CHAMP), { requirementId: req.id, reason, controls: '', expiryDays: 30 });
+    const asked = await acceptanceRequest(t.deps, as(CHAMP), { requirementId: req.id, reason, controls: 'Feature flag off', expiryDays: 30 });
     if ('error' in asked) throw new Error('request failed');
     expect(asked.needsApprover).toBe('champion');
     expect(await acceptanceDecide(t.deps, as(CHAMP), { acceptanceId: asked.acceptanceId, decision: 'approve' })).toMatchObject({ error: 'forbidden', message: expect.stringMatching(/own/) });
@@ -71,37 +72,69 @@ describe('Journey B: risk accepted under time pressure (RL-1, RL-2, RL-5)', () =
 
   it('High needs a champion: a tech lead cannot approve it', async () => {
     const { t, req } = await reviewed({ groups: { [DEV]: [], 'acc-lead': [LEADS] } });
-    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: '', expiryDays: 30 });
+    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: 'Feature flag off', expiryDays: 30 });
     if ('error' in asked) throw new Error('request failed');
     expect(await acceptanceDecide(t.deps, as('acc-lead'), { acceptanceId: asked.acceptanceId, decision: 'approve' })).toMatchObject({ error: 'forbidden' });
   });
 
+  it('security: approval goes by the requirement\'s severity now: a tech lead cannot approve a request whose requirement rose to High', async () => {
+    const { t, req, reqs } = await reviewed({ groups: { [DEV]: [], 'acc-lead': [LEADS], [CHAMP]: [CHAMPIONS] } });
+    await t.deps.requirements.upsert({ ...req, severity: 'Medium' });
+    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: 'Feature flag off', expiryDays: 30 });
+    if ('error' in asked) throw new Error('request failed');
+    expect(asked.needsApprover).toBe('tech_lead');
+    // A re-review (or champion triage) raises the same requirement to High before anyone approves.
+    await t.deps.requirements.upsert({ ...(await reqs()).find((r) => r.id === req.id)!, severity: 'High' });
+    expect(await acceptanceDecide(t.deps, as('acc-lead'), { acceptanceId: asked.acceptanceId, decision: 'approve' })).toMatchObject({ error: 'forbidden', message: expect.stringMatching(/security champion.*now High/) });
+    // A champion approves at High, so the acceptance covers the requirement as it is now.
+    expect(await acceptanceDecide(t.deps, as(CHAMP), { acceptanceId: asked.acceptanceId, decision: 'approve' })).toMatchObject({ state: 'active' });
+    expect(verdict(t).state).toBe('pass');
+  });
+
+  it('security: an active acceptance stops clearing the gate once its requirement rises above the accepted severity', async () => {
+    const { t, req, reqs } = await reviewed();
+    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: 'Feature flag off', expiryDays: 30 });
+    if ('error' in asked) throw new Error('request failed');
+    await acceptanceDecide(t.deps, as(CHAMP), { acceptanceId: asked.acceptanceId, decision: 'approve' });
+    expect(verdict(t).state).toBe('pass');
+    await t.deps.requirements.upsert({ ...(await reqs()).find((r) => r.id === req.id)!, severity: 'Critical' });
+    await refreshVerdict(t.deps, ISSUE);
+    expect(verdict(t).state).toBe('block');
+    expect(verdict(t).message).toMatch(/accepted at High, but the requirement is now Critical/);
+  });
+
   it('expiry is capped by policy and a reason is required', async () => {
     const { t, req } = await reviewed();
-    expect(await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: '', expiryDays: 120 })).toMatchObject({ error: 'validation', message: expect.stringMatching(/90 days/) });
-    expect(await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason: 'ok', controls: '', expiryDays: 30 })).toMatchObject({ error: 'validation' });
+    expect(await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: 'Feature flag off', expiryDays: 120 })).toMatchObject({ error: 'validation', message: expect.stringMatching(/90 days/) });
+    expect(await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason: 'ok', controls: 'Feature flag off', expiryDays: 30 })).toMatchObject({ error: 'validation' });
+  });
+
+  it('compensating controls are required', async () => {
+    const { t, req } = await reviewed();
+    for (const controls of [undefined, '', '  none  '])
+      expect(await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, ...(controls === undefined ? {} : { controls }), expiryDays: 30 })).toMatchObject({ error: 'validation', message: expect.stringMatching(/compensating controls/) });
   });
 
   it('one open acceptance per requirement', async () => {
     const { t, req } = await reviewed();
-    await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: '', expiryDays: 30 });
-    expect(await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: '', expiryDays: 30 })).toMatchObject({ error: 'conflict' });
+    await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: 'Feature flag off', expiryDays: 30 });
+    expect(await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: 'Feature flag off', expiryDays: 30 })).toMatchObject({ error: 'conflict' });
   });
 
   it('someone who cannot edit the work item cannot request', async () => {
     const { t, req } = await reviewed();
     t.jira.canEdit = async () => ok(false);
-    expect(await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: '', expiryDays: 30 })).toMatchObject({ error: 'not_found' });
+    expect(await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: 'Feature flag off', expiryDays: 30 })).toMatchObject({ error: 'not_found' });
   });
 
   it('a requirement of another work item is not found', async () => {
     const { t } = await reviewed();
-    expect(await acceptanceRequest(t.deps, as(DEV), { requirementId: 'req_other', reason, controls: '', expiryDays: 30 })).toMatchObject({ error: 'not_found' });
+    expect(await acceptanceRequest(t.deps, as(DEV), { requirementId: 'req_other', reason, controls: 'Feature flag off', expiryDays: 30 })).toMatchObject({ error: 'not_found' });
   });
 
   it('rejecting leaves the requirement open and the gate blocked', async () => {
     const { t, req, reqs } = await reviewed();
-    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: '', expiryDays: 30 });
+    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: 'Feature flag off', expiryDays: 30 });
     if ('error' in asked) throw new Error('request failed');
     expect(await acceptanceDecide(t.deps, as(CHAMP), { acceptanceId: asked.acceptanceId, decision: 'reject', note: 'Fix it first' })).toMatchObject({ state: 'rejected' });
     expect((await reqs()).find((r) => r.id === req.id)!.status).toBe('Open');
@@ -111,7 +144,7 @@ describe('Journey B: risk accepted under time pressure (RL-1, RL-2, RL-5)', () =
 
   it('revoking an active acceptance (RL-3: a new entry) reopens the requirement; strangers cannot revoke', async () => {
     const { t, req, reqs } = await reviewed();
-    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: '', expiryDays: 30 });
+    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: 'Feature flag off', expiryDays: 30 });
     if ('error' in asked) throw new Error('request failed');
     await acceptanceDecide(t.deps, as(CHAMP), { acceptanceId: asked.acceptanceId, decision: 'approve' });
     expect(await acceptanceRevoke(t.deps, as('acc-stranger'), { acceptanceId: asked.acceptanceId, reason: 'no longer needed' })).toMatchObject({ error: 'forbidden' });
@@ -121,10 +154,45 @@ describe('Journey B: risk accepted under time pressure (RL-1, RL-2, RL-5)', () =
   });
 });
 
+describe('scale: the hourly expiry sweep reads recent acceptance events only', () => {
+  it('expires a due acceptance without reading every acceptance event ever written', async () => {
+    const { t, req } = await reviewed();
+    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: 'WAF rule on the endpoint', expiryDays: 7 });
+    if ('error' in asked) throw new Error('request failed');
+    await acceptanceDecide(t.deps, as(CHAMP), { acceptanceId: asked.acceptanceId, decision: 'approve' });
+    const refuse = async () => ({ ok: false as const, error: { code: 'internal' as const, message: 'site-wide ledger read' } });
+    t.deps.ledger = { ...t.deps.ledger, all: refuse, ofTypes: refuse };
+    t.clock.advance(8 * DAY);
+    expect(await expireAcceptances(t.deps, t.clock.now())).toEqual({ ok: true, value: { expired: 1 } });
+  });
+});
+
+describe('approvers must be able to see the requirement’s threat (viewer scope)', () => {
+  async function hideThreat(t: Awaited<ReturnType<typeof reviewed>>['t'], threatId: string) {
+    const latest = (await t.deps.reviews.latest(ISSUE)) as { ok: true; value: { id: string } };
+    const facts = (await t.deps.reviews.facts(latest.value.id)) as { ok: true; value: Array<Record<string, unknown>> };
+    const secret = { ...facts.value[0]!, id: 'fact_secret', sourceAri: 'ari:cloud:confluence:c:page/77', sourceType: 'confluence_page', title: 'Restricted design' };
+    await t.deps.reviews.saveFacts(latest.value.id, [...facts.value, secret] as never);
+    await t.deps.reviews.updateThreat(threatId, { citations: [{ factId: 'fact_secret', quote: 'secret' }] });
+    t.deps.confluence = { canRead: async () => ok(false) } as never;
+  }
+
+  it('decide and revoke are not_found, and nothing is ledgered, for an approver who cannot see the threat', async () => {
+    const { t, req } = await reviewed();
+    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: 'WAF rule on the endpoint', expiryDays: 30 });
+    if ('error' in asked) throw new Error('request failed');
+    await hideThreat(t, req.threatId);
+    const before = ((await t.deps.ledger.all()) as { ok: true; value: unknown[] }).value.length;
+    expect(await acceptanceDecide(t.deps, as(CHAMP), { acceptanceId: asked.acceptanceId, decision: 'approve' })).toEqual({ error: 'not_found' });
+    expect(await acceptanceRevoke(t.deps, as(DEV), { acceptanceId: asked.acceptanceId, reason: 'HMAC check shipped early' })).toEqual({ error: 'not_found' });
+    expect(((await t.deps.ledger.all()) as { ok: true; value: unknown[] }).value.length).toBe(before);
+  });
+});
+
 describe('panel data for acceptances', () => {
   it('lists the work item’s acceptances with the viewer id and the policy caps the form needs', async () => {
     const { t, req } = await reviewed();
-    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: 'flag', expiryDays: 30 });
+    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: 'Feature flag off', expiryDays: 30 });
     if ('error' in asked) throw new Error('request failed');
     const dto = await panelGet(t.deps, as(CHAMP));
     if ('error' in dto) throw new Error('panel failed');
@@ -166,7 +234,7 @@ describe('break-glass (EN-8)', () => {
 describe('ledger verification and evidence pack (RL-4, RL-7)', () => {
   it('a tampered row in SQL is reported as the first broken link', async () => {
     const { t, sql, req } = await reviewed({ sqlLedger: true });
-    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: '', expiryDays: 30 });
+    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason, controls: 'Feature flag off', expiryDays: 30 });
     if ('error' in asked) throw new Error('request failed');
     await acceptanceDecide(t.deps, as(CHAMP), { acceptanceId: asked.acceptanceId, decision: 'approve' });
     expect(await ledgerVerify(t.deps, { accountId: ADMIN })).toEqual({ ok: true, length: 2 });
@@ -177,7 +245,7 @@ describe('ledger verification and evidence pack (RL-4, RL-7)', () => {
 
   it('exports one project and date range as CSV and JSON with every entry hash and the chain proof', async () => {
     const { t, req } = await reviewed();
-    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason: '=HYPERLINK("https://evil.example") is our reason', controls: 'none', expiryDays: 30 });
+    const asked = await acceptanceRequest(t.deps, as(DEV), { requirementId: req.id, reason: '=HYPERLINK("https://evil.example") is our reason', controls: 'Feature flag off', expiryDays: 30 });
     if ('error' in asked) throw new Error('request failed');
     await acceptanceDecide(t.deps, as(CHAMP), { acceptanceId: asked.acceptanceId, decision: 'approve' });
     expect(await ledgerExport(t.deps, { accountId: DEV }, { projectKey: 'PAY', from: '2026-11-01', to: '2026-11-30' })).toMatchObject({ error: 'forbidden' });

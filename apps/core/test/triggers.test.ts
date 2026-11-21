@@ -41,6 +41,33 @@ describe('onIssueChange', () => {
     expect(t.pushed).toEqual([{ kind: 'gather', issueId: '10042', reason: 'rerun', actorAccountId: 'acc-editor' }]);
   });
 
+  it('label re-runs are rate-limited per work item (then count as ordinary updates)', async () => {
+    const t = coreDeps();
+    const toggle = issueEvent({ items: [{ field: 'labels', fieldId: 'labels', fromString: '', toString: 'threatline-review' }] });
+    for (let i = 0; i < 12; i++) await onIssueChange(t.deps, toggle);
+    expect(t.pushed.filter((j) => j.kind === 'gather' && j.reason === 'rerun').length).toBe(10);
+    expect(t.pushed.slice(10)).toEqual([
+      { kind: 'gather', issueId: '10042', reason: 'updated', actorAccountId: 'acc-editor' },
+      { kind: 'gather', issueId: '10042', reason: 'updated', actorAccountId: 'acc-editor' },
+    ]);
+  });
+
+  it('an Automation rule that labels many work items re-runs every one (the limit is per work item, not per actor)', async () => {
+    const t = coreDeps();
+    for (let i = 0; i < 15; i++) {
+      const ev = issueEvent({ items: [{ field: 'labels', fieldId: 'labels', fromString: '', toString: 'threatline-review' }] });
+      await onIssueChange(t.deps, { ...ev, issue: { ...ev.issue, id: String(20000 + i) } });
+    }
+    expect(t.pushed.filter((j) => j.kind === 'gather' && j.reason === 'rerun').length).toBe(15);
+  });
+
+  it('a limiter that cannot be read does not drop the label re-run', async () => {
+    const t = coreDeps();
+    t.deps.usage = { ...t.deps.usage, takeSlot: async () => ({ ok: false, error: { code: 'upstream', message: "Table 'rate_limits' doesn't exist" } }) };
+    await onIssueChange(t.deps, issueEvent({ items: [{ field: 'labels', fieldId: 'labels', fromString: '', toString: 'threatline-review' }] }));
+    expect(t.pushed).toEqual([{ kind: 'gather', issueId: '10042', reason: 'rerun', actorAccountId: 'acc-editor' }]);
+  });
+
   it('removing the label is an ordinary update, not a rerun', async () => {
     const t = coreDeps();
     await onIssueChange(t.deps, issueEvent({ items: [{ field: 'labels', fieldId: 'labels', fromString: 'threatline-review', toString: '' }] }));

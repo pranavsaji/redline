@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 // Verifies a Threatline ledger proof offline, with no dependencies beyond Node.js (18+):
-//   node scripts/verify-ledger-proof.mjs proof.json
-// Checks, in order: the entry's own hash, the Ed25519 signature on the tree head, the RFC 9162 inclusion proof, and
-// (when present) the consistency proof from an earlier published head. Compare the printed key id and public key with
-// the ones on the "Threatline ledger tree heads" Confluence page before trusting the result.
+//   node scripts/verify-ledger-proof.mjs proof.json [--public-key <base64url key>]
+// Checks, in order: the entry's own hash, that the tree head's key id is the embedded public key's (sha256 of the raw
+// key, first 16 hex), the Ed25519 signature on the tree head, the RFC 9162 inclusion proof, and (when present) the
+// consistency proof from an earlier published head. A proof carries its own public key, so a forger can sign one with
+// theirs: pass Threatline's published key with --public-key (from the "Threatline ledger tree heads" Confluence page or
+// Threatline admin → Signing keys), or compare the printed key with it, before trusting the result.
+// Try it on docs/examples/ledger-proof.json (see docs/ARCHITECTURE.md, "The ledger").
 import { createHash, createPublicKey, verify } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -30,6 +33,12 @@ export function canonicalJson(v) {
 
 const entryHash = (e) => hex(sha256(Buffer.from(e.prevHash + canonicalJson({ seq: e.seq, eventType: e.eventType, payload: e.payload, actor: e.actor, createdAt: e.createdAt }), 'utf8')));
 const leafOf = (entryHashHex) => sha256(Buffer.from([0]), fromHex(entryHashHex));
+/** Threatline's key id: the first 16 hex characters of sha256(raw 32-byte public key); null for a non-key. */
+export function kidOfPublicKey(publicKey) {
+  if (typeof publicKey !== 'string') return null;
+  const raw = Buffer.from(publicKey, 'base64url');
+  return raw.length === 32 ? hex(sha256(raw)).slice(0, 16) : null;
+}
 
 function verifyHead(h, publicKey) {
   if (!Number.isInteger(h?.treeSize) || !isHash(h.rootHash) || typeof h.timestamp !== 'string' || typeof h.signature !== 'string') return false;
@@ -96,6 +105,9 @@ export function verifyProof(p) {
     return { ok: false, reason: 'entry_hash' };
   }
   if (!isHash(e.entryHash) || h !== e.entryHash) return { ok: false, reason: 'entry_hash' };
+  // The key id is not signed: without this, a head self-signed with any key could claim Threatline's kid.
+  const kid = kidOfPublicKey(p.publicKey);
+  if (!kid || p.treeHead.kid !== kid || (p.consistency && p.consistency.fromTreeHead?.kid !== kid)) return { ok: false, reason: 'kid' };
   if (!verifyHead(p.treeHead, p.publicKey)) return { ok: false, reason: 'signature' };
   if (!verifyInclusion(leafOf(e.entryHash), p.leafIndex, p.treeHead.treeSize, p.auditPath, p.treeHead.rootHash)) return { ok: false, reason: 'inclusion' };
   if (p.consistency) {
@@ -107,18 +119,26 @@ export function verifyProof(p) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const file = process.argv[2];
-  if (!file) {
-    console.error('usage: node scripts/verify-ledger-proof.mjs proof.json');
+  const args = process.argv.slice(2);
+  const at = args.indexOf('--public-key');
+  const pinned = at >= 0 ? args[at + 1] : undefined;
+  const file = args.find((a, i) => !a.startsWith('--') && (at < 0 || i !== at + 1));
+  if (!file || (at >= 0 && !kidOfPublicKey(pinned))) {
+    console.error('usage: node scripts/verify-ledger-proof.mjs proof.json [--public-key <base64url Ed25519 public key>]');
     process.exit(2);
   }
   const proof = JSON.parse(readFileSync(file, 'utf8'));
   const r = verifyProof(proof);
+  if (r.ok && pinned && proof.publicKey !== pinned) {
+    console.error(`FAILED: the proof is signed with key ${proof.publicKey} (key id ${proof.treeHead.kid}), not the pinned --public-key ${pinned} (key id ${kidOfPublicKey(pinned)}).`);
+    process.exit(1);
+  }
   if (r.ok) {
     console.log(`OK: ledger entry ${r.seq} (${proof.entry.eventType}) is in the signed tree of ${r.treeSize} entries.`);
-    console.log(`Root ${proof.treeHead.rootHash}, signed ${proof.treeHead.timestamp} by key ${proof.treeHead.kid}.`);
+    console.log(`Root ${proof.treeHead.rootHash}, signed ${proof.treeHead.timestamp}.`);
     if (proof.consistency) console.log(`Consistent with the earlier head of ${proof.consistency.fromTreeHead.treeSize} entries (nothing before it was rewritten).`);
-    console.log(`Public key ${proof.publicKey}: check it matches the "Threatline ledger tree heads" page.`);
+    console.log(`Public key ${proof.publicKey} (key id ${proof.treeHead.kid}).`);
+    console.log(pinned ? 'It matches the pinned --public-key.' : 'Check it matches the key on the "Threatline ledger tree heads" page, or re-run with --public-key <that key>.');
   } else {
     console.error(`FAILED: ${r.reason}`);
     process.exit(1);

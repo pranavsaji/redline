@@ -94,6 +94,8 @@ describe('Admin: signing keys (AT-3)', () => {
     await userEvent.click(within(section).getByRole('button', { name: 'Confirm rotation' }));
     expect(rotateKey).toHaveBeenCalled();
     expect(await within(section).findByText(/New key k3 is active/)).toBeTruthy();
+    // Bug 4c: merge gates trust a pasted key until it is removed or retired, so say so.
+    expect(within(section).getByText(/New key k3 is active/).textContent).toMatch(/remove the old key, or add until=.* after it/);
   });
 
   it.each(['light', 'dark'])('has no axe violations (%s)', async (mode) => {

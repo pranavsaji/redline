@@ -23,7 +23,9 @@ export async function pauseReasons(deps: Pick<CoreDeps, 'usage' | 'state'>, poli
   const last3 = Array.isArray(recent) ? recent.slice(-3) : [];
   const lastAt = typeof at === 'string' ? new Date(at).getTime() : NaN;
   const expired = Number.isFinite(lastAt) && now.getTime() - lastAt >= CREDITS_PAUSE_HOURS * 3_600_000;
-  return ok({ budget: u.value.reviews >= policy.budget.reviewsPerMonth, credits: !expired && last3.length === 3 && last3.every((x) => x === false) });
+  // The out-of-credits signal is about Rovo: Threatline Engine reviews run on Forge LLMs and are never paused by it.
+  const credits = policy.reviewMode !== 'engine' && !expired && last3.length === 3 && last3.every((x) => x === false);
+  return ok({ budget: u.value.reviews >= policy.budget.reviewsPerMonth, credits });
 }
 
 /**

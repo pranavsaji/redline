@@ -3,6 +3,7 @@ import Button from '@atlaskit/button/new';
 import { token } from '@atlaskit/tokens';
 import { errorText, isError, type AdminApi, type PublicKeyInfo } from '../bridge.js';
 import type { ApiError } from '../types.js';
+import { useInFlight } from '../components/in-flight.js';
 
 const code = { fontFamily: token('font.family.code'), font: token('font.body.small'), wordBreak: 'break-all' as const, padding: 8, borderRadius: 4, background: token('elevation.surface.sunken'), margin: 0 };
 
@@ -12,7 +13,7 @@ export function Keys({ api }: { api: AdminApi }) {
   const [keys, setKeys] = useState<PublicKeyInfo | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const { busy, run } = useInFlight();
 
   const load = useCallback(async () => {
     const r = await api.publicKeys().catch((): ApiError => ({ error: 'unavailable' }));
@@ -34,15 +35,17 @@ export function Keys({ api }: { api: AdminApi }) {
     await api.keyCopied().catch(() => undefined);
   };
 
-  const rotate = async () => {
-    setBusy(true);
-    const r = await api.rotateKey().catch((): ApiError => ({ error: 'unavailable' }));
-    setBusy(false);
-    setConfirming(false);
-    if (isError(r)) return setMessage(errorText(r));
-    setMessage(`New key ${r.kid} is active. Paste the new public key into Threatline for Bitbucket and your GitHub workflows within 7 days.`);
-    await load();
-  };
+  const rotate = () =>
+    run(async () => {
+      const r = await api.rotateKey().catch((): ApiError => ({ error: 'unavailable' }));
+      setConfirming(false);
+      if (isError(r)) return setMessage(errorText(r));
+      const retire = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+      setMessage(
+        `New key ${r.kid} is active. Paste the new public key into Threatline for Bitbucket and your GitHub workflows within 7 days. Merge gates trust a pasted key until it is removed: after the overlap, remove the old key, or add until=${retire} after it, in every repository.`,
+      );
+      await load();
+    });
 
   return (
     <section aria-labelledby={`${id}-h`} style={{ display: 'grid', gap: 8 }}>
@@ -76,7 +79,7 @@ export function Keys({ api }: { api: AdminApi }) {
               </>
             )}
           </div>
-          {confirming && <span style={{ font: token('font.body.small') }}>Attestations signed with the current key keep working for 7 days. Update Threatline for Bitbucket with the new public key before then.</span>}
+          {confirming && <span style={{ font: token('font.body.small') }}>Attestations signed with the current key keep working for 7 days. Update Threatline for Bitbucket and your GitHub workflows with the new public key before then, and afterwards remove the old key there (or give it an until= date).</span>}
         </>
       )}
       <p role="status" style={{ margin: 0 }}>

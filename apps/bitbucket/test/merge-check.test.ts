@@ -2,8 +2,10 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { encodeAttestation, generateKeyPair, type KeyPair } from '@threatline/crypto';
 import type { AttestationPayload } from '@threatline/shared';
+import type { DiffFile } from '@threatline/core';
 import { evaluateMergeCheck, runMergeCheck, type RepoSettings } from '../src/merge-check.js';
 import type { BitbucketClient } from '../src/bitbucket-client.js';
+import { kvsSettingsStore } from '../src/settings-store.js';
 
 const fixture = (p: string) => readFileSync(new URL(`./fixtures/${p}`, import.meta.url), 'utf8');
 const HEAD = 'b'.repeat(40);
@@ -35,8 +37,9 @@ function token(o: Partial<AttestationPayload> = {}, k: KeyPair = key): string {
 }
 const AUTH = [{ path: 'src/auth/webhook.ts', status: 'modified' as const, linesAdded: 40 }];
 const DOCS = [{ path: 'README.md', status: 'modified' as const, linesAdded: 2 }];
-const pr = (description: string, headSha = HEAD.slice(0, 12)) => ({ description, headSha, repoFullName: REPO, destSha: 'd'.repeat(12), title: 'PAY-7 Verify refund webhook signatures', branch: 'feature/PAY-7-webhook-hmac' });
-const run = (description: string, o: { files?: typeof AUTH; yaml?: string | null; s?: RepoSettings; head?: string } = {}) =>
+// The gate compares full 40-character hashes; runMergeCheck resolves Bitbucket's 12-character ones first (bug 7).
+const pr = (description: string, headSha = HEAD) => ({ description, headSha, repoFullName: REPO, destSha: 'd'.repeat(12), title: 'PAY-7 Verify refund webhook signatures', branch: 'feature/PAY-7-webhook-hmac' });
+const run = (description: string, o: { files?: DiffFile[]; yaml?: string | null; s?: RepoSettings; head?: string } = {}) =>
   evaluateMergeCheck({ pr: pr(description, o.head), files: o.files ?? AUTH, repoPolicyYaml: o.yaml ?? null, settings: o.s ?? settings(), nowSec: NOW });
 
 describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
@@ -109,6 +112,30 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
     });
   });
 
+  it('bug 4a: a token with a lifetime longer than Threatline issues is refused, saying why', async () => {
+    expect(await run(token({ iat: NOW - 60, exp: NOW + 400 * 86_400 }))).toEqual({
+      success: false,
+      outcome: 'fail_signature',
+      message: 'Threatline: this attestation is valid for longer than Threatline ever issues (7 days), so it is refused. Request a new one from the Jira issue panel.',
+    });
+  });
+
+  it('bug 4b: a trusted key with a retire date stops verifying from then on, with a clear message', async () => {
+    const old = generateKeyPair();
+    const retiring = (at: number) => settings({ publicKeys: { [key.kid]: key.publicKey, [old.kid]: old.publicKey }, keyRetireAt: { [old.kid]: new Date(at * 1000).toISOString() } });
+    expect(await run(token({}, old), { s: retiring(NOW + 60) })).toMatchObject({ success: true, outcome: 'pass_attested' });
+    expect(await run(token({}, old), { s: retiring(NOW - 60) })).toEqual({
+      success: false,
+      outcome: 'fail_signature',
+      message: `Threatline: this attestation is signed with key ${old.kid}, which this repository retired at 2025-11-15 11:59 UTC. Request a new attestation (it is signed with Threatline's current key).`,
+    });
+    // The current key still works next to a retired one.
+    expect(await run(token(), { s: retiring(NOW - 60) })).toMatchObject({ success: true });
+    // A second work item's token signed by the retired key does not count either.
+    const multi = await evaluateMergeCheck({ pr: { ...pr(`${token()}\n${token({ issueKey: 'PAY-6', nonce: 'n0nce2' }, old)}`), title: 'PAY-7 and PAY-6' }, files: AUTH, repoPolicyYaml: null, settings: retiring(NOW - 60), nowSec: NOW });
+    expect(multi).toMatchObject({ success: false, outcome: 'fail_other_issue' });
+  });
+
   it('an expired attestation → fail_expired with the time', async () => {
     expect(await run(token({ iat: NOW - 90_000, exp: NOW - 3600 }))).toEqual({ success: false, outcome: 'fail_expired', message: 'Threatline: attestation expired at 2025-11-15 11:00 UTC. Request a new one.' });
   });
@@ -133,6 +160,26 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
     expect(await multi(`${token()}\n${token({ issueKey: 'PAY-6', nonce: 'n0nce2', iat: NOW - 30 })}`)).toMatchObject({ success: true, outcome: 'pass_attested' });
     // A second token that is for another commit does not count.
     expect(await multi(`${token()}\n${token({ issueKey: 'PAY-6', nonce: 'n0nce3', commitSha: OLD, iat: NOW - 120 })}`)).toMatchObject({ success: false, outcome: 'fail_other_issue' });
+  });
+
+  it('bug 7: the attestation must name exactly the head commit (no prefix match on a short hash)', async () => {
+    const lookalike = `${HEAD.slice(0, 12)}${'c'.repeat(28)}`;
+    expect(await run(token({ commitSha: lookalike }))).toMatchObject({ success: false, outcome: 'fail_stale_commit' });
+    // A short head (what Bitbucket's pull request API reports) is never accepted by the gate itself.
+    expect(await run(token(), { head: HEAD.slice(0, 12) })).toMatchObject({ success: false, outcome: 'fail_stale_commit', message: expect.stringMatching(/full 40-character/) });
+  });
+
+  it('bug 8: a key next to an underscore (PAY-7_fix) is still a named work item that needs its own attestation', async () => {
+    const named = (title: string, branch: string, description = token({ issueKey: 'PAY-6' })) =>
+      evaluateMergeCheck({ pr: { ...pr(description), title, branch }, files: AUTH, repoPolicyYaml: null, settings: settings(), nowSec: NOW });
+    for (const branch of ['PAY-7_fix', 'feature/PAY-7_hotfix', 'fix_PAY-7', 'pay-7-fix', 'feature/pay-7_fix'])
+      expect(await named('PAY-6 harden refunds', branch)).toMatchObject({ success: false, outcome: 'fail_other_issue', message: expect.stringMatching(/also names PAY-7/) });
+    // A lowercase look-alike in another project is not a work item (no false requirement): utf-8, sha-256.
+    expect(await named('PAY-6 parse utf-8 bodies', 'feature/sha-256-hmac')).toMatchObject({ success: true, outcome: 'pass_attested' });
+    // An underscore-adjacent key alone is recognised for the attestation.
+    expect(await named('Harden refunds', 'PAY-6_hotfix')).toMatchObject({ success: true, outcome: 'pass_attested' });
+    // Lowercase only counts next to an uppercase key of the same project: alone it is not a key.
+    expect(await named('Harden refunds', 'pay-6-fix')).toMatchObject({ success: false, outcome: 'fail_other_issue', message: expect.stringMatching(/names no Jira work item/) });
   });
 
   it('M9: an attestation for a review made with partial context says so in the check message', async () => {
@@ -174,6 +221,20 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
     expect((await run('', { yaml: 'sensitivePaths: []\nmode: warn\n' })).outcome).toBe('fail_missing');
   });
 
+  it('bug 1: editing, deleting or shadowing the gate configuration is always sensitive (no loosening policy.yml in one PR)', async () => {
+    const f = (path: string, status: 'modified' | 'removed' | 'added' = 'modified') => [{ path, status, linesAdded: status === 'removed' ? 0 : 1 }];
+    for (const files of [
+      f('.threatline/policy.yml'),
+      f('.threatline/policy.yml', 'removed'),
+      f('.threatline/policy.yml', 'added'), // an empty file that shadows a legacy .redline/policy.yml
+      f('.redline/policy.yml', 'removed'),
+      f('bitbucket-pipelines.yml'),
+      f('.github/actions/setup/action.yml'),
+      [{ path: 'docs/old-policy.yml', oldPath: '.threatline/policy.yml', status: 'renamed' as const, linesAdded: 0 }],
+    ])
+      expect((await run('', { files, s: settings({ sensitivePaths: [] }) })).outcome).toBe('fail_missing');
+  });
+
   it('an invalid policy.yml on the target branch fails closed: the change needs an attestation', async () => {
     const r = await run('', { files: DOCS, yaml: 'sensitivePaths: [unclosed' });
     expect(r).toMatchObject({ success: false, outcome: 'fail_missing' });
@@ -187,7 +248,7 @@ describe('evaluateMergeCheck (EN-5, EN-6, AT-2)', () => {
 });
 
 describe('runMergeCheck: reads the PR, its diffstat, the destination policy and repo settings', () => {
-  function client(o: { description: string; diff?: string; policy?: string | null; fail?: 'pr' | 'diff'; patch?: string | null }) {
+  function client(o: { description: string; diff?: string; policy?: string | null; fail?: 'pr' | 'diff' | 'commit'; patch?: string | null; fullHead?: string }) {
     const calls: string[] = [];
     const prJson = JSON.parse(fixture('pr/auth-change.json').replace('{{ATTESTATION}}', o.description.replace(/\n/g, '\\n')));
     const c: BitbucketClient = {
@@ -195,6 +256,7 @@ describe('runMergeCheck: reads the PR, its diffstat, the destination policy and 
       diffstat: async (_ws, _repo, id) => (calls.push(`diff:${id}`), o.fail === 'diff' ? { ok: false, error: { code: 'upstream', message: '500' } } : { ok: true, value: JSON.parse(o.diff ?? fixture('diffstat/auth-change.json')).values }),
       fileAt: async (_ws, _repo, commit, path) => (calls.push(`file:${commit}:${path}`), { ok: true, value: o.policy ?? null }),
       diff: async (_ws, _repo, id) => (calls.push(`patch:${id}`), o.patch === null ? { ok: false, error: { code: 'upstream', message: '500' } } : { ok: true, value: o.patch ?? '' }),
+      headCommit: async (_ws, _repo, id, hash) => (calls.push(`head:${id}:${hash}`), o.fail === 'commit' ? { ok: false, error: { code: 'upstream', message: '500' } } : { ok: true, value: o.fullHead ?? 'b'.repeat(40) }),
     };
     return { c, calls };
   }
@@ -207,6 +269,24 @@ describe('runMergeCheck: reads the PR, its diffstat, the destination policy and 
     expect(calls).toContain('file:dddddddddddd:.threatline/policy.yml');
     // No .threatline/policy.yml: the file's name from before the rename is read instead.
     expect(calls).toContain('file:dddddddddddd:.redline/policy.yml');
+  });
+
+  it('bug 7: resolves Bitbucket’s short head hash to the full commit, and fails closed when it cannot', async () => {
+    const t = token({ commitSha: 'b'.repeat(40) });
+    const { c, calls } = client({ description: t });
+    expect(await runMergeCheck(event, { client: c, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: true });
+    expect(calls).toContain('head:7:bbbbbbbbbbbb');
+    // The short hash resolves to a different commit than the attestation names (same 12-character prefix).
+    const { c: other } = client({ description: t, fullHead: `${'b'.repeat(12)}${'e'.repeat(28)}` });
+    expect(await runMergeCheck(event, { client: other, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: false, message: expect.stringMatching(/attestation is for commit/) });
+    for (const bad of [client({ description: t, fail: 'commit' }).c, client({ description: t, fullHead: 'f'.repeat(40) }).c, client({ description: t, fullHead: 'bbbb' }).c])
+      expect(await runMergeCheck(event, { client: bad, settings: async () => settings(), nowSec: () => NOW })).toMatchObject({ success: false, message: expect.stringMatching(/could not read this pull request from Bitbucket \(head commit\)/) });
+  });
+
+  it('seam review 4: a docs-only PR passes even when Bitbucket cannot list its commits (the head is only looked up when needed)', async () => {
+    const { c, calls } = client({ description: '', diff: fixture('diffstat/docs-only.json'), fail: 'commit' });
+    expect(await runMergeCheck(event, { client: c, settings: async () => settings(), nowSec: () => NOW })).toEqual({ success: true, message: 'Threatline: no security-sensitive changes.' });
+    expect(calls.some((x) => x.startsWith('head:'))).toBe(false);
   });
 
   it('a docs-only PR passes without an attestation', async () => {
@@ -261,6 +341,20 @@ describe('runMergeCheck: reads the PR, its diffstat, the destination policy and 
     const { c } = client({ description: '', fail: 'diff' });
     const ended = settings({ mode: 'warn', warnUntil: new Date((NOW - 60) * 1000).toISOString() });
     expect((await runMergeCheck(event, { client: c, settings: async () => ended, nowSec: () => NOW })).success).toBe(false);
+  });
+
+  it('bug 3: settings that cannot be read (storage down, or a stored value that no longer parses) fail closed', async () => {
+    const billing = JSON.stringify({ values: [{ status: 'modified', lines_added: 3, old: { path: 'billing/invoice.ts' }, new: { path: 'billing/invoice.ts' } }] });
+    const { c } = client({ description: '', diff: billing });
+    // With the admin's settings, billing/** is sensitive; with no settings ever saved, it is not.
+    expect(await runMergeCheck(event, { client: c, settings: async () => settings({ sensitivePaths: ['billing/**'] }), nowSec: () => NOW })).toMatchObject({ success: false });
+    expect(await runMergeCheck(event, { client: c, settings: async () => null, nowSec: () => NOW })).toMatchObject({ success: true });
+    const kv = new Map<string, unknown>([['settings:0b1c2d3e-0000-4000-8000-000000000001', { mode: 'sideways' }]]);
+    const corrupt = kvsSettingsStore({ get: async (k) => kv.get(k) as never, set: async () => undefined });
+    for (const read of [async () => Promise.reject(new Error('kvs down')), (uuid: string) => corrupt.get(uuid)]) {
+      const r = await runMergeCheck({ ...event, repository: { uuid: '{0b1c2d3e-0000-4000-8000-000000000001}' } }, { client: c, settings: read, nowSec: () => NOW });
+      expect(r).toEqual({ success: false, message: "Threatline: could not read this repository's Threatline settings, so this pull request cannot be checked. Re-run the check in a minute." });
+    }
   });
 
   it('a repository with no settings yet uses the defaults: block mode and the built-in sensitive paths', async () => {

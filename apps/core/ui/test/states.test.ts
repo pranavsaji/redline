@@ -15,6 +15,12 @@ describe('viewOf', () => {
     expect(viewOf(FIXTURES[fixture]!).state).toBe(state);
   });
 
+  it('a review that failed at the budget is shown as failed (with a re-run) once the gate says reviews resumed', () => {
+    const b = FIXTURES.budget!;
+    const resumed = { ...b, verdict: { ...b.verdict!, reasons: [{ code: 'review_failed' as const, message: 'This work item’s review failed while reviews were paused at the AI budget. Reviews have resumed, so run it again.' }] } };
+    expect(viewOf(resumed).state).toBe('failed');
+  });
+
   it('flags partial, stale and injection', () => {
     expect(viewOf(FIXTURES.partial!).partial).toBe(true);
     expect(viewOf(FIXTURES.stale!).stale).toBe(true);

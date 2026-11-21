@@ -23,15 +23,21 @@ export async function issueSubmissionToken(deps: Pick<CoreDeps, 'state' | 'clock
   return token;
 }
 
-/** True only for an unexpired, unused token issued for this work item and caller. The token is consumed either way. */
-export async function consumeSubmissionToken(deps: Pick<CoreDeps, 'state' | 'clock'>, token: unknown, expect: { issueId: string; accountId: string }): Promise<boolean> {
+const USED = { used: true } as const;
+
+/**
+ * True only for an unexpired, unused token issued for this work item, caller and review revision (a token for revision
+ * N cannot file into N + 1). The token is consumed either way, atomically: it is swapped for a tombstone in one write,
+ * so of two submissions racing with the same token only one sees the record.
+ */
+export async function consumeSubmissionToken(deps: Pick<CoreDeps, 'state' | 'clock'>, token: unknown, expect: { issueId: string; accountId: string; revision: number }): Promise<boolean> {
   if (typeof token !== 'string' || !/^[0-9a-f]{32}$/.test(token)) return false;
   const key = keyOf(token);
   try {
-    const rec = await deps.state.get<TokenRecord>(key);
-    if (!rec) return false;
-    await deps.state.delete(key);
-    return rec.issueId === expect.issueId && rec.accountId === expect.accountId && deps.clock.now().getTime() < Date.parse(rec.expiresAt);
+    const rec = await deps.state.swap<Partial<TokenRecord>>(key, USED);
+    await deps.state.delete(key).catch(() => undefined);
+    if (!rec || !('issueId' in rec)) return false;
+    return rec.issueId === expect.issueId && rec.accountId === expect.accountId && rec.revision === expect.revision && deps.clock.now().getTime() < Date.parse(rec.expiresAt ?? '');
   } catch {
     return false;
   }

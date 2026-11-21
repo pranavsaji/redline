@@ -4,12 +4,17 @@ import { token } from '@atlaskit/tokens';
 import { decodeAttestation, findAttestations, fromB64url, kidOf } from '@threatline/crypto';
 import { field, label, box } from './styles.js';
 
-/** Builds kid → key from the pasted keys (one per line), skipping lines that are not keys. */
-export function keysFrom(text: string): Record<string, string> {
+/**
+ * Builds kid → key from the pasted keys (one per line, `<key>` or `<key> until=<date>`), skipping lines that are not
+ * keys and keys whose retire date has passed (the merge check no longer trusts them either).
+ */
+export function keysFrom(text: string, nowMs = Date.now()): Record<string, string> {
   const out: Record<string, string> = {};
   for (const line of text.split('\n').map((l) => l.trim()).filter(Boolean)) {
-    const bytes = fromB64url(line);
-    if (bytes && bytes.length === 32) out[kidOf(bytes)] = line;
+    const [key = '', until] = line.split(/\s+/);
+    const bytes = fromB64url(key);
+    const retire = until?.startsWith('until=') ? Date.parse(until.slice('until='.length)) : NaN;
+    if (bytes && bytes.length === 32 && !(retire <= nowMs)) out[kidOf(bytes)] = key;
   }
   return out;
 }
@@ -21,6 +26,7 @@ const REASON: Record<string, string> = {
   unknown_key: 'No public key is set above, so nothing can be verified.',
   expired: 'Expired: request a new attestation.',
   not_yet_valid: 'Not valid yet: the issuing clock is ahead. Try again in a few minutes.',
+  lifetime: 'Refused: it is valid for longer than Threatline ever issues (7 days).',
 };
 
 /** "Test a pasted attestation": verified here in the browser, with the keys currently in the form. */

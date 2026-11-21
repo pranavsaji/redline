@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId } from 'react';
 import Button from '@atlaskit/button/new';
 import { token } from '@atlaskit/tokens';
 import type { AdminPolicyDto } from '../types.js';
@@ -10,6 +10,7 @@ import {
   sectionStyle,
   splitList,
   usePolicySave,
+  useSynced,
   type PolicySectionProps,
 } from './policy-editor.js';
 
@@ -20,12 +21,12 @@ const ENGINE_BUDGET = { tokensInPerReview: 400_000, tokensOutPerReview: 60_000 }
 /**
  * Review mode. Threatline Engine (Threatline runs the review itself on Forge LLMs) is recommended; AI review via the Rovo
  * agent needs Automation rules. Rule-based checks only is an
- * explicit choice for sites without Rovo: every review completes at once from Threatline's deterministic checks, the
+ * explicit choice for sites that want no AI model calls: every review completes at once from Threatline's deterministic checks, the
  * panel labels it, and the change is recorded in the risk ledger like any policy change.
  */
 export function ReviewMode(props: PolicySectionProps & { recentAuthors?: AdminPolicyDto['recentReviewAuthors'] }) {
   const id = useId();
-  const [mode, setMode] = useState<Mode>(props.policy.reviewMode ?? 'agent');
+  const [mode, setMode] = useSynced<Mode>(props.policy.reviewMode ?? 'agent');
   const s = usePolicySave(props);
   return (
     <section aria-labelledby={`${id}-h`} style={sectionStyle}>
@@ -75,9 +76,9 @@ export function ReviewMode(props: PolicySectionProps & { recentAuthors?: AdminPo
               onChange={() => setMode('rules_only')}
             />
             <span>
-              <strong>Rule-based checks only.</strong> For sites without Rovo. Every review completes at once from
+              <strong>Rule-based checks only.</strong> For sites that want no AI model calls at all. Every review completes at once from
               Threatline's built-in checks (authentication, personal data, payments, public endpoints, AI agents, file
-              upload, secrets). No Rovo credits are used; the gates work the same.
+              upload, secrets). No Rovo credits or model calls are used; the gates work the same.
             </span>
           </label>
         </fieldset>
@@ -94,9 +95,10 @@ export function ReviewMode(props: PolicySectionProps & { recentAuthors?: AdminPo
  */
 function ReviewAuthors(props: PolicySectionProps & { recent: AdminPolicyDto['recentReviewAuthors'] }) {
   const id = useId();
-  const initial = props.policy.reviewAuthors ?? [];
-  const [locked, setLocked] = useState(initial.length > 0);
-  const [ids, setIds] = useState(initial.join('\n'));
+  // Strings and booleans, so a policy saved elsewhere (a new object with the same list) does not reset an edit.
+  const initial = (props.policy.reviewAuthors ?? []).join('\n');
+  const [locked, setLocked] = useSynced(initial.length > 0);
+  const [ids, setIds] = useSynced(initial);
   const s = usePolicySave(props);
   const submit = () => {
     const list = locked ? splitList(ids) : [];

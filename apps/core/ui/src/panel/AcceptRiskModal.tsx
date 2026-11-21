@@ -6,10 +6,13 @@ import { SeverityLozenge } from '../components/SeverityLozenge.js';
 import type { ApiError, PanelDto, Requirement, Severity } from '../types.js';
 import { box, errorText, field, label } from './form-styles.js';
 import { useInlineForm } from '../components/inline-form.js';
+import { useInFlight } from '../components/in-flight.js';
 
 const RANK: Record<Severity, number> = { Low: 1, Medium: 2, High: 3, Critical: 4 };
 const EXPIRY_CHOICES = [7, 14, 30, 60, 90];
 const MIN_REASON = 10;
+/** Mirrors the server's ACCEPTANCE_MIN_CONTROLS: an acceptance must say what reduces the risk meanwhile. */
+const MIN_CONTROLS = 8;
 
 /** Short form of a ledger entry hash, with a copy button (the full hash is what gets copied). */
 export function LedgerHash({ hash }: { hash: string }) {
@@ -32,11 +35,17 @@ export function LedgerHash({ hash }: { hash: string }) {
   );
 }
 
-/** Who must approve, worded for the requester (the server decides; this is only a preview). */
+/**
+ * Who must approve, worded for the requester (the server decides; this is only a preview). High and above always need
+ * a security champion, whatever the tech lead cap says, and nobody approves their own request.
+ */
 export function approverPreview(severity: Severity, roles: PanelDto['roles'], policy: PanelDto['acceptancePolicy']): string {
-  const champion = RANK[severity] >= RANK.High || RANK[severity] > RANK[policy.techLeadMaxSeverity];
-  if (champion) return `Needs a security champion (${policy.championGroup}) to approve.`;
-  if (roles.includes('tech_lead') || roles.includes('champion') || roles.includes('admin')) return `No second approval needed: you can accept up to ${policy.techLeadMaxSeverity}.`;
+  const own: Severity = RANK[policy.techLeadMaxSeverity] < RANK.High ? policy.techLeadMaxSeverity : 'Medium';
+  const champion = RANK[severity] > RANK[own];
+  if (champion)
+    return roles.includes('champion') ? `Needs another security champion (${policy.championGroup}) to approve: you cannot approve your own request.` : `Needs a security champion (${policy.championGroup}) to approve.`;
+  if (roles.includes('tech_lead') || roles.includes('champion') || roles.includes('admin'))
+    return `No second approval needed: you can accept ${own === 'Low' ? 'Low risks' : 'Medium and lower risks'} yourself. High and Critical always need a security champion.`;
   return `Needs a tech lead (${policy.techLeadGroup}) or security champion to approve.`;
 }
 
@@ -46,12 +55,13 @@ export function approverPreview(severity: Severity, roles: PanelDto['roles'], po
  */
 export function AcceptRiskModal({ requirement, dto, api, onDone, onCancel }: { requirement: Requirement; dto: PanelDto; api: PanelApi; onDone: () => void; onCancel: () => void }) {
   const cap = requirement.severity === 'Critical' ? dto.acceptancePolicy.maxExpiryDays.Critical : dto.acceptancePolicy.maxExpiryDays.default;
-  const choices = EXPIRY_CHOICES.filter((d) => d <= cap);
+  // The cap itself is always a choice (an admin may set any 1 to 30 or 90 days), and the default.
+  const choices = [...EXPIRY_CHOICES.filter((d) => d < cap), cap];
   const [reason, setReason] = useState('');
   const [controls, setControls] = useState('');
-  const [days, setDays] = useState(Math.min(30, cap));
+  const [days, setDays] = useState(cap);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const { busy: saving, run } = useInFlight();
   const [entry, setEntry] = useState<{ hash: string; needsApprover: string } | null>(null);
   const id = useId();
   const form = useInlineForm(onCancel);
@@ -59,9 +69,10 @@ export function AcceptRiskModal({ requirement, dto, api, onDone, onCancel }: { r
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (reason.trim().length < MIN_REASON) return setError(`Write a reason of at least ${MIN_REASON} characters.`);
-    setSaving(true);
-    const r = await api.requestAcceptance({ requirementId: requirement.id, reason: reason.trim(), controls: controls.trim(), expiryDays: days }).catch((): ApiError => ({ error: 'unavailable' }));
-    setSaving(false);
+    if (controls.trim().length < MIN_CONTROLS) return setError(`Describe the compensating controls (what reduces the risk meanwhile) in at least ${MIN_CONTROLS} characters.`);
+    // One request at a time: a double click or a second Enter must not file two acceptances.
+    const r = await run(() => api.requestAcceptance({ requirementId: requirement.id, reason: reason.trim(), controls: controls.trim(), expiryDays: days }).catch((): ApiError => ({ error: 'unavailable' })));
+    if (r === undefined) return;
     if (isError(r)) return setError(errorTextOf(r));
     setError(null);
     setEntry({ hash: r.entryHash, needsApprover: r.needsApprover });
@@ -92,7 +103,7 @@ export function AcceptRiskModal({ requirement, dto, api, onDone, onCancel }: { r
       <label style={label} htmlFor={`${id}-controls`}>
         Compensating controls
       </label>
-      <textarea id={`${id}-controls`} value={controls} onChange={(e) => setControls(e.target.value)} rows={2} maxLength={2000} style={field} placeholder="What reduces the risk meanwhile (feature flag, monitoring, WAF rule)" />
+      <textarea id={`${id}-controls`} value={controls} onChange={(e) => setControls(e.target.value)} rows={2} maxLength={2000} aria-required="true" style={field} placeholder="What reduces the risk meanwhile (feature flag, monitoring, WAF rule)" />
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <label style={label} htmlFor={`${id}-days`}>
           Expires after

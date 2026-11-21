@@ -19,9 +19,10 @@ Each stage is its own queue job, so every model call fits a function timeout and
 Code decides what a verifier verdict does:
 
 - A kept threat is marked **Verified** in the panel.
-- A dropped Medium or Low threat is dismissed, with the verifier's reason recorded on it. An untouched requirement it
-  had is removed.
-- A High or Critical threat the verifier doubts goes to a **security champion**. It never just disappears.
+- A dropped threat below the blocking level (High by default) is dismissed, with the verifier's reason recorded on
+  it, or stands back under a kept threat it duplicates. An untouched requirement it had is removed.
+- A threat at or above the blocking level that the verifier doubts goes to a **security champion**. It never just
+  disappears.
 - Rule-based threats are never sent to the verifier. One that a dropped AI threat covered becomes active again, with
   its requirement.
 - When injection is suspected anywhere in the material, the verifier does not run. A threat citing a flagged source is
@@ -43,7 +44,8 @@ The first engine design split each run into a quarantined extraction and proposa
 the text. On the same 30 cases and model (`claude-sonnet-4-5`) it scored much worse than the agent prompt: strict
 precision 18.7% against 35.9%, recall 80.0% against 85.2% (`evals/results/2026-11-20-claude-code-30-pipeline.md`).
 Proposals that cannot read the design write generic threats. So each engine run is the agent prompt over the fenced
-context, whose injection defences the eval already measures (6 of 6 poisoned cases held).
+context, whose injection defences the eval already measures (6 of 6 poisoned cases held on these 30 cases; 14 of 15 on
+the full 55-case set, `evals/results/2026-11-20-recorded-all.md`).
 
 `pnpm threatline eval --llm recorded --path engine --verify claude-code` replays the recorded agent runs and adds the
 verifier (its replies are saved in `evals/results/verified-engine/`; CI replays them). On the 30 cases:

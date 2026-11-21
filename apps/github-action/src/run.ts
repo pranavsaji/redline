@@ -1,5 +1,4 @@
-import { allAddedText, DIFF_UNREAD_PATH, evaluateMergeCheck, MAX_DIFF_TEXT, TRUNCATED_PATH, type CheckResult, type DiffFile, type RepoSettings } from '@threatline/core';
-import { fromB64url, isValidPublicKey, kidOf } from '@threatline/crypto';
+import { allAddedText, DIFF_UNREAD_PATH, evaluateMergeCheck, GATE_CONFIG_PATHS, MAX_DIFF_TEXT, parseTrustedKeys, TRUNCATED_PATH, type CheckResult, type DiffFile, type RepoSettings } from '@threatline/core';
 
 /** What the merge gate needs from GitHub's REST API, read with the workflow's token. */
 export interface GitHubPr {
@@ -26,28 +25,23 @@ export interface GitHubClient {
 }
 
 export const WARN_MAX_DAYS = 14;
-/**
- * Changing the gate's own configuration (the workflow that runs it, local actions, Threatline's policy file) is always
- * sensitive: loosening the gate needs an attestation like any other security change.
- */
-export const GATE_CONFIG_PATHS = ['.github/workflows/**', '.github/actions/**', '.threatline/**', '.redline/**'];
 const KEY_HINT = 'Add it to the public-keys input of the Threatline step in your workflow (Threatline admin → Signing keys → Copy public key).';
 const lines = (v: string | undefined) => (v ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
 
 /** The step's `with:` inputs → repository settings. Rejects anything it cannot honour rather than guessing. */
 export function parseInputs(input: Record<string, string | undefined>, nowSec: number): { ok: true; value: RepoSettings } | { ok: false; message: string } {
-  const publicKeys: Record<string, string> = {};
-  for (const k of lines(input['public-keys'])) {
-    const bytes = isValidPublicKey(k) ? fromB64url(k) : null;
-    if (!bytes) return { ok: false, message: `Threatline: "${k.slice(0, 12)}…" is not a Threatline public key. Copy it from Threatline admin → Signing keys.` };
-    publicKeys[kidOf(bytes)] = k;
-  }
+  // One key per line, optionally `<key> until=<ISO date>` when it retires (after a rotation's 7-day overlap).
+  const keys = parseTrustedKeys(lines(input['public-keys']));
+  if (!keys.ok)
+    return { ok: false, message: keys.reason === 'until' ? `Threatline: public-keys line ${keys.line}: ${keys.message}.` : `Threatline: ${keys.message}. Copy it from Threatline admin → Signing keys.` };
+  const { publicKeys, keyRetireAt } = keys;
   const mode = (input.mode ?? '').trim() || 'block';
   if (mode !== 'block' && mode !== 'warn') return { ok: false, message: `Threatline: mode must be block or warn, not "${mode.slice(0, 20)}".` };
   const rawThreshold = (input['diff-score-threshold'] ?? '').trim();
   const threshold = rawThreshold === '' ? 40 : Number(rawThreshold);
   if (!Number.isFinite(threshold) || threshold < 0 || threshold > 100) return { ok: false, message: 'Threatline: diff-score-threshold must be a number from 0 to 100.' };
-  const settings: RepoSettings = { publicKeys, sensitivePaths: [...GATE_CONFIG_PATHS, ...lines(input['sensitive-paths'])], mode, diffScoreThreshold: threshold, keyHint: KEY_HINT };
+  // The shared gate always adds GATE_CONFIG_PATHS (packages/core); listed here too so the settings show them.
+  const settings: RepoSettings = { publicKeys, ...(Object.keys(keyRetireAt).length > 0 ? { keyRetireAt } : {}), sensitivePaths: [...GATE_CONFIG_PATHS, ...lines(input['sensitive-paths'])], mode, diffScoreThreshold: threshold, keyHint: KEY_HINT };
   if (mode === 'warn') {
     const until = (input['warn-until'] ?? '').trim();
     const at = Date.parse(until);

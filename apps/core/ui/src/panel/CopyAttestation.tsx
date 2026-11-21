@@ -4,6 +4,7 @@ import { token } from '@atlaskit/tokens';
 import { errorText as errorTextOf, isError, type AttestationOutcome, type PanelApi } from '../bridge.js';
 import type { ApiError } from '../types.js';
 import { box, errorText, field, label } from './form-styles.js';
+import { useInFlight } from '../components/in-flight.js';
 
 const REPO = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
 const SHA = /^[0-9a-fA-F]{40}$/;
@@ -14,7 +15,7 @@ export function CopyAttestation({ api }: { api: PanelApi }) {
   const [repo, setRepo] = useState('');
   const [sha, setSha] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { busy, run } = useInFlight();
   const [result, setResult] = useState<AttestationOutcome | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -22,16 +23,16 @@ export function CopyAttestation({ api }: { api: PanelApi }) {
     e.preventDefault();
     if (!REPO.test(repo.trim())) return setError('Give the repository as workspace/repository (Bitbucket) or owner/repository (GitHub), for example acme/payments.');
     if (!SHA.test(sha.trim())) return setError('Give the full 40-character commit hash of the pull request’s head commit.');
-    setBusy(true);
-    const r = await api.attestation(repo.trim(), sha.trim()).catch((): ApiError => ({ error: 'unavailable' }));
-    setBusy(false);
-    setCopied(false);
-    if (isError(r)) {
-      setResult(null);
-      return setError(errorTextOf(r));
-    }
-    setError(null);
-    setResult(r);
+    await run(async () => {
+      const r = await api.attestation(repo.trim(), sha.trim()).catch((): ApiError => ({ error: 'unavailable' }));
+      setCopied(false);
+      if (isError(r)) {
+        setResult(null);
+        return setError(errorTextOf(r));
+      }
+      setError(null);
+      setResult(r);
+    });
   };
 
   const copy = async (text: string) => {

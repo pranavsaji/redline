@@ -33,10 +33,18 @@ describe('computeVerdict', () => {
   it('5. a review that could not run because reviews were paused blocks as budget_paused until a champion confirms (final review C3)', () => {
     const paused = review({ status: 'failed', failureReason: 'budget', samplesExpected: 0 });
     expect(codes(computeVerdict(input({ review: paused, budgetPaused: true, threats: [], requirements: [] })))).toEqual(['budget_paused']);
-    // The pause may already have lifted; the review still never ran, so the champion's confirmation is what releases it.
-    expect(codes(computeVerdict(input({ review: paused, budgetPaused: false, threats: [], requirements: [] })))).toEqual(['budget_paused']);
     const confirmed = computeVerdict(input({ review: paused, budgetPaused: true, threats: [], requirements: [], championConfirmations: [{ reviewId: 'rev_1', kind: 'budget' }] }));
     expect(confirmed.state).toBe('pass');
+  });
+  it('5a. once reviews resume, a review that could not run is a failed review with the one-click re-run (a champion can no longer confirm it)', () => {
+    const paused = review({ status: 'failed', failureReason: 'budget', samplesExpected: 0 });
+    const v = computeVerdict(input({ review: paused, budgetPaused: false, threats: [], requirements: [] }));
+    expect(v.state).toBe('block');
+    expect(v.reasons).toEqual([
+      { code: 'review_failed', message: 'The security review did not run because reviews were paused at the AI budget. Reviews have resumed, so run it again.', action: { label: 'Re-run review', href: 'https://demo.atlassian.net/browse/PROJ-1?rerun=1' } },
+    ]);
+    // A champion's confirmation made while reviews were paused still stands.
+    expect(computeVerdict(input({ review: paused, budgetPaused: false, threats: [], requirements: [], championConfirmations: [{ reviewId: 'rev_1', kind: 'budget' }] })).state).toBe('pass');
   });
   it('5b. a later budget pause does not block work whose review already ran (final review C3)', () => {
     expect(computeVerdict(input({ budgetPaused: true, threats: [], requirements: [] })).state).toBe('pass');
@@ -68,6 +76,18 @@ describe('computeVerdict', () => {
   it('7c. an expired acceptance no longer clears the block', () => {
     const v = computeVerdict(input({ requirements: [requirement({ status: 'AcceptedRisk' })], acceptances: [acceptance({ expiresAt: '2026-11-15T00:00:00Z' })] }));
     expect(v.state).toBe('block');
+  });
+  it('7e. security: an acceptance stops counting once its requirement rises above the severity it was accepted at', () => {
+    const critical = { threats: [threat({ severity: 'Critical' })], requirements: [requirement({ status: 'AcceptedRisk', severity: 'Critical' })] };
+    const v = computeVerdict(input({ ...critical, acceptances: [acceptance({ severity: 'Medium' })] }));
+    expect(v.state).toBe('block');
+    expect(v.reasons.find((x) => x.code === 'open_requirement')!.requirementIds).toEqual(['req_1']);
+    expect(v.reasons.map((x) => x.message)).toContain(
+      'The risk acceptance for PROJ-150 was accepted at Medium, but the requirement is now Critical, so it no longer counts. Revoke it and request a new risk acceptance in the Threatline panel.',
+    );
+    // Accepted at the current severity (or higher) still counts.
+    expect(computeVerdict(input({ ...critical, acceptances: [acceptance({ severity: 'Critical' })] })).state).toBe('pass');
+    expect(computeVerdict(input({ requirements: [requirement({ status: 'AcceptedRisk' })], acceptances: [acceptance({ severity: 'Critical' })] })).state).toBe('pass');
   });
   it('7d. dismissed and low-severity threats never block', () => {
     expect(computeVerdict(input({ threats: [threat({ state: 'dismissed' }), threat({ id: 'thr_2', severity: 'Medium' })], requirements: [] })).state).toBe('pass');
@@ -132,6 +152,16 @@ describe('combineVerdicts', () => {
     expect(v.state).toBe('warn');
     expect(v.validUntil).toBe(ancestor.validUntil);
     expect(v.overridden).toBeUndefined();
+  });
+
+  it('security: a child that passes only because its ancestor is overridden carries the override window', () => {
+    const parent = computeVerdict(input({ breakGlass: [{ issueId: '10001', until: '2026-11-16T00:00:00Z' }] }));
+    const own = computeVerdict(input({ threats: [], requirements: [] }));
+    const v = combineVerdicts(own, [{ issueKey: 'PROJ-1', verdict: parent }]);
+    expect(v).toMatchObject({ state: 'pass', overridden: true, validUntil: '2026-11-16T00:00:00.000Z', inheritedFrom: ['PROJ-1'] });
+    expect(verdictLapsed(v, new Date('2026-11-16T00:00:00Z'))).toBe(true);
+    // A child that blocks on its own still blocks.
+    expect(combineVerdicts(computeVerdict(input()), [{ issueKey: 'PROJ-1', verdict: parent }]).state).toBe('block');
   });
 
   it('security: a lenient ancestor without an end time makes the child block', () => {

@@ -119,6 +119,9 @@ const AdminPolicySchema = SitePolicySchema.superRefine((p, ctx) => {
   if (badAuthor !== undefined) ctx.addIssue({ code: 'custom', path: ['reviewAuthors'], message: `"${badAuthor.slice(0, 40)}" is not an Atlassian account ID.` });
   for (const g of ['techLeadGroup', 'championGroup'] as const)
     if (!name.safeParse(p[g]).success) ctx.addIssue({ code: 'custom', path: [g], message: g === 'championGroup' ? 'Name the security champions group.' : 'Name the tech leads group.' });
+  // canApprove needs a champion for High and above whatever this says; refuse a cap that would claim otherwise.
+  if (p.techLeadMaxSeverity === 'High' || p.techLeadMaxSeverity === 'Critical')
+    ctx.addIssue({ code: 'custom', path: ['techLeadMaxSeverity'], message: 'Tech leads can accept at most Medium risks: High and Critical always need a security champion.' });
   if (p.sensitivePaths.length > 200 || p.sensitivePaths.some((s) => !s.trim() || s.length > 300))
     ctx.addIssue({ code: 'custom', path: ['sensitivePaths'], message: 'Sensitive paths are up to 200 non-empty patterns.' });
 });
@@ -185,7 +188,10 @@ export async function adminSetPolicy(deps: CoreDeps, a: Admin, payload: unknown)
   const raw = (payload as { policy?: unknown } | null)?.policy;
   const current = await deps.config.site();
   if (!current.ok) return apiError(current.error);
-  const parsed = AdminPolicySchema.safeParse(raw && typeof raw === 'object' ? { ...raw, warnOnly: current.value.warnOnly } : raw);
+  // A site saved before the cap was limited may still hold High or Critical (which always acted as Medium): saving
+  // another section carries it as Medium rather than refusing the save. Only a new High or Critical is refused.
+  const legacyCap = (raw as { techLeadMaxSeverity?: unknown } | null)?.techLeadMaxSeverity === current.value.techLeadMaxSeverity && ['High', 'Critical'].includes(current.value.techLeadMaxSeverity);
+  const parsed = AdminPolicySchema.safeParse(raw && typeof raw === 'object' ? { ...raw, warnOnly: current.value.warnOnly, ...(legacyCap ? { techLeadMaxSeverity: 'Medium' } : {}) } : raw);
   if (!parsed.success) return { error: 'validation', message: firstIssue(parsed.error) };
   const next: SitePolicy = { ...parsed.data, enabledProjects: [...new Set(parsed.data.enabledProjects)] };
   for (const key of next.enabledProjects.filter((k) => !current.value.enabledProjects.includes(k))) {
@@ -207,8 +213,11 @@ const WarnSchema = z.object({
   days: z.number({ message: `Warn-only lasts 1 to ${WARN_ONLY_MAX_DAYS} days.` }).int(`Warn-only lasts 1 to ${WARN_ONLY_MAX_DAYS} days.`).min(1, `Warn-only lasts 1 to ${WARN_ONLY_MAX_DAYS} days.`).max(WARN_ONLY_MAX_DAYS, `Warn-only lasts 1 to ${WARN_ONLY_MAX_DAYS} days.`),
 });
 
-/** `admin.warnOnly`: the project's gate warns instead of blocking, from now, for 1 to 14 days. Ledgered; replaces any window. */
-export async function adminWarnOnly(deps: CoreDeps, a: Admin, payload: unknown): Promise<{ projectKey: string; since: string; until: string; entryHash: string } | ApiError> {
+/**
+ * `admin.warnOnly`: the project's gate warns instead of blocking, from now, for 1 to 14 days. Ledgered; replaces any
+ * window. Switching it on again while it is on keeps the original start, so the 14 days cannot be renewed forever.
+ */
+export async function adminWarnOnly(deps: CoreDeps, a: Admin, payload: unknown): Promise<{ projectKey: string; since: string; until: string; entryHash: string; message?: string } | ApiError> {
   const denied = await requireAdmin(deps, a);
   if (denied) return denied;
   const p = WarnSchema.safeParse(payload);
@@ -218,17 +227,28 @@ export async function adminWarnOnly(deps: CoreDeps, a: Admin, payload: unknown):
   if (!policy.ok) return apiError(policy.error);
   if (!policy.value.enabledProjects.includes(projectKey)) return { error: 'validation', message: `Threatline is not turned on for ${projectKey}.` };
   const now = deps.clock.now();
-  const since = now.toISOString();
-  const until = new Date(now.getTime() + days * DAY).toISOString();
-  const row = await appendLedger(deps.ledger, deps.clock, 'policy.warn_only', { projectKey, since, until, days }, a.accountId);
+  const t = now.getTime();
+  const active = policy.value.warnOnly.find((w) => {
+    const from = Date.parse(w.since);
+    return w.projectKey === projectKey && from <= t && t < Math.min(Date.parse(w.until), from + WARN_ONLY_MAX_DAYS * DAY);
+  });
+  const start = active ? new Date(active.since) : now;
+  const since = start.toISOString();
+  const until = new Date(Math.min(t + days * DAY, start.getTime() + WARN_ONLY_MAX_DAYS * DAY)).toISOString();
+  const row = await appendLedger(deps.ledger, deps.clock, 'policy.warn_only', { projectKey, since, until, days, ...(active ? { extended: true } : {}) }, a.accountId);
   if (!row.ok) return apiError(row.error);
   const kept = policy.value.warnOnly.filter((w) => w.projectKey !== projectKey && new Date(w.until).getTime() > now.getTime());
   const saved = await deps.config.setSite({ ...policy.value, warnOnly: [...kept, { projectKey, since, until }] });
   if (!saved.ok) return apiError(saved.error);
   if (!(await bumpPolicyVersion(deps))) return SAVED_UNCHECKED;
   await opsAlert(deps, `alert:warn_only:${row.value.entryHash}`, `Threatline: an administrator switched ${projectKey} to warn-only until ${until.slice(0, 16).replace('T', ' ')} UTC. Its Done gate warns instead of blocking until then. Recorded in the Threatline ledger.`);
-  return { projectKey, since, until, entryHash: row.value.entryHash };
+  const message = active
+    ? `${projectKey} has been in warn-only since ${utc(since)}, and warn-only lasts at most ${WARN_ONLY_MAX_DAYS} days from when it was switched on, so it now ends ${utc(until)}. After that the gate blocks again; it can be switched on afresh once this window has ended.`
+    : undefined;
+  return { projectKey, since, until, entryHash: row.value.entryHash, ...(message ? { message } : {}) };
 }
+
+const utc = (iso: string) => `${iso.slice(0, 16).replace('T', ' ')} UTC`;
 
 /** `admin.warnOnlyEnd`: ends a project's warn-only window now. Ledgered; the gate blocks again at once. */
 export async function adminWarnOnlyEnd(deps: CoreDeps, a: Admin, payload: unknown): Promise<{ projectKey: string; entryHash: string } | ApiError> {

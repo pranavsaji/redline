@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import type { ApproverNeeded } from '@threatline/core';
+import { ACCEPTANCE_EVENTS, rebuildAcceptances, type ApproverNeeded } from '@threatline/core';
 import type { AcceptanceState } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { BREAK_GLASS_MAX_HOURS, BREAK_GLASS_MIN_REASON, breakGlass, decideAcceptance, requestAcceptance, revokeAcceptance } from '../services/acceptance-service.js';
 import { apiError, type ApiError } from './errors.js';
 import { authorise, type Viewer } from './panel.js';
+import { threatVisible } from '../services/requirements-service.js';
 
 const id = z.string().min(1).max(120);
 const RequestSchema = z.object({ requirementId: id, reason: z.string().max(2000), controls: z.string().max(2000).default(''), expiryDays: z.number().int().min(1).max(365) });
@@ -28,12 +29,32 @@ export async function acceptanceRequest(deps: CoreDeps, v: Viewer, payload: unkn
   return r.ok ? r.value : apiError(r.error);
 }
 
+/**
+ * Security: the approver (or revoker) must be able to see the acceptance's requirement, i.e. its threat, as in the
+ * panel. Otherwise they could decide on, and read back, a risk whose sources they cannot open. Unknown ids fall through
+ * to the service (which answers not_found); a failed lookup is unavailable.
+ */
+async function refuseUnlessShown(deps: CoreDeps, v: Viewer, acceptanceId: string): Promise<ApiError | null> {
+  const rows = await deps.ledger.forIssues(ACCEPTANCE_EVENTS, [v.issueId]);
+  if (!rows.ok) return { error: 'unavailable' };
+  const a = rebuildAcceptances(rows.value, deps.clock.now()).find((x) => x.id === acceptanceId);
+  if (!a) return null;
+  const req = await deps.requirements.get(a.requirementId);
+  if (!req.ok) return { error: 'unavailable' };
+  if (!req.value || req.value.issueId !== v.issueId) return { error: 'not_found' };
+  const seen = await threatVisible(deps, v, req.value.threatId);
+  if (!seen.ok) return { error: 'unavailable' };
+  return seen.value ? null : { error: 'not_found' };
+}
+
 /** `acceptance.decide`: approver roles are checked by canApprove (never the requester). */
 export async function acceptanceDecide(deps: CoreDeps, v: Viewer, payload: unknown): Promise<{ state: AcceptanceState; entryHash: string } | ApiError> {
   const p = DecideSchema.safeParse(payload);
   if (!p.success) return invalid(p.error);
   const auth = await authorise(deps, v, 'browse');
   if ('error' in auth) return auth;
+  const refused = await refuseUnlessShown(deps, v, p.data.acceptanceId);
+  if (refused) return refused;
   const r = await decideAcceptance(deps, v, auth.issue, { acceptanceId: p.data.acceptanceId, decision: p.data.decision, ...(p.data.note ? { note: p.data.note } : {}) });
   return r.ok ? r.value : apiError(r.error);
 }
@@ -44,6 +65,8 @@ export async function acceptanceRevoke(deps: CoreDeps, v: Viewer, payload: unkno
   if (!p.success) return invalid(p.error);
   const auth = await authorise(deps, v, 'browse');
   if ('error' in auth) return auth;
+  const refused = await refuseUnlessShown(deps, v, p.data.acceptanceId);
+  if (refused) return refused;
   const r = await revokeAcceptance(deps, v, auth.issue, p.data);
   return r.ok ? r.value : apiError(r.error);
 }

@@ -4,7 +4,8 @@ import { token } from '@atlaskit/tokens';
 import { errorText, isError } from '../bridge.js';
 import type { ApiError, UsageDto } from '../types.js';
 import { field } from '../panel/form-styles.js';
-import { grid2, hint, h2, intIn, Labeled, PolicyForm, sectionStyle, usePolicySave, type PolicySectionProps } from './policy-editor.js';
+import { grid2, hint, h2, intIn, Labeled, PolicyForm, sectionStyle, usePolicySave, useSynced, type PolicySectionProps } from './policy-editor.js';
+import { useInFlight } from '../components/in-flight.js';
 
 const SAMPLES = [1, 3, 5] as const;
 
@@ -14,12 +15,14 @@ export function Budgets(props: PolicySectionProps) {
   const { api, policy } = props;
   const [usage, setUsage] = useState<UsageDto | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
-  const [reviews, setReviews] = useState(String(policy.budget.reviewsPerMonth));
-  const [tokensIn, setTokensIn] = useState(String(policy.budget.tokensInPerReview));
-  const [tokensOut, setTokensOut] = useState(String(policy.budget.tokensOutPerReview));
-  const [samples, setSamples] = useState<1 | 3 | 5>(policy.agentSamples);
-  const [timeout, setTimeoutMin] = useState(String(policy.agentTimeoutMinutes));
+  // Review mode raises the token caps when it switches to Threatline Engine; these follow the saved policy.
+  const [reviews, setReviews] = useSynced(String(policy.budget.reviewsPerMonth));
+  const [tokensIn, setTokensIn] = useSynced(String(policy.budget.tokensInPerReview));
+  const [tokensOut, setTokensOut] = useSynced(String(policy.budget.tokensOutPerReview));
+  const [samples, setSamples] = useSynced<1 | 3 | 5>(policy.agentSamples);
+  const [timeout, setTimeoutMin] = useSynced(String(policy.agentTimeoutMinutes));
   const s = usePolicySave(props);
+  const resuming = useInFlight();
 
   const loadUsage = () =>
     api
@@ -30,12 +33,13 @@ export function Budgets(props: PolicySectionProps) {
     void loadUsage();
   }, [api, policy]);
 
-  const resume = async () => {
-    const r = await api.resumeReviews().catch((): ApiError => ({ error: 'unavailable' }));
-    if (isError(r)) return setUsageError(errorText(r));
-    setUsageError(null);
-    await loadUsage();
-  };
+  const resume = () =>
+    resuming.run(async () => {
+      const r = await api.resumeReviews().catch((): ApiError => ({ error: 'unavailable' }));
+      if (isError(r)) return setUsageError(errorText(r));
+      setUsageError(null);
+      await loadUsage();
+    });
 
   const submit = () => {
     const reviewsPerMonth = intIn(reviews, 1, 1_000_000);
@@ -45,7 +49,8 @@ export function Budgets(props: PolicySectionProps) {
     if (reviewsPerMonth === null) return s.fail('Reviews per month must be a whole number of at least 1.');
     if (tokensInPerReview === null || tokensOutPerReview === null) return s.fail('Token caps must be whole numbers of at least 1.');
     if (agentTimeoutMinutes === null) return s.fail('The agent timeout is 1 to 120 minutes.');
-    void s.save({ budget: { reviewsPerMonth, tokensInPerReview, tokensOutPerReview }, agentSamples: samples, agentTimeoutMinutes });
+    // The whole policy is saved (the resolver takes a full SitePolicy); the budget keeps any field this form does not own.
+    void s.save({ budget: { ...policy.budget, reviewsPerMonth, tokensInPerReview, tokensOutPerReview }, agentSamples: samples, agentTimeoutMinutes });
   };
 
   const used = usage ? Math.min(1, usage.reviews / Math.max(1, usage.budget.reviewsPerMonth)) : 0;
@@ -73,7 +78,9 @@ export function Budgets(props: PolicySectionProps) {
           </p>
           {usage.paused.credits && !usage.paused.budget && (
             <div>
-              <Button onClick={() => void resume()}>Resume reviews</Button>
+              <Button onClick={() => void resume()} isDisabled={resuming.busy}>
+                Resume reviews
+              </Button>
               <span style={{ ...hint, marginLeft: 8 }}>After topping up Rovo credits. The pause also lifts by itself 6 hours after the last agent run.</span>
             </div>
           )}

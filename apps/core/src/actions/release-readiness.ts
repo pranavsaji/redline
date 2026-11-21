@@ -1,8 +1,9 @@
-import { ACCEPTANCE_EVENTS, rebuildAcceptances, releaseReadiness, type ReleaseCall } from '@threatline/core';
+import { rebuildAcceptances, releaseReadiness, type ReleaseCall } from '@threatline/core';
 import type { Severity, Verdict } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { readVerdict } from '../services/verdict-service.js';
+import { acceptanceRowsFor } from '../services/posture-service.js';
 import { callerOf, type ActionPayload } from './common.js';
 import { fitJson, jqlString, parseInput, SCHEMAS, type ActionError } from './schemas.js';
 import { splitVisibleAcceptances } from './visibility.js';
@@ -35,12 +36,11 @@ export async function getReleaseReadiness(payload: ActionPayload & Record<string
   const caller = callerOf(payload);
   if (!caller) return { error: 'not_found' };
   const { fixVersion } = input.value;
-  const [found, policy, ledger] = await Promise.all([
+  const [found, policy] = await Promise.all([
     deps.jira.search(`fixVersion = ${jqlString(fixVersion)} ORDER BY key ASC`, ['summary', 'issuetype', 'project', 'status', 'fixVersions', 'components', 'labels'], RELEASE_MAX_ITEMS + 1),
     deps.config.site(),
-    deps.ledger.ofTypes(ACCEPTANCE_EVENTS),
   ]);
-  if (!found.ok || !policy.ok || !ledger.ok) return { error: 'unavailable' };
+  if (!found.ok || !policy.ok) return { error: 'unavailable' };
   const listed = found.value.filter((i) => !i.issueType.subtask);
   const visible = await deps.jira.browsable(caller, listed.slice(0, RELEASE_MAX_ITEMS).map((i) => i.id));
   if (!visible.ok) return { error: 'unavailable' };
@@ -67,6 +67,8 @@ export async function getReleaseReadiness(payload: ActionPayload & Record<string
   );
   // Only acceptances whose requirement this caller can see are named; the others still make the call Conditional.
   const ids = new Set(items.map((i) => i.issueId));
+  const ledger = await acceptanceRowsFor(deps, [...ids]);
+  if (!ledger.ok) return { error: 'unavailable' };
   const relevant = rebuildAcceptances(ledger.value, now).filter((a) => a.state === 'active' && a.issueId !== undefined && ids.has(a.issueId) && new Date(a.expiresAt) > now);
   const shown = await splitVisibleAcceptances(deps, caller, relevant);
   const hidden = shown.hidden;

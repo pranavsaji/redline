@@ -159,6 +159,14 @@ describe('Admin: policy sections (Task 30)', () => {
     expect(setPolicy).toHaveBeenCalledWith(expect.objectContaining({ techLeadMaxSeverity: 'Low', championGroup: 'threatline-security-champions', techLeadGroup: 'threatline-tech-leads' }));
   });
 
+  it('roles: the tech lead cap offers only Low and Medium (High and above always need a security champion)', async () => {
+    render(<AdminPage api={mockAdminApi()} />);
+    const form = await screen.findByRole('form', { name: 'Roles' });
+    const cap = within(form).getByRole('combobox', { name: 'Tech leads may accept risk up to' }) as HTMLSelectElement;
+    expect([...cap.options].map((o) => o.value)).toEqual(['Low', 'Medium']);
+    expect(screen.getByText(/High and Critical always need a security champion/)).toBeTruthy();
+  });
+
   it('a non-admin sees a plain message instead of the policy', async () => {
     render(<AdminPage api={{ ...mockAdminApi(), getPolicy: async () => ({ error: 'forbidden' as const, message: 'Only a Jira administrator can do this.' }) }} />);
     expect((await screen.findAllByText('Only a Jira administrator can do this.')).length).toBeGreaterThan(0);

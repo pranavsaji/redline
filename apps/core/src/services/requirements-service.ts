@@ -1,4 +1,4 @@
-import { requirementsFor } from '@threatline/core';
+import { appendLedger, requirementsFor } from '@threatline/core';
 import { appError, err, ok, type Evidence, type Requirement, type RequirementStatus, type Result, type Threat } from '@threatline/shared';
 import type { CoreDeps } from '../deps.js';
 import type { AdfDoc, AdfNode, JiraIssue } from '../adapters/jira.js';
@@ -162,13 +162,15 @@ export async function threatVisible(deps: CoreDeps, v: Viewer, threatId: string)
 
 /**
  * RQ-3 / RQ-4. Verified needs evidence, attested by the caller. Not applicable is a security champion's call. Accepted
- * risk only comes from an approved risk acceptance (ledgered), never from a status change.
+ * risk only comes from an approved risk acceptance (ledgered), never from a status change. Every change is ledgered
+ * here, for the panel and agents alike, before it is saved: if the ledger cannot record it, nothing changes.
  */
 export async function setRequirementStatus(
   deps: CoreDeps,
   v: Viewer,
-  input: { requirementId: string; status: RequirementStatus; evidence?: { kind: Evidence['kind']; ref: string } },
-): Promise<Result<Requirement>> {
+  input: { requirementId: string; status: RequirementStatus; evidence?: { kind: Evidence['kind']; ref: string; note?: string } },
+  opts: { viaAgent?: boolean } = {},
+): Promise<Result<{ requirement: Requirement; entryHash: string }>> {
   if (input.status === 'AcceptedRisk') return err(appError('validation', 'Request a risk acceptance in the Threatline panel instead.'));
   const got = await deps.requirements.get(input.requirementId);
   if (!got.ok) return got;
@@ -190,11 +192,26 @@ export async function setRequirementStatus(
     const e = input.evidence;
     if (!e) return err(appError('validation', 'Verified needs evidence: a PR link, a test file path, a Confluence section, or a note.'));
     if ((e.kind === 'pr' || e.kind === 'confluence') && !HTTPS(e.ref)) return err(appError('validation', 'A PR or Confluence link must start with https://.'));
-    next = { ...next, verifiedBy: v.accountId, verifiedAt: deps.clock.now().toISOString(), evidence: { kind: e.kind, ref: e.ref, attester: v.accountId } };
+    next = { ...next, verifiedBy: v.accountId, verifiedAt: deps.clock.now().toISOString(), evidence: { kind: e.kind, ref: e.ref, ...(e.note ? { note: e.note } : {}), attester: v.accountId } };
   }
+  const e = next.evidence;
+  const row = await appendLedger(
+    deps.ledger,
+    deps.clock,
+    input.status === 'Verified' ? 'requirement.verified' : 'requirement.status_changed',
+    { requirementId: req.id, issueId: v.issueId, from: req.status, to: input.status, ...(e ? { evidenceKind: e.kind, evidence: e.ref, ...(e.note ? { note: e.note } : {}) } : {}), viaAgent: opts.viaAgent === true },
+    v.accountId,
+  );
+  if (!row.ok) return row;
   const u = await deps.requirements.upsert(next);
-  if (!u.ok) return u;
+  if (!u.ok) {
+    // The change is recorded before it is saved, so it is never saved unrecorded. When the save then fails, a second
+    // entry says the recorded change did not take effect, so the ledger never shows a change that never happened.
+    const undo = await appendLedger(deps.ledger, deps.clock, 'requirement.status_change_failed', { requirementId: req.id, issueId: v.issueId, failedEntryHash: row.value.entryHash, code: u.error.code }, v.accountId);
+    if (!undo.ok) log('requirement.status_change_failed_unrecorded', { requirementId: req.id, code: undo.error.code });
+    return u;
+  }
   await refreshVerdict(deps, v.issueId);
   await deps.queue.push([{ kind: 'propagate', issueId: v.issueId }]);
-  return ok(next);
+  return ok({ requirement: next, entryHash: row.value.entryHash });
 }

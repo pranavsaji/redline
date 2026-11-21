@@ -40,6 +40,7 @@ export function ThreatCard({
   const [open, setOpen] = useState(false);
   const [explained, setExplained] = useState<ThreatExplanation | null>(null);
   const [explaining, setExplaining] = useState(false);
+  const [explainError, setExplainError] = useState<string | null>(null);
   const bodyId = useId();
   const g = GROUNDING[threat.grounding];
   const runs = threat.origin === 'baseline' ? 'Rule-based' : `${threat.votes} of ${threat.samples} runs`;
@@ -105,17 +106,26 @@ export function ThreatCard({
             </ul>
           </div>
           {!explained ? (
-            <div>
+            <div style={{ display: 'grid', gap: 4, justifyItems: 'start' }}>
               <Button
                 isLoading={explaining}
+                isDisabled={explaining}
                 onClick={async () => {
+                  if (explaining) return;
                   setExplaining(true);
-                  setExplained(await explain(threat));
+                  const r = await explain(threat).catch(() => null);
                   setExplaining(false);
+                  setExplainError(r ? null : 'Threatline could not explain this threat right now. Try again.');
+                  setExplained(r);
                 }}
               >
                 Explain like I’m new to security
               </Button>
+              {explainError && (
+                <p role="alert" style={{ margin: 0, color: token('color.text.danger'), font: token('font.body.small') }}>
+                  {explainError}
+                </p>
+              )}
             </div>
           ) : (
             <section aria-label="Explanation" style={{ background: token('color.background.neutral.subtle'), borderRadius: 6, padding: 8, display: 'grid', gap: 6 }}>

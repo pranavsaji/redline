@@ -22,8 +22,10 @@ export function gitHubClient(o: { api: string; token: string; repo: string; numb
       for (let page = 1; page <= MAX_PAGES; page++) {
         const r = await get(`/pulls/${o.number}/files?per_page=${PER_PAGE}&page=${page}`);
         if (!r.ok) return { ok: false, status: r.status };
-        const batch = (await r.json()) as GitHubFile[];
-        all.push(...batch);
+        const batch = (await r.json()) as unknown;
+        // A page that is not a file list cannot be trusted to be the whole change.
+        if (!Array.isArray(batch)) return { ok: false, status: r.status };
+        all.push(...(batch as GitHubFile[]));
         if (batch.length < PER_PAGE) return { ok: true, value: { files: all, truncated: false } };
       }
       return { ok: true, value: { files: all, truncated: true } };

@@ -71,5 +71,17 @@ export function sqlLedgerRepo(x: SqlExecutor): LedgerRepo {
       const r = await x.query<Row>(`SELECT ${COLS} FROM ledger WHERE event_type IN (${types.map(() => '?').join(', ')}) ORDER BY seq DESC LIMIT ${n}`, [...types]);
       return r.ok ? list([...r.value].reverse()) : r;
     },
+    async ofTypesSince(types, sinceIso) {
+      if (types.length === 0) return ok([]);
+      const r = await x.query<Row>(`SELECT ${COLS} FROM ledger WHERE event_type IN (${types.map(() => '?').join(', ')}) AND created_at >= ? ORDER BY seq ASC`, [...types, sinceIso]);
+      return r.ok ? list(r.value) : r;
+    },
+    async entryHashes(afterSeq, limit) {
+      const n = Math.max(0, Math.min(5000, Math.floor(limit)));
+      if (n === 0) return ok([]);
+      // Only the two columns the Merkle tree needs: a page stays small however large the payloads are.
+      const r = await x.query<{ seq: number; entry_hash: string }>(`SELECT seq, entry_hash FROM ledger WHERE seq > ? ORDER BY seq ASC LIMIT ${n}`, [afterSeq]);
+      return r.ok ? ok(r.value.map((v) => ({ seq: Number(v.seq), entryHash: v.entry_hash }))) : r;
+    },
   };
 }

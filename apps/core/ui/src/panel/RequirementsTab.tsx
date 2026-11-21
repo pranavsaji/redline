@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type MouseEvent } from 'react';
 import type { ApiError } from '../types.js';
 import Button from '@atlaskit/button/new';
 import Lozenge from '@atlaskit/lozenge';
@@ -13,6 +13,7 @@ import { FixBy, TestSkeletonCopy } from './RequirementTools.js';
 import { count } from '../text.js';
 import { useFocusReturn } from '../components/inline-form.js';
 import { field } from './form-styles.js';
+import { useInFlight } from '../components/in-flight.js';
 
 const STATUS_LABEL: Record<RequirementStatus, string> = {
   Open: 'Open',
@@ -37,6 +38,7 @@ function EvidenceLine({ r }: { r: Requirement }) {
       ) : (
         r.evidence.ref
       )}
+      {r.evidence.note ? ` (${r.evidence.note})` : null}
     </span>
   );
 }
@@ -48,29 +50,41 @@ export function RequirementsTab({ dto, api, onChanged }: { dto: PanelDto; api: P
   const [accepting, setAccepting] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const returnTo = useFocusReturn(accepting !== null || verifying !== null, root);
-  const [busy, setBusy] = useState(false);
+  const creating = useInFlight();
+  const busy = creating.busy;
+  /** Status changes, one at a time; the selects are disabled while one saves. */
+  const saving = useInFlight();
   const canEdit = dto.roles.includes('developer');
   const champion = dto.roles.includes('champion');
   const missing = dto.requirements.filter((r) => !r.subtaskKey);
   const openAcceptance = new Set(dto.acceptances.filter((a) => a.state === 'pending' || a.state === 'active').map((a) => a.requirementId));
 
-  const create = async () => {
-    setBusy(true);
-    const r = await api.createRequirements(missing.map((x) => x.threatId)).catch((): ApiError => ({ error: 'unavailable' }));
-    setBusy(false);
-    if (isError(r)) return setNotice(errorTextOf(r));
-    const keys = r.created.map((c) => c.subtaskKey);
-    const failed = r.skipped.filter((s) => s.reason === 'failed').length;
-    setNotice(`${keys.length > 0 ? `Created ${keys.join(', ')}.` : 'No new sub-tasks were needed.'}${failed > 0 ? ` ${failed} could not be created; try again.` : ''}`);
-    onChanged();
-  };
+  const create = () =>
+    creating.run(async () => {
+      const r = await api.createRequirements(missing.map((x) => x.threatId)).catch((): ApiError => ({ error: 'unavailable' }));
+      if (isError(r)) return setNotice(errorTextOf(r));
+      const keys = r.created.map((c) => c.subtaskKey);
+      const failed = r.skipped.filter((s) => s.reason === 'failed').length;
+      setNotice(`${keys.length > 0 ? `Created ${keys.join(', ')}.` : 'No new sub-tasks were needed.'}${failed > 0 ? ` ${failed} could not be created; try again.` : ''}`);
+      onChanged();
+    });
 
   const change = async (r: Requirement, status: RequirementStatus) => {
+    if (saving.busy) return;
     if (status === 'Verified') return (returnTo(`[data-status="${r.id}"]`), setVerifying(r.id));
     setVerifying(null);
-    const out = await api.setStatus(r.id, status).catch((): ApiError => ({ error: 'unavailable' }));
-    if (isError(out)) setNotice(errorTextOf(out));
-    else onChanged();
+    await saving.run(async () => {
+      const out = await api.setStatus(r.id, status).catch((): ApiError => ({ error: 'unavailable' }));
+      if (isError(out)) setNotice(errorTextOf(out));
+      else onChanged();
+    });
+  };
+
+  /** Custom UI runs on Atlassian's CDN origin, so a relative /browse link must go through the Forge router to reach Jira. */
+  const openIssue = (e: MouseEvent<HTMLAnchorElement>, key: string) => {
+    if (!api.navigate) return;
+    e.preventDefault();
+    void api.navigate(`/browse/${key}`, { newTab: e.metaKey || e.ctrlKey || e.shiftKey }).catch(() => setNotice(`Could not open ${key}. Find it in Jira search.`));
   };
 
   return (
@@ -98,7 +112,7 @@ export function RequirementsTab({ dto, api, onChanged }: { dto: PanelDto; api: P
               <strong>{r.title}</strong>
               <FixBy requirement={r} />
               {r.subtaskKey && (
-                <a href={`/browse/${r.subtaskKey}`} target="_top" style={{ color: token('color.link') }}>
+                <a href={`/browse/${r.subtaskKey}`} target="_top" onClick={(e) => openIssue(e, r.subtaskKey!)} style={{ color: token('color.link') }}>
                   {r.subtaskKey}
                 </a>
               )}
@@ -113,7 +127,7 @@ export function RequirementsTab({ dto, api, onChanged }: { dto: PanelDto; api: P
             {canEdit && r.status !== 'AcceptedRisk' && (
               <label style={{ display: 'flex', gap: 6, alignItems: 'center', font: token('font.body.small') }}>
                 Status
-                <select aria-label="Status" data-status={r.id} value={verifying === r.id ? 'Verified' : r.status} onChange={(e) => void change(r, e.target.value as RequirementStatus)} style={field}>
+                <select aria-label="Status" data-status={r.id} value={verifying === r.id ? 'Verified' : r.status} onChange={(e) => void change(r, e.target.value as RequirementStatus)} disabled={saving.busy} style={field}>
                   <option value="Open">Open</option>
                   <option value="InProgress">In progress</option>
                   <option value="Verified">Verified</option>

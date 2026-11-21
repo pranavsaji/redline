@@ -51,7 +51,8 @@ modules:
       resolver:
         function: panelResolverFn
       title: Threatline security review
-      icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+      # The brand icon, bundled (docs/brand/icon.svg); Forge accepts resource:<key>;<path> for module icons.
+      icon: resource:icons;threatline.svg
   jira:adminPage:
     - key: threatline-admin
       resource: panel
@@ -212,8 +213,8 @@ modules:
         controls:
           title: Compensating controls
           type: string
-          required: false
-          description: What reduces the risk meanwhile, for example a WAF rule
+          required: true
+          description: What reduces the risk meanwhile, for example a WAF rule or a feature flag, at least 8 characters
         expiryDays:
           title: Expiry in days
           type: integer
@@ -376,6 +377,8 @@ resources:
     path: ui/build
   - key: agent-prompt
     path: agent
+  - key: icons
+    path: icons
 permissions:
   scopes:
     read:jira-work:

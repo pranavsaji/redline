@@ -21,9 +21,16 @@ const label = (r: Pick<Requirement, 'subtaskKey' | 'severity'>) => r.subtaskKey 
 /** Acceptances as the ledger events alone say (no time-based expiry applied), to find the ones that still need an expiry entry. */
 const byEvents = (rows: readonly LedgerRow[]) => rebuildAcceptances(rows, new Date(0));
 
-/** Every acceptance event (the hourly expiry sweep), or, with an issue, that work item's only (indexed; scale). */
+/**
+ * Scale: an acceptance expires at most 365 days after its request, and the hourly sweep closes it then, so the sweep
+ * reads the acceptance events of the last 400 days (indexed on type and time) rather than every one ever written.
+ */
+const SWEEP_WINDOW_MS = 400 * 86_400_000;
+
+/** The recent acceptance events (the hourly expiry sweep), or, with an issue, that work item's only (indexed; scale). */
 async function ledgerRows(deps: CoreDeps, issueId?: string): Promise<Result<LedgerRow[]>> {
-  return issueId ? deps.ledger.forIssues(ACCEPTANCE_EVENTS, [issueId]) : deps.ledger.ofTypes(ACCEPTANCE_EVENTS);
+  if (issueId) return deps.ledger.forIssues(ACCEPTANCE_EVENTS, [issueId]);
+  return deps.ledger.ofTypesSince(ACCEPTANCE_EVENTS, new Date(deps.clock.now().getTime() - SWEEP_WINDOW_MS).toISOString());
 }
 
 async function setStatus(deps: CoreDeps, requirementId: string, from: Requirement['status'][], to: Requirement['status']): Promise<Result<void>> {
@@ -135,20 +142,24 @@ export async function decideAcceptance(
   const { a } = found.value;
   const policy = await deps.config.site();
   if (!policy.ok) return policy;
-  const roles = await rolesOf(deps, v.accountId, v.issueId, policy.value);
-  const allowed = canApprove(a, { accountId: v.accountId, roles }, policy.value);
-  if (!allowed.ok) return allowed;
   const approve = input.decision === 'approve';
+  const req = await deps.requirements.get(a.requirementId);
+  if (!req.ok) return req;
+  if (approve && !req.value) return err(appError('not_found', 'This requirement no longer exists, so there is nothing to accept. Reject the request.'));
+  // Approving is judged on the requirement as it is now (a re-review or triage may have raised it), not as it was requested.
+  const severity = approve && req.value ? req.value.severity : a.severity;
+  const roles = await rolesOf(deps, v.accountId, v.issueId, policy.value);
+  const allowed = canApprove(a, { accountId: v.accountId, roles }, policy.value, severity);
+  if (!allowed.ok) return allowed;
   const row = await appendLedger(
     deps.ledger,
     deps.clock,
     approve ? 'acceptance.approved' : 'acceptance.rejected',
-    { acceptanceId: a.id, requirementId: a.requirementId, issueId: v.issueId, ...(input.note?.trim() ? { note: input.note.trim() } : {}) },
+    { acceptanceId: a.id, requirementId: a.requirementId, issueId: v.issueId, ...(approve ? { severity } : {}), ...(input.note?.trim() ? { note: input.note.trim() } : {}) },
     v.accountId,
   );
   if (!row.ok) return row;
-  const req = await deps.requirements.get(a.requirementId);
-  const name = req.ok && req.value ? label(req.value) : `a ${a.severity} security requirement`;
+  const name = req.value ? label(req.value) : `a ${a.severity} security requirement`;
   if (approve) {
     const s = await setStatus(deps, a.requirementId, ['Open', 'InProgress'], 'AcceptedRisk');
     if (!s.ok) log('acceptance.status_failed', { requirementId: a.requirementId, code: s.error.code });

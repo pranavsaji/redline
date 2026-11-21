@@ -41,7 +41,9 @@ export function memoryReviewRepo(): ReviewRepo & { _reviews: Map<string, Review>
       return ok([...reviews.values()].filter((r) => r.issueId === issueId).sort((a, b) => a.revision - b.revision).map(clone));
     },
     async byStatus(status, olderThan) {
-      return ok([...reviews.values()].filter((r) => r.status === status && (!olderThan || r.updatedAt < olderThan)).map(clone));
+      // Like SQL: oldest first, at most 200.
+      const list = [...reviews.values()].filter((r) => r.status === status && (!olderThan || r.updatedAt < olderThan)).sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+      return ok(list.slice(0, 200).map(clone));
     },
     async create(r) {
       if (reviews.has(r.id)) return err(appError('conflict', `review ${r.id} exists`));
@@ -53,6 +55,19 @@ export function memoryReviewRepo(): ReviewRepo & { _reviews: Map<string, Review>
       if (!r) return err(appError('not_found', `review ${id}`));
       reviews.set(id, { ...r, ...clone(patch) });
       return ok(undefined);
+    },
+    async updateWhere(id, expect, patch) {
+      const r = reviews.get(id);
+      if (!r) return ok(false);
+      if (expect.status !== undefined && r.status !== expect.status) return ok(false);
+      if (expect.samplesReceivedAtMost !== undefined && r.samplesReceived > expect.samplesReceivedAtMost) return ok(false);
+      reviews.set(id, { ...r, ...clone(patch) });
+      return ok(true);
+    },
+    async updatedSince(status, since, limit) {
+      const n = Math.max(1, Math.min(500, Math.floor(limit)));
+      const list = [...reviews.values()].filter((r) => r.status === status && r.updatedAt >= since).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      return ok(list.slice(0, n).map(clone));
     },
     async reserveUsage(id, est, cap) {
       const r = reviews.get(id);
@@ -75,6 +90,8 @@ export function memoryReviewRepo(): ReviewRepo & { _reviews: Map<string, Review>
       return ok(clone(facts.get(reviewId) ?? []));
     },
     async saveThreats(reviewId, t, d) {
+      // Like the SQL primary key: threat ids are unique, and a refused save writes nothing.
+      if (new Set(t.map((x) => x.id)).size !== t.length) return err(appError('conflict', 'duplicate threat id'));
       threats.set(reviewId, clone(t));
       discarded.set(reviewId, clone(d));
       return ok(undefined);
@@ -184,6 +201,13 @@ export function memoryLedgerRepo(): LedgerRepo & { _rows: LedgerRow[] } {
     async latestOfTypes(types, limit) {
       return ok(rows.filter((r) => types.includes(r.eventType)).slice(-Math.max(0, limit)).map((r) => ({ ...r, payload: { ...r.payload } })));
     },
+    async ofTypesSince(types, sinceIso) {
+      return ok(rows.filter((r) => types.includes(r.eventType) && r.createdAt >= sinceIso).map(clone));
+    },
+    async entryHashes(afterSeq, limit) {
+      const n = Math.max(0, Math.min(5000, Math.floor(limit)));
+      return ok(rows.filter((r) => r.seq > afterSeq).sort((a, b) => a.seq - b.seq).slice(0, n).map((r) => ({ seq: r.seq, entryHash: r.entryHash })));
+    },
   };
 }
 
@@ -251,6 +275,7 @@ export function memoryAttestationRepo(): AttestationRepo {
 
 export function memoryUsageRepo(): UsageRepo {
   const m = new Map<string, { tokensIn: number; tokensOut: number; reviews: number }>();
+  const slots = new Map<string, { window: string; used: number }>();
   return {
     async add(month, d) {
       const cur = m.get(month) ?? { tokensIn: 0, tokensOut: 0, reviews: 0 };
@@ -259,6 +284,19 @@ export function memoryUsageRepo(): UsageRepo {
     },
     async get(month) {
       return ok(m.get(month) ?? { tokensIn: 0, tokensOut: 0, reviews: 0 });
+    },
+    async takeSlot(bucket, window, limit) {
+      const cur = slots.get(bucket);
+      const used = cur && cur.window === window ? cur.used : 0;
+      if (used >= limit) return ok(null);
+      slots.set(bucket, { window, used: used + 1 });
+      return ok(used + 1);
+    },
+    async reserveReview(month, cap) {
+      const cur = m.get(month) ?? { tokensIn: 0, tokensOut: 0, reviews: 0 };
+      if (cur.reviews + 1 > cap) return ok(false);
+      m.set(month, { ...cur, reviews: cur.reviews + 1 });
+      return ok(true);
     },
   };
 }

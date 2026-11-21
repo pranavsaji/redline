@@ -78,7 +78,9 @@ export function httpJson(request: FetchLike, opts: HttpOptions = {}) {
       const text = await res.text().catch(() => '');
       if (res.status < 200 || res.status >= 300) {
         const msg = errorMessage(text);
-        return err(appError(statusCode(res.status), `${method} ${path.split('?')[0]} → ${res.status}${msg ? `: ${msg}` : ''}`, { status: res.status }));
+        // The message is for logs only; `upstream` marks it so resolvers and actions show a plain one instead (errors.ts).
+        const upstream = path.startsWith('/wiki') ? 'Confluence' : 'Jira';
+        return err(appError(statusCode(res.status), `${method} ${path.split('?')[0]} → ${res.status}${msg ? `: ${msg}` : ''}`, { status: res.status, upstream }));
       }
       if (text.trim() === '') return ok(undefined);
       try {

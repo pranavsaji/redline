@@ -6,7 +6,7 @@ import type { Sample } from '@threatline/core';
 import type { CoreDeps } from '../deps.js';
 import { log } from '../adapters/log.js';
 import { ReviewJobSchema, type ReviewJob } from '../jobs/types.js';
-import { isBudgetPaused, monthOf } from '../services/budget.js';
+import { monthOf, pauseReasons } from '../services/budget.js';
 import { contextKey, refreshVerdict } from '../services/verdict-service.js';
 import { isPublished, publishThreatModel } from '../services/confluence-page.js';
 
@@ -46,9 +46,14 @@ async function applyAssembly(deps: CoreDeps, review: Review, bundle: ContextBund
   }
   const prior = await priorRevision(deps, review);
   if (!prior.ok) return prior;
-  // Threatline Engine: the quarantined extractor's model-based injection signal counts like a flagged fact.
+  // Threatline Engine: the quarantined extractor's model-based injection signal counts like a flagged fact. Fail closed:
+  // in an engine review, an injection check that failed or never completed counts as suspected (as for the verifier).
   const extract = await deps.reviews.stage(review.id, 'extract');
-  const extractorFlag = extract.ok && extract.value?.status === 'done' && (extract.value.checkpoint as { sketch?: { injectionSuspected?: boolean } } | undefined)?.sketch?.injectionSuspected === true;
+  if (!extract.ok) return extract;
+  const extractorFlag =
+    extract.value?.status === 'done'
+      ? (extract.value.checkpoint as { sketch?: { injectionSuspected?: boolean } } | undefined)?.sketch?.injectionSuspected === true
+      : samples.length > 0 && (await isEngineReview(deps, review.id));
   const out = assembleReview({
     review, bundle, samples, samplesExpected: review.samplesExpected, priorDismissed, policy, promptVersion: PROMPT_VERSION, now: deps.clock.now(), mode,
     ...(extractorFlag ? { injectionSuspected: true } : {}),
@@ -102,6 +107,13 @@ async function gather(deps: CoreDeps, job: Extract<ReviewJob, { kind: 'gather' }
   }
 
   const prev = latest.value;
+  // Resumable: a retried gather whose first attempt created this revision but failed before starting it (facts,
+  // threats, engine runs) finishes those steps now, instead of leaving a review nobody runs.
+  if (prev && prev.contextHash === b.contextHash) {
+    const unstarted = await isUnstarted(deps, prev);
+    if (!unstarted.ok) return unstarted;
+    if (unstarted.value) return startReview(deps, prev, b, policy.value, job.reason);
+  }
   // New revisions: first review; explicit re-run; a create whose content differs. Edits and page changes only mark the
   // review out of date (verdict review_stale with a one-click re-run), so no agent run is left waiting for nobody.
   const createNew = !prev || job.reason === 'rerun' || (job.reason === 'created' && prev.contextHash !== b.contextHash);
@@ -112,26 +124,37 @@ async function gather(deps: CoreDeps, job: Extract<ReviewJob, { kind: 'gather' }
   }
 
   const now = deps.clock.now();
-  const paused = await isBudgetPaused(deps, policy.value, now);
-  if (!paused.ok) return paused;
+  const month = monthOf(now);
+  const reasons = await pauseReasons(deps, policy.value, now);
+  if (!reasons.ok) return reasons;
+  const rulesOnlyMode = policy.value.reviewMode === 'rules_only';
+  // The month's review count is reserved atomically (increment-then-check), so parallel gathers at the cap cannot all
+  // start one. Rules-only reviews use no AI and are not counted (they still pause at the budget, as before).
+  let paused = reasons.value.credits || (rulesOnlyMode && reasons.value.budget);
+  let reserved = false;
+  if (!paused && !rulesOnlyMode) {
+    const r = await deps.usage.reserveReview(month, policy.value.budget.reviewsPerMonth);
+    if (!r.ok) return r;
+    reserved = r.value;
+    paused = !r.value;
+  }
   const revision = (prev?.revision ?? 0) + 1;
-  // Rules-only mode (no Rovo on the site): the review is settled now from the rule-based checks; no AI, no budget.
-  const rulesOnly = !paused.value && policy.value.reviewMode === 'rules_only';
-  // Threatline Engine: Threatline runs the review itself on Forge LLMs (no Rovo, no Automation rule).
-  const engine = !paused.value && policy.value.reviewMode === 'engine';
+  // Rules-only mode (no Rovo on the site): the review is settled from the rule-based checks; no AI, no budget.
+  const rulesOnly = !paused && rulesOnlyMode;
   const review: Review = {
     id: `rev_${job.issueId}_${revision}`,
     issueId: job.issueId,
     issueKey: b.issueKey,
     revision,
-    status: paused.value ? 'failed' : rulesOnly ? 'ready' : 'awaiting_agent',
-    ...(paused.value ? { failureReason: 'budget' } : {}),
+    // A rules-only review becomes ready only once its threats are stored (startReview), never before.
+    status: paused ? 'failed' : 'awaiting_agent',
+    ...(paused ? { failureReason: 'budget' } : {}),
     contextHash: b.contextHash,
     riskScore: 0,
     partial: b.partial,
     promptVersion: PROMPT_VERSION,
     modelIds: rulesOnly ? [RULES_ONLY_MODEL] : [],
-    samplesExpected: paused.value || rulesOnly ? 0 : policy.value.agentSamples,
+    samplesExpected: paused || rulesOnly ? 0 : policy.value.agentSamples,
     samplesReceived: 0,
     tokensIn: 0,
     tokensOut: 0,
@@ -140,35 +163,74 @@ async function gather(deps: CoreDeps, job: Extract<ReviewJob, { kind: 'gather' }
   };
   const created = await deps.reviews.create(review);
   if (!created.ok) {
-    // A concurrent gather already created this revision: the work is done, just refresh.
+    // This attempt did not create the review, so it does not count it (whoever created it counted it).
+    if (reserved) {
+      const back = await deps.usage.add(month, { tokensIn: 0, tokensOut: 0, reviews: -1 });
+      if (!back.ok) log('budget.release_failed', { issueId: job.issueId, code: back.error.code });
+    }
+    // A concurrent gather already created this revision: finish starting it if nobody has, else just refresh.
     if (created.error.code === 'conflict') {
+      const existing = await deps.reviews.get(review.id);
+      if (!existing.ok) return existing;
+      if (existing.value && existing.value.contextHash === b.contextHash) {
+        const unstarted = await isUnstarted(deps, existing.value);
+        if (!unstarted.ok) return unstarted;
+        if (unstarted.value) return startReview(deps, existing.value, b, policy.value, job.reason);
+      }
       await refreshVerdict(deps, job.issueId);
       return voidOk();
     }
     return created;
   }
+  return startReview(deps, review, b, policy.value, job.reason);
+}
+
+/**
+ * The `gather` stage (the run trace's first step) is written once a review's gather has started it, as its last step:
+ * a review without it was created by a gather that failed part-way.
+ */
+const STARTED_STAGE = 'gather';
+
+/** A review that was created but not started (and nothing has run on yet): a retried gather finishes it. */
+async function isUnstarted(deps: CoreDeps, review: Review): Promise<Result<boolean>> {
+  if (review.status !== 'awaiting_agent' || review.samplesReceived > 0) return ok(false);
+  const [started, samples] = await Promise.all([deps.reviews.stage(review.id, STARTED_STAGE), deps.reviews.samples(review.id)]);
+  if (!started.ok) return started;
+  if (!samples.ok) return samples;
+  return ok(!started.value && samples.value.length === 0);
+}
+
+/**
+ * Everything after the review row exists (its review count was reserved before it was created): facts, the
+ * provisional assembly, the engine's first stage, then the marker that it started. Every step is idempotent, so a
+ * retried gather runs them again safely.
+ */
+async function startReview(deps: CoreDeps, review: Review, b: ContextBundle, policy: SitePolicy, reason: string): Promise<Result<void>> {
+  const now = deps.clock.now();
+  const paused = review.status === 'failed' && review.failureReason === 'budget';
+  const rulesOnly = !paused && review.modelIds.includes(RULES_ONLY_MODEL);
+  // Threatline Engine: Threatline runs the review itself on Forge LLMs (no Rovo, no Automation rule).
+  const engine = !paused && !rulesOnly && policy.reviewMode === 'engine';
   const facts = await deps.reviews.saveFacts(review.id, b.facts);
   if (!facts.ok) return facts;
-  await trace(deps, review.id, 'gather', paused.value ? 'failed' : 'done', paused.value ? 'budget' : undefined);
-  const out = await applyAssembly(deps, review, b, [], policy.value, rulesOnly ? 'final' : 'progress');
+  const out = await applyAssembly(deps, review, b, [], policy, rulesOnly ? 'final' : 'progress');
   if (!out.ok) return out;
-  const upd = await deps.reviews.update(review.id, { riskScore: out.value.riskScore, updatedAt: now.toISOString() });
+  const upd = await deps.reviews.update(review.id, { riskScore: out.value.riskScore, ...(rulesOnly ? { status: 'ready' as const } : {}), updatedAt: now.toISOString() });
   if (!upd.ok) return upd;
-  if (!paused.value && !rulesOnly) {
-    const u = await deps.usage.add(monthOf(now), { tokensIn: 0, tokensOut: 0, reviews: 1 });
-    if (!u.ok) return u;
-  }
   if (engine) {
     // Marks the review as Threatline Engine's. The quarantined injection check runs first; it then starts the runs.
-    await deps.reviews.saveStage(review.id, 'engine', 'done', { runs: review.samplesExpected }, undefined, now.toISOString());
+    const m = await deps.reviews.saveStage(review.id, 'engine', 'done', { runs: review.samplesExpected }, undefined, now.toISOString());
+    if (!m.ok) return m;
     const q = await deps.queue.push([{ kind: 'engine', reviewId: review.id, stage: 'extract' }]);
     if (!q.ok) return q;
   }
-  log('review.created', { issueId: job.issueId, revision, reason: job.reason, paused: paused.value, partial: b.partial, engine });
-  const v = await refreshVerdict(deps, job.issueId);
+  const started = await deps.reviews.saveStage(review.id, STARTED_STAGE, paused ? 'failed' : 'done', undefined, paused ? 'budget' : undefined, deps.clock.now().toISOString());
+  if (!started.ok) return started;
+  log('review.created', { issueId: review.issueId, revision: review.revision, reason, paused, partial: b.partial, engine });
+  const v = await refreshVerdict(deps, review.issueId);
   if (!v.ok) return v;
   // A published page now trails the newest revision: re-publish so it says it is out of date.
-  return afterChange(deps, job.issueId, true);
+  return afterChange(deps, review.issueId, true);
 }
 
 /** The run trace the admin page shows (review_stages). Best effort: a trace write never fails the review. */
@@ -188,19 +250,40 @@ async function traceSamples(deps: CoreDeps, reviewId: string, samples: readonly 
   }
 }
 
-async function assemble(deps: CoreDeps, reviewId: string): Promise<Result<void>> {
+/** Is this review still its work item's newest revision? Jobs of a superseded one must not touch shared rows. */
+async function isCurrentRevision(deps: Pick<CoreDeps, 'reviews'>, review: Pick<Review, 'id' | 'issueId'>): Promise<Result<boolean>> {
+  const l = await deps.reviews.latest(review.issueId);
+  if (!l.ok) return l;
+  return ok(!l.value || l.value.id === review.id);
+}
+
+/** An assembly assembles again when a newer run lands while it works, at most this many times. */
+const MAX_REASSEMBLY = 6;
+
+async function assemble(deps: CoreDeps, reviewId: string, again = 0): Promise<Result<void>> {
   const got = await deps.reviews.get(reviewId);
   if (!got.ok) return got;
   const review = got.value;
   if (!review) return err(appError('not_found', `review ${reviewId} not found`));
   if (review.status === 'failed' && review.failureReason === 'budget') return refreshVerdict(deps, review.issueId).then(() => voidOk());
+  const current = await isCurrentRevision(deps, review);
+  if (!current.ok) return current;
+  if (!current.value) {
+    log('assemble.superseded', { reviewId });
+    return voidOk();
+  }
   const policy = await deps.config.site();
   if (!policy.ok) return policy;
   const [samples, facts, issue] = await Promise.all([deps.reviews.samples(reviewId), deps.reviews.facts(reviewId), deps.jira.issue(review.issueId)]);
   if (!samples.ok) return samples;
-  // M3: a settled review with no new samples is not assembled again (a redelivered job would overwrite champion triage).
+  // M3: a settled review is not assembled again. A redelivered job, or a run arriving after the review settled (after
+  // the timeout), would overwrite champion triage, so late runs are ignored. (`again` is this job assembling again
+  // after a concurrent assembly, below.)
   const settled = review.status !== 'awaiting_agent' && review.status !== 'agent_timeout';
-  if (settled && samples.value.length <= review.samplesReceived) return refreshVerdict(deps, review.issueId).then((v) => (v.ok ? voidOk() : v));
+  if (settled && again === 0) {
+    if (samples.value.length > review.samplesReceived) log('assemble.late_runs_ignored', { reviewId, received: samples.value.length, assembled: review.samplesReceived });
+    return refreshVerdict(deps, review.issueId).then((v) => (v.ok ? voidOk() : v));
+  }
   if (!facts.ok) return facts;
   const bundle: ContextBundle = {
     issueId: review.issueId,
@@ -213,15 +296,32 @@ async function assemble(deps: CoreDeps, reviewId: string): Promise<Result<void>>
     // Trusted component names come from Jira, never from the samples.
     components: issue.ok ? issue.value.components : [],
   };
+  const k = samples.value.length;
   const mode = review.status === 'agent_timeout' ? 'final' : 'progress';
   const out = await applyAssembly(deps, review, bundle, samples.value, policy.value, mode);
   if (!out.ok) return out;
+  // Concurrency: runs are only ever added. If one landed while this assembled, another job may already have written a
+  // newer assembly that this one just overwrote, so assemble again: the last threat write always saw every run.
+  const latestSamples = await deps.reviews.samples(reviewId);
+  if (!latestSamples.ok) return latestSamples;
+  if (latestSamples.value.length > k && again < MAX_REASSEMBLY) return assemble(deps, reviewId, again + 1);
   const status = review.status === 'failed' ? 'failed' : out.value.status;
-  const upd = await deps.reviews.update(review.id, { status, riskScore: out.value.riskScore, samplesReceived: samples.value.length, updatedAt: deps.clock.now().toISOString() });
+  const failureReason = status === 'failed' || status === 'agent_timeout' ? out.value.failureReason : undefined;
+  // Compare-and-set: a stale assembly (fewer runs, or one that read the status before the sweeper timed the review out)
+  // never overwrites what a newer one wrote; it assembles again from the current row instead.
+  const upd = await deps.reviews.updateWhere(
+    review.id,
+    { samplesReceivedAtMost: k, status: review.status },
+    { status, riskScore: out.value.riskScore, samplesReceived: k, ...(failureReason ? { failureReason } : {}), updatedAt: deps.clock.now().toISOString() },
+  );
   if (!upd.ok) return upd;
+  if (!upd.value) {
+    log('assemble.superseded_by_newer', { reviewId, samples: k });
+    return again < MAX_REASSEMBLY ? assemble(deps, reviewId, again + 1) : voidOk();
+  }
   await traceSamples(deps, review.id, samples.value);
-  await trace(deps, review.id, 'assemble', status === 'failed' ? 'failed' : 'done', status === 'failed' ? (review.failureReason ?? 'failed') : undefined);
-  log('review.assembled', { reviewId, status, samples: samples.value.length });
+  await trace(deps, review.id, 'assemble', status === 'failed' ? 'failed' : 'done', status === 'failed' ? (failureReason ?? review.failureReason ?? 'failed') : undefined);
+  log('review.assembled', { reviewId, status, samples: k });
   // Threatline Engine: once settled, the verifier runs (once); a later re-assembly re-applies its stored verdicts.
   if (status === 'ready' && (await isEngineReview(deps, review.id))) {
     const verified = await deps.reviews.stage(review.id, 'verify');
